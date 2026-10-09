@@ -1,0 +1,89 @@
+{
+ "lights": [
+  {
+   "pos": [
+    0,
+    2.2,
+    -0.3
+   ],
+   "color": "#ffe0c0",
+   "energy": 25
+  },
+  {
+   "pos": [
+    -1.0,
+    1.7,
+    -1.0
+   ],
+   "color": "#ffd0a0",
+   "energy": 6
+  }
+ ],
+ "markers": [
+  {
+   "kind": "door",
+   "id": "bruecke",
+   "pos": [
+    0,
+    0,
+    1.9
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "Zum Kommandodeck"
+  },
+  {
+   "kind": "terminal",
+   "id": "kabine_terminal",
+   "pos": [
+    0.9,
+    0,
+    -0.4
+   ],
+   "dir": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "label": "Terminal (Speichern \u00b7 Logbuch)"
+  },
+  {
+   "kind": "terminal",
+   "id": "bett",
+   "pos": [
+    -0.6,
+    0,
+    -1.0
+   ],
+   "dir": [
+    -1.0,
+    0.0,
+    -0.0
+   ],
+   "label": "Schlafen (neuer Tag)"
+  },
+  {
+   "kind": "spawn",
+   "id": "default",
+   "pos": [
+    0,
+    0,
+    1.5
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  }
+ ],
+ "window_dir": [
+  0,
+  0,
+  -1
+ ],
+ "lightScale": 2.0
+}

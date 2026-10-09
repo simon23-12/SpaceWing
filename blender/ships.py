@@ -158,17 +158,247 @@ def wespe():
 
 SHIPS = {'spacewing': spacewing, 'wespe': wespe}
 
-ship_id = BL_ARGS[0]
-flags = BL_ARGS[1:]
-swlib.fresh()
-swship.MATS.clear()
-P, E, cam = SHIPS[ship_id]()
-prev = swlib.out('ships', ship_id, 'preview.jpg')
-if '--no-preview' not in flags:
-    swship.studio_preview(prev, cam['center'], cam['dist'], samples=int(os.environ.get('SW_SAMPLES', 96)))
-res = {'preview': prev}
-if '--preview-only' not in flags:
-    path, hull = swship.finalize_ship(ship_id, P, E)
-    res['glb'] = path
-    res['tris'] = sum(len(p.vertices) - 2 for p in hull.data.polygons)
-result = res
+
+def _mule(rusty):
+    """Mule MT-3 bulk hauler (~36 m). 'Sankt Rostig' is a 40 year old example."""
+    sfx = 'rost' if rusty else 'mule'
+    paint = mat_paint('hull_' + sfx, '#7d8a7a' if rusty else '#c9c2b0', color2='#5d5f5a' if rusty else '#8a8f94',
+                      wear=0.9 if rusty else 0.35, rust=0.7 if rusty else 0.0, dirt=0.8 if rusty else 0.4,
+                      scale=0.7, stripe=('y', 13.2, 0.8), stripe_color='#c8901a')
+    cont = mat_paint('cont_' + sfx, '#2f5a7a' if not rusty else '#7a3b22', color2='#a8692a' if rusty else '#c9b25a',
+                     wear=0.7, rust=0.4 if rusty else 0.05, dirt=0.6, scale=0.6, panel=0.6)
+    metal = mat_metal('metal_' + sfx, '#5f6164', 0.45, metal=0.7)
+    dark = mat_rubber('dark_' + sfx)
+    glow = mat_emit('glow_engine_' + sfx, '#ffb070' if rusty else '#8fc4ff', 10)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_' + sfx)
+    P = []
+    cab = loft('cabin', [
+        dict(y=18.6, w=0.3, h=0.3, z=0.6),
+        dict(y=18.0, w=3.2, h=2.6, z=0.4, e=3.2, flat=0.8),
+        dict(y=16.4, w=4.6, h=3.6, z=0.3, e=4.0, flat=0.85),
+        dict(y=13.0, w=5.0, h=3.8, z=0.2, e=4.5),
+        dict(y=11.5, w=4.2, h=3.0, z=0.2, e=4.5),
+    ], paint, n=36)
+    P.append(cab)
+    P.append(sphere('canopy', glass, 1.0, (0, 16.9, 1.35), scale=(1.7, 1.2, 0.75)))
+    P.append(box('spine', metal, (1.6, 26.0, 1.4), (0, -1.5, 0.0), bevel=0.08))
+    for i in range(6):
+        P.append(box(f'truss{i}', metal, (3.8, 0.4, 0.4), (0, 9.0 - i * 4.4, 0.0)))
+    k = 0
+    for i in range(5):
+        y = 8.0 - i * 4.4
+        for sx in (-1, 1):
+            for sz in (-1, 1):
+                if rusty and (i, sx, sz) in ((3, 1, -1), (1, -1, 1)):
+                    continue
+                P.append(box(f'container{k}', cont, (2.3, 4.0, 2.3), (sx * 1.6, y, sz * 1.25), bevel=0.06)); k += 1
+    eng_block = loft('engblock', [
+        dict(y=-13.0, w=4.0, h=3.4, e=4.0), dict(y=-14.5, w=6.4, h=4.6, e=4.5),
+        dict(y=-19.0, w=6.6, h=4.8, e=4.5), dict(y=-20.0, w=5.8, h=4.2, e=4.0)], paint, n=36)
+    P.append(eng_block)
+    exh = []
+    for i, (x, z) in enumerate(((-1.7, 0.9), (1.7, 0.9), (0.0, -1.2))):
+        P.append(lathe(f'noz{i}', [(-20.0, 1.0), (-21.6, 1.25), (-22.4, 1.45)], dark, axis_pos=(x, 0, z)))
+        P.append(cyl(f'eglow{i}', glow, 0.95, 0.05, (x, -20.2, z)))
+        exh.append(empty(f'exhaust_{i}', (x, -22.6, z)))
+    for sx in (-1, 1):
+        P.append(box('radiator', metal, (5.0, 3.0, 0.08), (sx * 5.2, -16.5, 0.0), bevel=0.02))
+    P.append(cyl('dish_mast', metal, 0.06, 2.0, (1.4, 14.0, 2.6), rot=(0, 0, 0)))
+    P.append(sphere('dish', metal, 0.6, (1.4, 14.0, 3.6), scale=(1, 1, 0.3)))
+    P += greebles(cab, metal, count=26, size=(0.25, 0.8), height=(0.04, 0.12), seed=11,
+                  region=lambda h: not (h.z > 0.6 and h.y > 15.0))
+    P += greebles(eng_block, metal, count=20, size=(0.3, 0.9), height=(0.05, 0.15), seed=12)
+    P += nav_lights((-5.4, 13.0, 0.4), (5.4, 13.0, 0.4), (0, -14.0, 2.5), gr, gg, gw)
+    E = exh + [empty('gun_0', (0, 19.0, 2.4)), empty('turret', (0, 6.0, 2.8)), empty('cockpit', (0, 17.4, 1.7))]
+    # dorsal turret (Mags' gun)
+    P.append(cyl('turret_base', metal, 0.9, 0.5, (0, 6.0, 2.1), rot=(0, 0, 0)))
+    P.append(sphere('turret_dome', paint, 0.8, (0, 6.0, 2.5), scale=(1, 1, 0.6)))
+    P.append(cyl('turret_gun', dark, 0.1, 2.4, (0, 7.4, 2.7)))
+    return P, E, dict(dist=70, center=(0, -1, 0))
+
+
+def sankt_rostig(): return _mule(True)
+def mule(): return _mule(False)
+
+
+def lanze():
+    """Titan-Konsortium 'Lanze' interceptor – white enamel and gold, very clean."""
+    paint = mat_paint('hull_lanze', '#e9e4d8', color2='#c9a24a', wear=0.12, rust=0.0, dirt=0.15, metal=0.35, rough=0.25,
+                      stripe=('x', 0.0, 0.35), stripe_color='#c9a24a')
+    gold = mat_metal('metal_lanze', '#b8913d', 0.25, metal=1.0, grime=0.1)
+    dark = mat_rubber('dark_lanze', '#141416')
+    glow = mat_emit('glow_engine_lanze', '#ffd28a', 12)
+    gr, gg = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12)
+    glass = mat_glass('glass_lanze', '#1a1406')
+    P = []
+    fus = loft('fuselage', [
+        dict(y=8.5, w=0.04, h=0.04, z=0.0),
+        dict(y=7.0, w=0.55, h=0.4, e=2.0),
+        dict(y=4.5, w=1.2, h=0.85, z=0.05, e=2.2),
+        dict(y=1.5, w=1.7, h=1.1, z=0.1, e=2.4, flat=0.6),
+        dict(y=-2.0, w=2.0, h=1.05, z=0.1, e=2.6, flat=0.6),
+        dict(y=-5.0, w=1.7, h=0.95, z=0.1, e=2.6),
+        dict(y=-6.2, w=1.4, h=0.8, z=0.1, e=2.4),
+    ], paint, n=36)
+    P.append(fus)
+    P.append(sphere('canopy', glass, 1.0, (0, 3.2, 0.48), scale=(0.5, 1.9, 0.38)))
+    P.append(wing('wing', paint, root_y=-3.0, root_chord=6.0, tip_chord=0.7, span=4.6, sweep=-4.4, dihedral=-0.2,
+                  thick=0.1, x0=0.8, z0=-0.05))
+    P.append(wing('canard', gold, root_y=4.2, root_chord=1.4, tip_chord=0.4, span=1.2, sweep=-0.8, thick=0.08, x0=0.5, z0=0.0))
+    f = wing('fin', paint, root_y=-5.0, root_chord=2.8, tip_chord=0.6, span=2.0, sweep=-1.8, thick=0.08, x0=0.0, mirror=False)
+    f.rotation_euler = (0, R(-90), 0); f.location = (0, 0, 0.5); P.append(f)
+    eng, _ = engine_pod('eng', 0.0, 0.1, -3.5, -6.4, 0.7, gold, dark, glow, mirror=False, intake=False)
+    P += eng
+    for x in (0.9,):
+        P.append(cyl('gun', gold, 0.07, 2.4, (x, 2.6, -0.35)))
+        mirror_x_world(P[-1])
+    P += greebles(fus, gold, count=14, size=(0.1, 0.3), height=(0.01, 0.04), seed=21,
+                  region=lambda h: not (h.z > 0.2 and 1.0 < h.y < 5.5))
+    P += nav_lights((-5.3, -6.8, -0.25), (5.3, -6.8, -0.25), None, gr, gg, None)
+    E = [empty('exhaust_0', (0, -7.0, 0.1)), empty('gun_0', (-0.9, 3.9, -0.35)), empty('gun_1', (0.9, 3.9, -0.35)),
+         empty('cockpit', (0, 3.3, 0.75))]
+    return P, E, dict(dist=26, center=(0, 0, 0))
+
+
+def kestrel():
+    """Kestrel K-9 – ex-militia multirole fighter. Grey-blue, forward-swept wings."""
+    paint = mat_paint('hull_kestrel', '#56636e', color2='#7d8790', wear=0.35, rust=0.0, dirt=0.4, metal=0.3, rough=0.45,
+                      stripe=('y', 5.0, 0.35), stripe_color='#d23a2a')
+    metal = mat_metal('metal_kestrel', '#6b6e72', 0.4, metal=0.8)
+    dark = mat_rubber('dark_kestrel')
+    glow = mat_emit('glow_engine_kestrel', '#9fd0ff', 12)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_kestrel', '#0a1420')
+    P = []
+    fus = loft('fuselage', [
+        dict(y=7.2, w=0.05, h=0.05, z=-0.1),
+        dict(y=6.2, w=0.8, h=0.6, z=-0.05, e=2.4),
+        dict(y=4.2, w=1.5, h=1.2, z=0.05, e=2.8, flat=0.7),
+        dict(y=1.5, w=2.0, h=1.4, z=0.1, e=3.2, flat=0.7),
+        dict(y=-2.0, w=2.6, h=1.3, z=0.05, e=3.6, flat=0.8),
+        dict(y=-5.0, w=2.0, h=1.2, z=0.05, e=3.2),
+        dict(y=-5.8, w=1.6, h=1.0, z=0.05, e=3.0),
+    ], paint, n=36)
+    P.append(fus)
+    P.append(sphere('canopy', glass, 1.0, (0, 3.6, 0.6), scale=(0.62, 1.7, 0.5)))
+    P.append(box('canopy_frame', metal, (0.06, 2.0, 0.05), (0, 3.5, 1.1)))
+    P.append(wing('wing', paint, root_y=-2.4, root_chord=3.6, tip_chord=1.6, span=4.3, sweep=1.4, dihedral=0.25,
+                  thick=0.14, x0=1.1, z0=-0.1))
+    for side in (1,):
+        f = wing('fin', paint, root_y=-4.4, root_chord=2.2, tip_chord=0.8, span=1.8, sweep=-1.0, thick=0.1, x0=0.0, mirror=False)
+        f.rotation_euler = (0, R(-65), 0); f.location = (0.9, 0, 0.5)
+        swship.apply_all(f); mirror_x(f); P.append(f)
+    eng, _ = engine_pod('eng', 0.0, 0.05, -3.8, -6.2, 0.75, metal, dark, glow, mirror=False, intake=False)
+    P += eng
+    for sx in (1,):
+        P.append(lathe('intake', [(0.5, 0.0), (1.2, 0.42), (-1.5, 0.45), (-2.5, 0.3)], metal, axis_pos=(1.35, 0, -0.25)))
+        mirror_x_world(P[-1])
+    P.append(cyl('gun', dark, 0.08, 2.4, (5.4, -1.2, -0.0)))
+    mirror_x_world(P[-1])
+    P.append(cyl('missile_rail', metal, 0.12, 1.6, (3.0, -1.6, -0.4)))
+    mirror_x_world(P[-1])
+    P += greebles(fus, metal, count=28, size=(0.12, 0.4), height=(0.02, 0.06), seed=31,
+                  region=lambda h: not (h.z > 0.25 and 1.6 < h.y < 5.8) and h.y < 5.8)
+    P += nav_lights((-5.4, -2.6, 0.15), (5.4, -2.6, 0.15), (0, -5.8, 0.65), gr, gg, gw)
+    E = [empty('exhaust_0', (0, -6.7, 0.05)), empty('gun_0', (-5.4, 0.1, 0)), empty('gun_1', (5.4, 0.1, 0)),
+         empty('cockpit', (0, 3.6, 0.95))]
+    return P, E, dict(dist=26, center=(0, 0, 0))
+
+
+def corsair():
+    """Corsair heavy gunship – broad armoured wedge, four engines, dorsal turret. Olive/black."""
+    paint = mat_paint('hull_corsair', '#4a5240', color2='#2c2f2a', wear=0.45, rust=0.1, dirt=0.55, metal=0.3, rough=0.5,
+                      scale=0.8, stripe=('y', 7.0, 0.5), stripe_color='#d9d2b0')
+    metal = mat_metal('metal_corsair', '#5d5f61', 0.4, metal=0.8)
+    dark = mat_rubber('dark_corsair')
+    glow = mat_emit('glow_engine_corsair', '#ff9a5a', 12)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_corsair', '#0a1008')
+    P = []
+    body = loft('body', [
+        dict(y=10.0, w=0.4, h=0.3, z=-0.2),
+        dict(y=8.8, w=3.2, h=1.2, z=-0.1, e=4.0, flat=0.6),
+        dict(y=5.0, w=6.0, h=2.2, z=0.0, e=5.0, flat=0.7),
+        dict(y=0.0, w=8.6, h=2.6, z=0.0, e=6.0, flat=0.7),
+        dict(y=-6.0, w=9.6, h=2.4, z=0.0, e=6.0),
+        dict(y=-8.0, w=9.0, h=2.0, z=0.0, e=5.0),
+    ], paint, n=40)
+    P.append(body)
+    P.append(sphere('canopy', glass, 1.0, (0, 6.6, 0.9), scale=(1.1, 1.8, 0.55)))
+    exh = []
+    for i, x in enumerate((-3.4, -1.15, 1.15, 3.4)):
+        eng, _ = engine_pod(f'eng{i}', x, 0.0, -5.0, -8.6, 0.85, metal, dark, glow, mirror=False, intake=False)
+        P += eng; exh.append(empty(f'exhaust_{i}', (x, -9.1, 0.0)))
+    P.append(cyl('turret_base', metal, 1.0, 0.4, (0, -1.5, 1.4), rot=(0, 0, 0)))
+    P.append(sphere('turret', paint, 0.95, (0, -1.5, 1.7), scale=(1, 1.2, 0.55)))
+    for x in (0.35,):
+        P.append(cyl('tgun', dark, 0.09, 2.6, (x, 0.2, 1.85))); mirror_x_world(P[-1])
+    for x in (2.2,):
+        P.append(cyl('chin_gun', dark, 0.12, 3.0, (x, 8.4, -0.9))); mirror_x_world(P[-1])
+        P.append(box('chin_mount', metal, (0.5, 1.6, 0.5), (x, 6.6, -0.8))); mirror_x_world(P[-1])
+    P += greebles(body, metal, count=50, size=(0.2, 0.7), height=(0.03, 0.12), seed=41,
+                  region=lambda h: not (h.z > 0.4 and 4.8 < h.y < 8.6))
+    P += nav_lights((-4.9, -4.0, 0.0), (4.9, -4.0, 0.0), (0, -8.0, 1.0), gr, gg, gw)
+    E = exh + [empty('gun_0', (-2.2, 10.0, -0.9)), empty('gun_1', (2.2, 10.0, -0.9)), empty('turret', (0, -1.5, 2.0)),
+               empty('cockpit', (0, 6.8, 1.3))]
+    return P, E, dict(dist=40, center=(0, 0, 0))
+
+
+def korvette():
+    """Liga customs corvette 'Unbestechlich' (~85 m). White and blue, wedge hull, bridge tower."""
+    paint = mat_paint('hull_korv', '#d9dde2', color2='#9aa3ad', wear=0.18, rust=0.0, dirt=0.3, metal=0.3, rough=0.35,
+                      scale=0.35, stripe=('y', 20.0, 3.0), stripe_color='#2a5bb8')
+    metal = mat_metal('metal_korv', '#6a6e74', 0.4, metal=0.85, scale=0.5)
+    dark = mat_rubber('dark_korv')
+    glow = mat_emit('glow_engine_korv', '#a8d4ff', 12)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    win = mat_emit('glow_windows', '#ffe9c0', 6)
+    P = []
+    hull = loft('hull', [
+        dict(y=44.0, w=1.0, h=1.0, z=-1.0),
+        dict(y=38.0, w=9.0, h=4.0, z=-0.5, e=4.0, flat=0.7),
+        dict(y=20.0, w=22.0, h=8.0, z=0.0, e=6.0, flat=0.6),
+        dict(y=-10.0, w=28.0, h=9.5, z=0.0, e=7.0, flat=0.6),
+        dict(y=-36.0, w=26.0, h=9.0, z=0.0, e=7.0),
+        dict(y=-40.0, w=22.0, h=7.5, z=0.0, e=6.0),
+    ], paint, n=44)
+    P.append(hull)
+    tower = loft('tower', [dict(y=-6.0, w=8.0, h=3.0, z=5.5, e=6), dict(y=-10.0, w=10.0, h=6.0, z=7.0, e=6),
+                           dict(y=-22.0, w=10.0, h=6.0, z=7.0, e=6), dict(y=-26.0, w=7.0, h=3.0, z=5.5, e=6)], paint, n=32)
+    P.append(tower)
+    P.append(box('bridge_win', win, (8.4, 0.2, 0.7), (0, -9.2, 8.6)))
+    for i in range(10):
+        P.append(box(f'win{i}', win, (0.2, 1.4, 0.35), (13.9, 12 - i * 4.5, 0.5))); mirror_x_world(P[-1])
+    exh = []
+    for i, (x, z) in enumerate(((-8, 2), (0, 2.5), (8, 2), (-4.5, -2.2), (4.5, -2.2))):
+        eng, _ = engine_pod(f'eng{i}', x, z, -32.0, -41.0, 2.1, metal, dark, glow, mirror=False, intake=False)
+        P += eng; exh.append(empty(f'exhaust_{i}', (x, -42.5, z)))
+    for i, (x, y) in enumerate(((6, 18), (-6, 18), (9, -2), (-9, -2))):
+        P.append(cyl(f'tbase{i}', metal, 1.4, 0.8, (x, y, 4.2), rot=(0, 0, 0)))
+        P.append(cyl(f'tgun{i}', dark, 0.25, 6.0, (x, y + 3.0, 4.6)))
+    P.append(cyl('mast', metal, 0.25, 8.0, (0, -16.0, 14.0), rot=(0, 0, 0)))
+    P += greebles(hull, metal, count=110, size=(0.6, 2.4), height=(0.15, 0.6), seed=51)
+    P += greebles(tower, metal, count=30, size=(0.4, 1.4), height=(0.1, 0.4), seed=52)
+    P += nav_lights((-14, -10, 0), (14, -10, 0), (0, -16, 18.2), gr, gg, gw)
+    E = exh + [empty(f'gun_{i}', p) for i, p in enumerate(((6, 21, 4.6), (-6, 21, 4.6), (9, 1, 4.6), (-9, 1, 4.6)))]
+    return P, E, dict(dist=150, center=(0, 0, 0))
+
+
+SHIPS.update({'sankt_rostig': sankt_rostig, 'mule': mule, 'lanze': lanze, 'kestrel': kestrel, 'corsair': corsair, 'korvette': korvette})
+
+if __name__ != 'ships':  # executed via the bridge (not imported)
+    ship_id = BL_ARGS[0]
+    flags = BL_ARGS[1:]
+    swlib.fresh()
+    swship.MATS.clear()
+    P, E, cam = SHIPS[ship_id]()
+    prev = swlib.out('ships', ship_id, 'preview.jpg')
+    if '--no-preview' not in flags:
+        swship.studio_preview(prev, cam['center'], cam['dist'], samples=int(os.environ.get('SW_SAMPLES', 96)))
+    res = {'preview': prev}
+    if '--preview-only' not in flags:
+        path, hull = swship.finalize_ship(ship_id, P, E)
+        res['glb'] = path
+        res['tris'] = sum(len(p.vertices) - 2 for p in hull.data.polygons)
+    result = res

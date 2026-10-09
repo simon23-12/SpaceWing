@@ -116,7 +116,7 @@ export class ShipModel {
         const hex = (o.userData && o.userData.glow_color) || '#ffffff';
         const isEngine = n.includes('engine');
         const c = isEngine ? engineColor.clone() : new THREE.Color(hex);
-        o.material = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(isEngine ? 4 : 6), toneMapped: false });
+        o.material = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(isEngine ? 2 : 4), toneMapped: false });
         this.glows.push({ mesh: o, base: c, engine: isEngine, blink: n.includes('white') });
       } else if (o.isMesh && n.startsWith('glass')) {
         o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1016, metalness: 0.0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2, transparent: true, opacity: 0.9 });
@@ -147,7 +147,7 @@ export class ShipModel {
       pl.scale.set(1, 1, (0.6 + 4.5 * throttle) * (boost ? 1.8 : 1));
     }
     for (const g of this.glows) {
-      if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(1.5 + 5 * p);
+      if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(0.9 + 2.2 * p);
       else if (g.blink) g.mesh.visible = (this.time % 1.4) < 0.08;
     }
   }

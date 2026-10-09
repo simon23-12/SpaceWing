@@ -7,6 +7,7 @@ import swlib
 from swlib import G, hexc
 
 MATS = {}   # material name -> dict of channel sockets
+Q = {'bevel': 8, 'ao': 16}   # shader sample counts (rooms lower these for faster lightmap bakes)
 
 
 # ====================================================================== geometry
@@ -92,8 +93,11 @@ def wing(name, mat, root_y, root_chord, tip_chord, span, sweep, dihedral=0.0, th
     return ob
 
 
-def lathe(name, profile, mat, n=32, axis_pos=(0, 0, 0), cap=True, rot=None):
-    """profile: list of (y, r) along +Y. Builds a solid of revolution around a Y-parallel axis."""
+def lathe(name, profile, mat, n=32, axis_pos=(0, 0, 0), cap=True, rot=None, closed=None):
+    """profile: list of (y, r) along +Y. Builds a solid of revolution around a Y-parallel axis.
+    closed=True treats the profile as a closed loop (ring/torus-like): no end caps."""
+    if closed is None:
+        closed = len(profile) == 4 and profile[0][1] > 0 and profile[-1][1] > 0 and abs(profile[0][0] - profile[-1][0]) < 1e-6
     bm = bmesh.new()
     rings = []
     for y, r in profile:
@@ -102,12 +106,14 @@ def lathe(name, profile, mat, n=32, axis_pos=(0, 0, 0), cap=True, rot=None):
             t = 2 * math.pi * i / n
             ring.append(bm.verts.new((r * math.cos(t), y, r * math.sin(t))))
         rings.append(ring)
-    for a, b in zip(rings, rings[1:]):
+    pairs = list(zip(rings, rings[1:])) + ([(rings[-1], rings[0])] if closed else [])
+    for a, b in pairs:
         for i in range(n):
             j = (i + 1) % n
             bm.faces.new((a[i], a[j], b[j], b[i]))
-    if cap:
-        bm.faces.new(list(reversed(rings[0]))); bm.faces.new(rings[-1])
+    if cap and not closed:
+        if profile[0][1] > 1e-6: bm.faces.new(list(reversed(rings[0])))
+        if profile[-1][1] > 1e-6: bm.faces.new(rings[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = _obj_from_bm(bm, name, mat)
     if rot:
@@ -293,7 +299,7 @@ def mat_paint(name, color, color2=None, scale=1.0, wear=0.5, rust=0.0, dirt=0.5,
     n1, _ = g.noise(g.vscale(p, 6.0 * scale), 1.0, 6, 0.6)
     n2, _ = g.noise(g.vscale(p, 0.8 * scale), 1.0, 4, 0.6)
     # edge wear via bevel normal deviation
-    bev = g.node('ShaderNodeBevel'); bev.samples = 8
+    bev = g.node('ShaderNodeBevel'); bev.samples = Q['bevel']
     bev.inputs['Radius'].default_value = 0.035
     edge = g.sub(1.0, g.dot(bev.outputs['Normal'], nrm))
     edge = g.clamp01(g.mul(edge, 18.0))
@@ -302,7 +308,7 @@ def mat_paint(name, color, color2=None, scale=1.0, wear=0.5, rust=0.0, dirt=0.5,
     bare = g.mix(n1, g.rgb('#6d6e70'), g.rgb('#9a9b9c'))
     base = g.mix(wearm, paint, bare)
     # cavity dirt
-    ao = g.node('ShaderNodeAmbientOcclusion'); ao.samples = 16; ao.only_local = True
+    ao = g.node('ShaderNodeAmbientOcclusion'); ao.samples = Q['ao']; ao.only_local = True
     ao.inputs['Distance'].default_value = 0.6
     cav = g.sub(1.0, ao.outputs['AO'])
     dirtm = g.clamp01(g.mul(g.add(g.mul(cav, 1.6), g.mul(g.smooth(n2, 0.55, 0.8), 0.4)), dirt))
@@ -529,7 +535,7 @@ def export_glb(objs, path):
         o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_apply=True,
-                              export_yup=True, export_tangents=True, export_materials='PLACEHOLDER',
+                              export_yup=True, export_tangents=False, export_materials='PLACEHOLDER',
                               export_extras=True, export_cameras=False, export_lights=False)
     return path
 
