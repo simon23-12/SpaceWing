@@ -28,7 +28,8 @@ if __name__ == "__main__":
     else:
         fname = os.path.abspath(sys.argv[1])
         code, args = open(fname).read(), sys.argv[2:]
-    pre = "BL_ARGS = %r\nREPO = %r\n__file__ = %r\nimport sys as _s\n_s.path.insert(0, %r)\n" % (
+    pre = ("BL_ARGS = %r\nREPO = %r\n__file__ = %r\nimport sys as _s, importlib as _il\n"
+           "_p = %r\nif _p not in _s.path: _s.path.insert(0, _p)\n_il.invalidate_caches()\n") % (
         args, REPO, fname, os.path.join(REPO, "blender"))
     res = run(pre + code)
     if res.get("stdout"): print(res["stdout"], end="")
