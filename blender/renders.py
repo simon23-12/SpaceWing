@@ -42,7 +42,7 @@ def hide_fields():
 def moon(name, tex, radius, loc, rot=(0, 0, 0)):
     m = swlib.new_mat('moon_' + name); m.node_tree.nodes.clear(); g = G(m.node_tree)
     t = g.node('ShaderNodeTexImage'); t.image = bpy.data.images.load(os.path.join(REPO, f'public/assets/planets/{tex}.jpg'), check_existing=True)
-    h = g.node('ShaderNodeTexImage'); h.image = bpy.data.images.load(os.path.join(REPO, f'public/assets/planets/{tex}_h.png'), check_existing=True)
+    h = g.node('ShaderNodeTexImage'); h.image = bpy.data.images.load(os.path.join(REPO, f'public/assets/planets/{tex}_h.jpg'), check_existing=True)
     h.image.colorspace_settings.name = 'Non-Color'
     bp = g.node('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.6; g.l.new(h.outputs['Color'], bp.inputs['Height'])
     bs = g.node('ShaderNodeBsdfDiffuse'); g.l.new(t.outputs['Color'], bs.inputs['Color']); g.l.new(bp.outputs['Normal'], bs.inputs['Normal'])
@@ -70,7 +70,7 @@ if what == 'title':
         bpy.data.objects.remove(o, do_unlink=True)
     sat = bpy.data.objects.get('SATURN_BG')
     if sat:
-        sat.rotation_euler = (R(-18), R(10), R(30))
+        sat.rotation_euler = (R(-28), R(12), R(28))
     sun(None, 5.0, direction=(-0.55, 0.75, -0.35))
     rim = bpy.data.lights.new('rim', 'AREA'); rim.energy = 3000; rim.size = 10; rim.color = (0.55, 0.7, 1.0)
     ro = bpy.data.objects.new('rim', rim); bpy.context.scene.collection.objects.link(ro); ro.location = (-8, 14, 6)

@@ -70,7 +70,7 @@ export class FlightMode {
       if (!this.zone.hostile) this.addWaypoint('dock', this.station.dock.pos.clone().addScaledVector(this.station.dock.dir, 300), 'Andockbucht ' + this.station.name);
     }
     if (this.zone.debris) {
-      this.debris = await Debris.create(this.zone.debris, this.zone.debris === 'ring' ? 2600 : 500);
+      this.debris = await Debris.create(this.zone.debris, this.zone.debris === 'ring' ? 1500 : 420);
       sc.add(this.debris.root);
     }
     // player
@@ -289,10 +289,16 @@ export class FlightMode {
     if (input.locked) {
       this.stick.x += input.mouse.dx * sens;
       this.stick.y += input.mouse.dy * sens * (this.game.settings?.invertY ? -1 : 1);
-    }
+      if (input.mouse.dx === 0 && input.mouse.dy === 0) { const k = Math.exp(-dt * 0.9); this.stick.x *= k; this.stick.y *= k; }
+    } else if (this.mouseSteer) {
+      // without pointer lock: the cursor position relative to the screen centre is the stick
+      const R = Math.min(innerWidth, innerHeight) * 0.32;
+      this.stick.x = (input.mouse.x - innerWidth / 2) / R;
+      this.stick.y = (input.mouse.y - innerHeight / 2) / R * (this.game.settings?.invertY ? -1 : 1);
+    } else { const k = Math.exp(-dt * 3); this.stick.x *= k; this.stick.y *= k; }
+    if (!this.mouseSteer && (input.mouse.dx || input.mouse.dy) && !input.locked && !this.game.ui.modalOpen) this.mouseSteer = true;
     const l = Math.hypot(this.stick.x, this.stick.y);
     if (l > 1) { this.stick.x /= l; this.stick.y /= l; }
-    if (input.mouse.dx === 0 && input.mouse.dy === 0) { const k = Math.exp(-dt * 0.9); this.stick.x *= k; this.stick.y *= k; }
     const dz = (v) => Math.abs(v) < 0.04 ? 0 : (v - Math.sign(v) * 0.04) / 0.96;
     inp.yaw = -dz(this.stick.x) * 1.0;
     inp.pitch = -dz(this.stick.y);
@@ -471,7 +477,8 @@ export class FlightMode {
     this.hud.update(dt, this);
     // docking prompt
     if (this.state === 'flying') {
-      const prompt = this.canDock() && !this.missionBlocksDock ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
+      const justLeft = this.opts.spawn === 'undock' && this.time < 12;
+      const prompt = this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
       this.hud.prompt(prompt);
     } else this.hud.prompt('');
     this.game.audio?.engine(p.throttle, p.input.boost);

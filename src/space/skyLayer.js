@@ -236,7 +236,7 @@ export class SkyLayer {
     for (const [id, b] of Object.entries(BODIES)) {
       const map = assets.tex(`assets/planets/${b.tex}.jpg`);
       map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
-      const bump = assets.tex(`assets/planets/${b.tex}_h.png`);
+      const bump = assets.tex(`assets/planets/${b.tex}_h.jpg`);
       const mat = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 2.5, roughness: 1, metalness: 0 });
       const m = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 160, 100), mat);
       m.userData.pos = new THREE.Vector3(...b.pos);

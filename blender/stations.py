@@ -287,7 +287,7 @@ def rocks():
     for i in range(5):
         m = mat_paint(f'rock_{i}', '#8a857d', color2='#6c6863', wear=0.0, rust=0.0, dirt=0.9, metal=0.0, rough=0.9, panel=0.0, scale=0.6)
         bm = bmesh.new()
-        bmesh.ops.create_icosphere(bm, subdivisions=4, radius=1.0)
+        bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
         ob = swship._obj_from_bm(bm, f'rock_{i}', m)
         tex = bpy.data.textures.new(f'rocknoise{i}', 'VORONOI')
         tex.noise_scale = 0.6 + i * 0.1

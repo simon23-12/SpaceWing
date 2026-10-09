@@ -276,6 +276,6 @@ for nm in names:
     fn, w, has_h = BODIES[nm]
     outs = [("color", swlib.out("planets", nm + ".jpg"), "JPEG", "8", False)]
     if has_h:
-        outs.append(("height", swlib.out("planets", nm + "_h.png"), "PNG", "8", True))
+        outs.append(("height", swlib.out("planets", nm + "_h.jpg"), "JPEG", "8", True))
     done += swlib.render_plane_texture(lambda g, d, uv: fn(g, d, uv), outs, w, w // 2, mapping="sphere", samples=4)
 result = {"done": done}

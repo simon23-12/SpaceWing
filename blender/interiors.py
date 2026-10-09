@@ -271,7 +271,10 @@ def setup_world_space(strength=1.0, saturn=True, sat_dir=(0.0, 1.0, 0.25), sat_d
         u = rg.div(rg.sub(r, 66900 / 60268), (141000 - 66900) / 60268)
         rt = rg.node('ShaderNodeTexImage'); rt.image = rimg; rt.extension = 'EXTEND'
         rg._in(rt.inputs['Vector'], rg.combine(u, 0.5, 0.0))
-        dif = rg.node('ShaderNodeBsdfDiffuse'); rg.l.new(rt.outputs['Color'], dif.inputs['Color'])
+        dif0 = rg.node('ShaderNodeBsdfDiffuse'); rg.l.new(rt.outputs['Color'], dif0.inputs['Color'])
+        tl = rg.node('ShaderNodeBsdfTranslucent'); rg.l.new(rt.outputs['Color'], tl.inputs['Color'])
+        dif = rg.node('ShaderNodeMixShader'); dif.inputs[0].default_value = 0.45
+        rg.l.new(dif0.outputs[0], dif.inputs[1]); rg.l.new(tl.outputs[0], dif.inputs[2])
         tr = rg.node('ShaderNodeBsdfTransparent')
         mx = rg.node('ShaderNodeMixShader')
         inside = rg.mul(rg.math('GREATER_THAN', u, 0.0), rg.math('LESS_THAN', u, 1.0))
@@ -281,7 +284,7 @@ def setup_world_space(strength=1.0, saturn=True, sat_dir=(0.0, 1.0, 0.25), sat_d
         bpy.ops.mesh.primitive_circle_add(vertices=256, radius=141000 / 60268, fill_type='NGON', location=(0, 0, 0))
         ring = bpy.context.active_object; ring.name = 'RINGS_BG'
         ring.data.materials.append(rm)
-        ring.parent = sat; ring.location = (0, 0, 0); ring.scale = (1, 1, 1 / 0.902)
+        ring.parent = sat; ring.location = (0, 0, 0); ring.scale = (sat_size, sat_size, sat_size / 0.902)
         ring.visible_shadow = False
         made.append(ring)
         sat.rotation_euler = (R(16), R(-8), R(25))

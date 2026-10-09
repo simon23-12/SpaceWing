@@ -17,7 +17,7 @@ class Input {
     addEventListener('blur', () => { this.keys.clear(); this.mouse.buttons = 0; });
     addEventListener('mousemove', e => {
       this.mouse.x = e.clientX; this.mouse.y = e.clientY;
-      if (this.locked) { this.mouse.dx += e.movementX; this.mouse.dy += e.movementY; }
+      this.mouse.dx += e.movementX; this.mouse.dy += e.movementY;
     });
     addEventListener('mousedown', e => { this.mouse.buttons |= (1 << e.button); this.clicked.add(e.button); });
     addEventListener('mouseup', e => { this.mouse.buttons &= ~(1 << e.button); });

@@ -318,5 +318,6 @@
   0,
   -1
  ],
- "lightScale": 2.0
+ "lightScale": 2.0,
+ "signsFixed": true
 }

@@ -4,6 +4,14 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 
 **Spielen:** https://simon23-12.github.io/SpaceWing/
 
+![Titelbild](public/assets/ui/title.jpg)
+
+| Kommandodeck (Übersicht) | Bar „Cassini-Spalt“ |
+|---|---|
+| ![Übersicht](public/assets/ui/overview.jpg) | ![Bar](public/assets/ui/bar.jpg) |
+| **Hangar 7** | **Titan-Orbit** |
+| ![Hangar](public/assets/ui/hangar.jpg) | ![Titan](public/assets/ui/kraken.jpg) |
+
 ## Features
 
 - **Brückenübersicht im Stil von X-Wing Alliance:** ein in Cycles gerendertes Bild des Kommandodecks mit anklickbaren Bereichen (Bar, Hangar, Quartiere, Aussichtsplattform, Söldnerbörse, Werft, Systemkarte).

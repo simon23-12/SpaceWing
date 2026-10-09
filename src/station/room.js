@@ -73,7 +73,7 @@ export class RoomMode {
         colliders.push(g.index ? g.toNonIndexed() : g);
       } else if (n.startsWith('glow') || n.startsWith('glow_')) {
         const hex = o.userData.glow_color || '#ffffff';
-        o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(n.includes('sign') || n.includes('neon') ? 3.5 : 2.5), toneMapped: false });
+        o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(n.includes('sign') || n.includes('emblem') ? 1.25 : n.includes('neon') ? 2.2 : 2.0), toneMapped: false });
       } else if (n.startsWith('glass') || /porthole|booth_glass|dome/.test(n)) {
         o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1218, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.08, envMapIntensity: 0.18, depthWrite: false, side: THREE.DoubleSide });
         o.renderOrder = 5;
