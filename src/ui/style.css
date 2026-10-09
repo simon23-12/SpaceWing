@@ -171,3 +171,4 @@ table.grid tr:hover td { background: rgba(127,212,255,.05); }
 .notif div { background: var(--panel2); border-left: 3px solid var(--warm); padding: 8px 14px; font-size: 15px; animation: commIn .3s; max-width: 380px; }
 
 .hud.cockpit .hud-radar, .hud.cockpit .hud-left, .hud.cockpit .hud-right { display: none; }
+.btn.small { white-space: nowrap; }

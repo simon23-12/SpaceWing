@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BODIES, SATURN, SUN_DIR } from './universe.js';
 import { assets } from '../core/assets.js';
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 
 const sunDir = new THREE.Vector3(...SUN_DIR).normalize();
 
@@ -27,7 +28,7 @@ const saturnFrag = `
     float ndl = dot(N, sunDir);
     float ndv = max(dot(N, vView), 0.0);
     // Minnaert-ish limb darkening for a gas giant
-    float lit = pow(max(ndl, 0.0), 0.85) * pow(ndv, 0.12);
+    float lit = pow(max(ndl, 0.0), 0.85) * pow(max(ndv, 1e-4), 0.12);
     // ring shadow: march from surface point toward the sun to the ring plane
     vec3 P = vLocal * radius;
     float shadow = 1.0;
@@ -46,7 +47,7 @@ const saturnFrag = `
     float ringshine = 0.018 * smoothstep(0.0, 0.6, -N.y * sign(sunDir.y) + 0.3) * (1.0 - max(ndl, 0.0));
     vec3 col = alb * (lit * shadow * 1.35 + ringshine);
     // terminator warmth + atmospheric rim
-    float rim = pow(1.0 - ndv, 3.0) * smoothstep(-0.15, 0.3, ndl);
+    float rim = pow(clamp(1.0 - ndv, 0.0, 1.0), 3.0) * smoothstep(-0.15, 0.3, ndl);
     col += vec3(0.85, 0.72, 0.5) * rim * 0.35;
     gl_FragColor = vec4(col, 1.0);
     #include <tonemapping_fragment>
@@ -90,7 +91,7 @@ const ringFrag = `
     col *= shadow;
     // edge-on: opacity rises with path length
     float mu = abs(dot(viewDir, vec3(0.0,1.0,0.0)));
-    float alpha = 1.0 - pow(1.0 - a, 1.0 / max(mu, 0.04));
+    float alpha = 1.0 - pow(clamp(1.0 - a, 0.0, 1.0), 1.0 / max(mu, 0.04));
     gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -114,11 +115,50 @@ const atmoFrag = `
   void main(){
     #include <logdepthbuf_fragment>
     float ndv = max(dot(normalize(vN), vView), 0.0);
-    float rim = pow(1.0 - ndv, power);
+    float rim = pow(clamp(1.0 - ndv, 0.0, 1.0), power);
     float l = smoothstep(-0.35, 0.4, dot(normalize(vN), sunDir));
     float fwd = pow(max(dot(-vView, sunDir), 0.0), 8.0);
     gl_FragColor = vec4(color * rim * (l + fwd * 2.0) * strength, 1.0);
   }`;
+
+const plumeVert = `
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
+  varying vec3 vP; varying vec3 vW; varying vec3 vN;
+  void main(){ vP = position; vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;
+  #include <logdepthbuf_vertex>
+  }`;
+const plumeFrag = `
+  uniform vec3 sunDir; uniform float time, len;
+  varying vec3 vP; varying vec3 vW; varying vec3 vN;
+  #include <logdepthbuf_pars_fragment>
+  float hash(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719))) * 43758.5453); }
+  float noise(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
+    return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+               mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z); }
+  void main(){
+    #include <logdepthbuf_fragment>
+    float h = clamp((-vP.y - 240.0) / len, 0.0, 1.0);
+    vec3 view = normalize(cameraPosition - vW);
+    float soft = pow(clamp(abs(dot(normalize(vN), view)), 0.0, 1.0), 2.0);
+    float ang = atan(vP.z, vP.x);
+    float streaks = 0.5 + 0.5 * noise(vec3(ang * 6.0, h * 3.0 - time * 0.03, 0.0));
+    float n = noise(vP * 0.015 + vec3(0.0, time * 0.04, 0.0));
+    float d = soft * pow(clamp(1.0 - h, 0.0, 1.0), 2.2) * (0.3 + 0.7 * streaks) * (0.5 + n);
+    float fwd = 0.3 + 2.8 * pow(max(dot(-view, sunDir), 0.0), 4.0);
+    gl_FragColor = vec4(vec3(0.75, 0.85, 1.0) * d * fwd * 0.09, 1.0);
+  }`;
+
+function makeFlareTex(kind) {
+  const s = 128, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  if (kind === 'ring') { grd.addColorStop(0.0, 'rgba(0,0,0,0)'); grd.addColorStop(0.75, 'rgba(120,180,255,0.0)'); grd.addColorStop(0.88, 'rgba(140,200,255,0.25)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); }
+  else { grd.addColorStop(0, 'rgba(255,255,255,0.5)'); grd.addColorStop(0.5, 'rgba(180,210,255,0.12)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); }
+  g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 function makeSunTexture() {
   const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
@@ -215,6 +255,26 @@ export class SkyLayer {
     this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeSunTexture(), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, color: new THREE.Color(6, 5.6, 5) }));
     this.sunSprite.scale.setScalar(3.2e6);
     this.scene.add(this.sunSprite);
+    // subtle lens flare ghosts
+    const lf = new Lensflare();
+    const dot = makeFlareTex('dot'), ring = makeFlareTex('ring');
+    lf.addElement(new LensflareElement(ring, 260, 0.0, new THREE.Color(0.6, 0.7, 1.0)));
+    lf.addElement(new LensflareElement(dot, 60, 0.35, new THREE.Color(0.5, 0.6, 0.9)));
+    lf.addElement(new LensflareElement(dot, 90, 0.6, new THREE.Color(0.7, 0.5, 0.3)));
+    lf.addElement(new LensflareElement(ring, 180, 0.85, new THREE.Color(0.4, 0.6, 1.0)));
+    this.sunSprite.add(lf);
+    // Enceladus geysers (south pole plumes)
+    const enc = this.moons.enceladus;
+    if (enc) {
+      this.plumeMat = new THREE.ShaderMaterial({ vertexShader: plumeVert, fragmentShader: plumeFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        uniforms: { sunDir: { value: sunDir }, time: { value: 0 }, len: { value: 900 } } });
+      const geo = new THREE.CylinderGeometry(40, 520, 900, 48, 24, true);
+      geo.translate(0, -450 - 240, 0);
+      const plume = new THREE.Mesh(geo, this.plumeMat);
+      plume.renderOrder = 3;
+      enc.add(plume);
+      this.plume = plume;
+    }
   }
 
   /** Update positions relative to the camera's system position (km). */
@@ -233,6 +293,6 @@ export class SkyLayer {
   }
 
   update(dt) {
-    for (const m of Object.values(this.moons)) m.rotation.y += dt * 0.0005;
+    if (this.plumeMat) this.plumeMat.uniforms.time.value += dt;
   }
 }

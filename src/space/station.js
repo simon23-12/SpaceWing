@@ -32,7 +32,7 @@ export class Station {
   constructor(def, model, meta, dir) {
     this.id = def.id;
     const info = STATIONS[def.id] || {};
-    this.name = info.name || def.id;
+    this.name = info.name || { schakalnest: 'Schakalnest' }[def.id] || def.id;
     this.faction = info.faction || 'neutral';
     this.root = new THREE.Group();
     this.root.position.fromArray(def.pos || [0, 0, 0]);

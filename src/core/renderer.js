@@ -26,10 +26,20 @@ const GradeShader = {
     }`,
 };
 
+// Replaces NaN/Inf pixels before bloom so one bad fragment can never smear into a black block.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tDiffuse, vUv);
+      bool ok = (c.r > -1.0 && c.r < 60000.0) && (c.g > -1.0 && c.g < 60000.0) && (c.b > -1.0 && c.b < 60000.0);
+      gl_FragColor = ok ? vec4(c.rgb, 1.0) : vec4(0.0, 0.0, 0.0, 1.0); }`,
+};
+
 export class Renderer {
   constructor(canvas) {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', logarithmicDepthBuffer: true, stencil: false });
-    this.gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.gl.outputColorSpace = THREE.SRGBColorSpace;
     this.gl.toneMapping = THREE.ACESFilmicToneMapping;
     this.gl.toneMappingExposure = 1.0;
@@ -46,6 +56,7 @@ export class Renderer {
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.passFar);
     this.composer.addPass(this.passNear);
+    this.composer.addPass(new ShaderPass(SanitizeShader));
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.grade);

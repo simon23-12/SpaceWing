@@ -274,15 +274,14 @@ export class UI {
   openWerft(initialTab = 'werft') {
     const station = this.g.location;
     let tab = initialTab;
-    const wrap = this.panel('Werft & Markt', `${STATIONS[station].name} · Lenka Brandvold`, (body, rebuild) => {
-      const old = wrap?.querySelector?.('.tabs'); if (old) old.remove();
+    return this.panel('Werft & Markt', `${STATIONS[station].name} · Lenka Brandvold`, (body, rebuild, close, w) => {
+      const old = w.querySelector('.tabs'); if (old) old.remove();
       this.tabs(body, [['werft', 'Mein Schiff'], ['kauf', 'Schiffe kaufen'], ['hangar', 'Hangar'], ['markt', 'Markt']], tab, (k) => { tab = k; rebuild(); });
       if (tab === 'markt') return this.marketBody(body, rebuild, station);
       if (tab === 'kauf') return this.shipShop(body, rebuild);
       if (tab === 'hangar') return this.hangarList(body, rebuild);
       this.shipUpgrades(body, rebuild);
     });
-    return wrap;
   }
 
   shipUpgrades(body, rebuild) {
@@ -411,7 +410,7 @@ export class UI {
       const proj = (p) => {
         const r = Math.hypot(p[0], p[2]); const a = Math.atan2(p[2], p[0]);
         const k = Math.log10(Math.max(r, 60000) / 60000) / Math.log10(13e6 / 60000);
-        const R = 40 + k * 280;
+        const R = 60 + k * 300;
         return [450 + Math.cos(a) * R, 333 + Math.sin(a) * R * 0.62];
       };
       const draw = () => {
@@ -419,24 +418,24 @@ export class UI {
         // orbits
         ctx.strokeStyle = 'rgba(120,200,255,0.12)';
         for (const b of Object.values(BODIES)) {
-          const r = Math.hypot(b.pos[0], b.pos[2]); const k = Math.log10(r / 60000) / Math.log10(13e6 / 60000); const R = 40 + k * 280;
+          const r = Math.hypot(b.pos[0], b.pos[2]); const k = Math.log10(r / 60000) / Math.log10(13e6 / 60000); const R = 60 + k * 300;
           ctx.beginPath(); ctx.ellipse(450, 333, R, R * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
         }
         // Saturn + rings
-        ctx.fillStyle = '#d8c08a'; ctx.beginPath(); ctx.arc(450, 333, 16, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(220,200,160,.6)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(450, 333, 30, 10, -0.3, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
-        ctx.font = '13px Rajdhani, sans-serif';
+        ctx.fillStyle = '#d8c08a'; ctx.beginPath(); ctx.arc(450, 333, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(220,200,160,.6)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(450, 333, 44, 14, -0.3, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+        ctx.font = '600 24px Rajdhani, sans-serif';
         for (const [id, z] of zones) {
           const [x, y] = proj(zoneAnchor(id));
           const isHere = id === here, isSel = id === sel;
           const story = STORY[g.story]?.zone === id && g.flags['accepted:' + g.story];
           const job = g.jobs.some(j => (j.kind === 'fracht' && STATIONS[j.to].zone === id) || ((j.kind === 'kopfgeld' || j.kind === 'eskorte') && j.zone === id));
           ctx.fillStyle = z.hostile ? '#ff5a4a' : isHere ? '#7fe08a' : '#7fd4ff';
-          ctx.beginPath(); ctx.arc(x, y, isSel ? 8 : 5, 0, Math.PI * 2); ctx.fill();
-          if (isSel) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI * 2); ctx.stroke(); }
-          if (story) { ctx.strokeStyle = '#ffcf7a'; ctx.beginPath(); ctx.arc(x, y, 17, 0, Math.PI * 2); ctx.stroke(); }
+          ctx.beginPath(); ctx.arc(x, y, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
+          if (isSel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
+          if (story) { ctx.strokeStyle = '#ffcf7a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
           ctx.fillStyle = isHere ? '#bff5c4' : '#d8e6ef';
-          ctx.fillText(z.name.split(' · ')[0] + (isHere ? ' (hier)' : '') + (job ? ' ◆' : ''), x + 12, y + 4);
+          ctx.fillText(z.name.split(' · ')[0] + (isHere ? ' (hier)' : '') + (job ? ' ◆' : ''), x + 16, y + 8);
         }
       };
       const pick = (id) => {

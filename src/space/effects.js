@@ -203,7 +203,7 @@ const shieldMat = new THREE.ShaderMaterial({
     #include <logdepthbuf_pars_fragment>
     void main(){
       #include <logdepthbuf_fragment>
-      float rim = pow(1.0 - abs(dot(vN, vV)), 2.5);
+      float rim = pow(clamp(1.0 - abs(dot(vN, vV)), 0.0, 1.0), 2.5);
       float spot = pow(max(dot(vP, normalize(hit)), 0.0), 24.0);
       float hex = 0.6 + 0.4 * sin(vP.x * 40.0) * sin(vP.y * 40.0) * sin(vP.z * 40.0);
       gl_FragColor = vec4(color * (rim * 0.06 + spot * 1.1 * hex) * amount, 1.0); }`,

@@ -147,7 +147,7 @@ export class ShipModel {
       pl.scale.set(1, 1, (0.6 + 4.5 * throttle) * (boost ? 1.8 : 1));
     }
     for (const g of this.glows) {
-      if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(0.9 + 2.2 * p);
+      if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(0.5 + 1.5 * p);
       else if (g.blink) g.mesh.visible = (this.time % 1.4) < 0.08;
     }
   }

@@ -1,0 +1,322 @@
+{
+ "interior": [
+  "box",
+  -15.0,
+  15.0,
+  -9.0,
+  9.0,
+  0.0,
+  8.0
+ ],
+ "markers": [
+  {
+   "kind": "door",
+   "id": "bar",
+   "pos": [
+    -10.5,
+    0,
+    7.7
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "BAR \u201eCASSINI-SPALT\u201c"
+  },
+  {
+   "kind": "door",
+   "id": "kabine",
+   "pos": [
+    -5.0,
+    0,
+    7.7
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "QUARTIERE"
+  },
+  {
+   "kind": "terminal",
+   "id": "boerse",
+   "pos": [
+    1.5,
+    0,
+    6.1
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "S\u00d6LDNERB\u00d6RSE"
+  },
+  {
+   "kind": "npc",
+   "id": "oduya",
+   "pos": [
+    1.5,
+    0,
+    8.15
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  },
+  {
+   "kind": "terminal",
+   "id": "werft",
+   "pos": [
+    9.5,
+    0,
+    6.1
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "WERFT & MARKT"
+  },
+  {
+   "kind": "npc",
+   "id": "haendler",
+   "pos": [
+    9.5,
+    0,
+    8.15
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  },
+  {
+   "kind": "door",
+   "id": "hangar",
+   "pos": [
+    13.7,
+    0,
+    2.0
+   ],
+   "dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "label": "HANGAR"
+  },
+  {
+   "kind": "door",
+   "id": "aussicht",
+   "pos": [
+    13.7,
+    0,
+    -5.5
+   ],
+   "dir": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "label": "AUSSICHT"
+  },
+  {
+   "kind": "terminal",
+   "id": "karte",
+   "pos": [
+    0,
+    0,
+    2.0
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "label": "Systemkarte"
+  },
+  {
+   "kind": "spawn",
+   "id": "default",
+   "pos": [
+    -11.0,
+    0,
+    1.0
+   ],
+   "dir": [
+    1.0,
+    0.0,
+    -0.0
+   ]
+  },
+  {
+   "kind": "spawn",
+   "id": "from_bar",
+   "pos": [
+    -10.5,
+    0,
+    7.2
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  },
+  {
+   "kind": "spawn",
+   "id": "from_kabine",
+   "pos": [
+    -5.0,
+    0,
+    7.2
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  },
+  {
+   "kind": "spawn",
+   "id": "from_hangar",
+   "pos": [
+    13.0,
+    0,
+    2.0
+   ],
+   "dir": [
+    -1.0,
+    0.0,
+    -0.0
+   ]
+  },
+  {
+   "kind": "spawn",
+   "id": "from_aussicht",
+   "pos": [
+    13.0,
+    0,
+    -5.5
+   ],
+   "dir": [
+    -1.0,
+    0.0,
+    -0.0
+   ]
+  }
+ ],
+ "hotspots": [
+  {
+   "id": "bar",
+   "label": "BAR \u201eCASSINI-SPALT\u201c",
+   "objs": [
+    "door0",
+    "sign0",
+    "doorframe0"
+   ]
+  },
+  {
+   "id": "kabine",
+   "label": "QUARTIERE",
+   "objs": [
+    "door1",
+    "sign1",
+    "doorframe1"
+   ]
+  },
+  {
+   "id": "boerse",
+   "label": "S\u00d6LDNERB\u00d6RSE",
+   "objs": [
+    "counter0",
+    "screen_boerse",
+    "csign0",
+    "screenframe0"
+   ]
+  },
+  {
+   "id": "werft",
+   "label": "WERFT & MARKT",
+   "objs": [
+    "counter1",
+    "screen_werft",
+    "csign1",
+    "screenframe1"
+   ]
+  },
+  {
+   "id": "hangar",
+   "label": "HANGAR",
+   "objs": [
+    "door10",
+    "sign10",
+    "doorframe10"
+   ]
+  },
+  {
+   "id": "aussicht",
+   "label": "AUSSICHT",
+   "objs": [
+    "door11",
+    "sign11",
+    "doorframe11"
+   ]
+  },
+  {
+   "id": "karte",
+   "label": "Systemkarte",
+   "objs": [
+    "holo_base",
+    "holo_top"
+   ]
+  }
+ ],
+ "holo": [
+  0,
+  1.05,
+  -0.5
+ ],
+ "lights": [
+  {
+   "pos": [
+    0,
+    1.6,
+    -0.5
+   ],
+   "color": "#5fd0ff",
+   "energy": 60
+  },
+  {
+   "pos": [
+    1.5,
+    3.6,
+    7.8
+   ],
+   "color": "#5fb0ff",
+   "energy": 80
+  },
+  {
+   "pos": [
+    9.5,
+    3.6,
+    7.8
+   ],
+   "color": "#5fb0ff",
+   "energy": 80
+  }
+ ],
+ "window_dir": [
+  0,
+  0,
+  -1
+ ],
+ "lightScale": 2.0
+}

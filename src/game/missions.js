@@ -172,8 +172,7 @@ export class Director {
     // jobs in this zone
     for (const j of g.jobs) {
       if (j.kind === 'kopfgeld' && j.zone === this.zoneId && !j.done) run((c) => bountyScript(c, this.game, j));
-      if (j.kind === 'eskorte' && j.zone === this.zoneId && !j.done && this.opts.spawn !== 'undock') run((c) => escortScript(c, this.game, j));
-      if (j.kind === 'eskorte' && j.zone === this.zoneId && !j.done && this.opts.spawn === 'undock') run((c) => escortScript(c, this.game, j));
+      if (j.kind === 'eskorte' && j.zone === this.zoneId && !j.done) run((c) => escortScript(c, this.game, j));
       if (j.kind === 'fracht' && j.risk && STATIONS[j.to].zone === this.zoneId && this.opts.spawn === 'arrive' && !j.ambushed) {
         j.ambushed = true;
         run((c) => ambushScript(c, this.game, j.risk + 1));

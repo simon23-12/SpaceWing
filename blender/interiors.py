@@ -290,6 +290,22 @@ def setup_world_space(strength=1.0, saturn=True, sat_dir=(0.0, 1.0, 0.25), sat_d
 
 # ------------------------------------------------------------------------------- bake + export
 
+def denoise(rgb, passes=2, sigma=0.06):
+    """Edge-aware 3x3 smoothing of the baked radiance (cheap stand-in for a real denoiser)."""
+    rgb = rgb.astype(np.float32)
+    for _ in range(passes):
+        acc = rgb.copy(); wsum = np.ones(rgb.shape[:2], np.float32)
+        lum = rgb.mean(-1)
+        for dy, dx, k in ((-1, 0, 1), (1, 0, 1), (0, -1, 1), (0, 1, 1), (-1, -1, .6), (1, 1, .6), (-1, 1, .6), (1, -1, .6)):
+            sh = np.roll(np.roll(rgb, dy, 0), dx, 1)
+            d = sh.mean(-1) - lum
+            rel = d / (np.abs(lum) * 0.5 + sigma)
+            w = (k * np.exp(-rel * rel)).astype(np.float32)
+            acc += sh * w[..., None]; wsum += w
+        rgb = acc / wsum[..., None]
+    return rgb
+
+
 def cull_hidden(ob, interior):
     """Delete faces that can never be seen from inside the room (outer wall skins, floor underside, roof)."""
     if not interior:
@@ -341,7 +357,8 @@ def bake_room(name, static, glows, glass, extra_exports, outdir, size=4096, samp
     bpy.ops.object.bake(type='COMBINED')
     px = np.empty(size * size * 4, np.float32); img.pixels.foreach_get(px)
     px = px.reshape(size, size, 4)
-    rgb = np.clip(px[..., :3] * scale, 0, 1)
+    rgb = denoise(px[..., :3])
+    rgb = np.clip(rgb * scale, 0, 1)
     # denoise-lite: edge-aware 3x3 blur on the low bits keeps grain from showing in 8-bit
     srgb = np.where(rgb <= 0.0031308, rgb * 12.92, 1.055 * np.power(rgb, 1 / 2.4) - 0.055)
     out = bpy.data.images.new('lightmap8', size, size, alpha=False, float_buffer=False)
@@ -368,6 +385,7 @@ def bake_room(name, static, glows, glass, extra_exports, outdir, size=4096, samp
     swship.export_glb(finals, path)
     meta = dict(INFO)
     meta['lightScale'] = 1.0 / scale
+    meta['signsFixed'] = True
     with open(os.path.join(outdir, 'meta.json'), 'w') as f:
         json.dump(meta, f, indent=1)
     return path
@@ -411,7 +429,7 @@ def bruecke():
         Gl.append(box(f'doorled{k}', mat_emit('glow_door', '#7fdcff', 6), (dw + 0.3, 0.05, 0.06), (x + inward.x * 0.25, y + inward.y * 0.25, dh + 0.35), rot=(0, 0, ang)))
         sign_col = '#ff5ad0' if target == 'bar' else '#ffd36a' if target == 'hangar' else '#9fe0ff'
         Gl.append(text_mesh(f'sign{k}', label, mat_emit('glow_sign_' + target, sign_col, 8), 0.38 if target != 'bar' else 0.34,
-                            (x + inward.x * 0.25, y + inward.y * 0.25, dh + 0.9), rot=(R(90), 0, ang)))
+                            (x + inward.x * 0.25, y + inward.y * 0.25, dh + 0.9), rot=(R(90), 0, ang + R(180))))
         marker('door', target, (x + inward.x * 1.3, y + inward.y * 1.3, 0), math.atan2(-inward.y, -inward.x), label=label)
         INFO.setdefault('hotspots', []).append({'id': target, 'label': label, 'objs': [f'door{k}', f'sign{k}', f'doorframe{k}']})
     for k, (x, label, target, w, h) in enumerate(doorsS):
@@ -426,12 +444,12 @@ def bruecke():
         scr = bpy.context.active_object
         scr.name = f'screen_{target}'
         scr.scale = (4.6, 2.4, 1)
-        scr.rotation_euler = (R(90), 0, 0)
-        scr.location = (x, Y0 + 0.16, 3.6)
+        scr.rotation_euler = (R(90), 0, R(180))
+        scr.location = (x, Y0 + 0.24, 3.6)
         scr.data.materials.append(light_mat('screen_lit_' + target, '#2f6f9c', 2.5))
         X.append(scr)
         S.append(box(f'screenframe{k}', dark, (4.9, 0.12, 2.7), (x, Y0 + 0.1, 3.6)))
-        Gl.append(text_mesh(f'csign{k}', label, mat_emit('glow_sign_' + target, '#9fe0ff', 8), 0.42, (x, Y0 + 0.2, 5.45), rot=(R(90), 0, 0)))
+        Gl.append(text_mesh(f'csign{k}', label, mat_emit('glow_sign_' + target, '#9fe0ff', 8), 0.42, (x, Y0 + 0.2, 5.45), rot=(R(90), 0, R(180))))
         marker('terminal', target, (x, Y0 + 2.9, 0), R(-90), label=label)
         marker('npc', 'oduya' if target == 'boerse' else 'haendler', (x, Y0 + 0.85, 0), R(90))
         INFO.setdefault('hotspots', []).append({'id': target, 'label': label, 'objs': [f'counter{k}', f'screen_{target}', f'csign{k}', f'screenframe{k}']})
@@ -442,8 +460,8 @@ def bruecke():
         door(10 + k, X1, y, R(90), label, target, w, h, Vector((-1, 0, 0)))
     # west wall with station emblem
     S += wall('wW', wallm, (X0, Y0), (X0, Y1), H)
-    Gl.append(text_mesh('emblem', 'HOCHSTATION CASSINI', mat_emit('glow_emblem', '#ffe2b0', 6), 0.8, (X0 + 0.2, 0, 5.6), rot=(R(90), 0, R(-90))))
-    Gl.append(text_mesh('emblem2', 'RHEA-ORBIT · FREIHAFEN SEIT 2198', mat_emit('glow_emblem2', '#9fe0ff', 6), 0.3, (X0 + 0.2, 0, 4.7), rot=(R(90), 0, R(-90))))
+    Gl.append(text_mesh('emblem', 'HOCHSTATION CASSINI', mat_emit('glow_emblem', '#ffe2b0', 6), 0.8, (X0 + 0.2, 0, 5.6), rot=(R(90), 0, R(90))))
+    Gl.append(text_mesh('emblem2', 'RHEA-ORBIT · FREIHAFEN SEIT 2198', mat_emit('glow_emblem2', '#9fe0ff', 6), 0.3, (X0 + 0.2, 0, 4.7), rot=(R(90), 0, R(90))))
     # pilasters, baseboards, coves
     for x in (-15, -10, -5, 0, 5, 10, 15):
         S.append(box(f'pilS{x}', trim, (0.5, 0.5, H), (x, Y0 + 0.2, H / 2), bevel=0.04))
@@ -627,7 +645,7 @@ def kabine():
     S.append(box('desk', trim, (0.6, 1.1, 0.06), (1.25, 0.4, 0.78)))
     bpy.ops.mesh.primitive_plane_add(size=1.0)
     scr = bpy.context.active_object; scr.name = 'screen_kabine'
-    scr.scale = (0.6, 0.38, 1); scr.rotation_euler = (R(80), 0, R(90)); scr.location = (1.5, 0.4, 1.15)
+    scr.scale = (0.6, 0.38, 1); scr.rotation_euler = (R(80), 0, R(-90)); scr.location = (1.5, 0.4, 1.15)
     scr.data.materials.append(light_mat('screen_lit_cab', '#3a7fb0', 3))
     X.append(scr)
     S.append(box('photo', mat_simple('photo', '#d0c0a0', 0.6), (0.01, 0.2, 0.15), (1.55, -0.3, 1.5)))
@@ -714,7 +732,7 @@ def hangar():
     # door to the bridge
     S.append(box('door', hazard, (2.6, 0.12, 3.2), (-22.2, 9.0, 1.6), rot=(0, 0, R(90))))
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (0.05, 2.8, 0.06), (-21.8, 9.0, 3.45)))
-    Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, 0, 10), rot=(R(90), 0, R(-90))))
+    Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, 0, 10), rot=(R(90), 0, R(90))))
     marker('door', 'bruecke', (-20.5, 9.0, 0), R(180), label='Zum Kommandodeck')
     marker('ship', 'ship', (2, 0, 0.2), R(0), label='Einsteigen und starten')
     marker('terminal', 'hangar_werft', (-17, 10.5, 0), R(90), label='Werft-Terminal')

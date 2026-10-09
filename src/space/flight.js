@@ -67,6 +67,7 @@ export class FlightMode {
     if (this.zone.station) {
       this.station = await Station.load(this.zone.station);
       sc.add(this.station.root);
+      if (!this.zone.hostile) this.addWaypoint('dock', this.station.dock.pos.clone().addScaledVector(this.station.dock.dir, 300), 'Andockbucht ' + this.station.name);
     }
     if (this.zone.debris) {
       this.debris = await Debris.create(this.zone.debris, this.zone.debris === 'ring' ? 2600 : 500);
@@ -370,7 +371,7 @@ export class FlightMode {
     if (!this.station) { this.hud.showToast('Keine Station in Reichweite', 2); return; }
     if (this.zone.hostile) { this.hud.showToast('Andocken verweigert', 2); return; }
     if (!this.canDock()) { this.hud.showToast('Zu weit entfernt – näher als 3 km an die Andockbucht', 2.5); return; }
-    if (this.ships.some(s => s.alive && this.isHostile(s, this.player) && s.pos.distanceTo(this.player.pos) < 3000)) {
+    if (!this.allowHotDock && this.ships.some(s => s.alive && this.isHostile(s, this.player) && s.pos.distanceTo(this.player.pos) < 3000)) {
       this.hud.showToast('Andocken unmöglich – Feinde in der Nähe', 2.5); return;
     }
     const d = this.station.dock;

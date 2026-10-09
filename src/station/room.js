@@ -22,7 +22,7 @@ const holoFrag = `uniform vec3 color; uniform float time, flicker;
 varying vec3 vN; varying vec3 vV; varying vec3 vW;
 void main(){
   #include <logdepthbuf_fragment>
-  float f = pow(1.0 - abs(dot(normalize(vN), vV)), 1.8);
+  float f = pow(clamp(1.0 - abs(dot(normalize(vN), vV)), 0.0, 1.0), 1.8);
   float scan = 0.65 + 0.35 * sin(vW.y * 90.0 - time * 6.0);
   float band = smoothstep(0.0, 0.05, fract(vW.y * 1.3 - time * 0.4)) * 0.3 + 0.7;
   float fl = 1.0 - flicker * step(0.97, fract(sin(floor(time * 24.0)) * 43758.5));
@@ -83,6 +83,7 @@ export class RoomMode {
         o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.55, 1.0).multiplyScalar(0.5), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
       }
     });
+    if (!meta.signsFixed) this.mirrorBackwardSigns(root);
     this.scene.add(root);
     // collision BVH
     const merged = mergeGeometries(colliders, false);
@@ -113,6 +114,90 @@ export class RoomMode {
     await this.populate();
     this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
     this.ui();
+  }
+
+  /** Older bakes exported some signs/screens facing into the wall: mirror them along the wall so they read
+   *  correctly from inside (mirroring also flips their winding to face the room). Screens move off their frame. */
+  mirrorBackwardSigns(root) {
+    const fix = this.roomId === 'bruecke' ? /^(glow_sign|glow_emblem|screen_)/ : this.roomId === 'kabine' ? /^screen_/ : null;
+    if (!fix) return;
+    root.traverse(o => {
+      if (!o.isMesh || !fix.test(o.name)) return;
+      const g = o.geometry;
+      const parts = o.name.startsWith('glow') ? this.splitByIsland(g) : [g];
+      for (const part of parts) {
+        part.computeBoundingBox();
+        const bb = part.boundingBox, c = bb.getCenter(new THREE.Vector3()), size = bb.getSize(new THREE.Vector3());
+        const along = size.x >= size.z ? 'x' : 'z';
+        const thin = along === 'x' ? 'z' : 'x';
+        const m = new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z)
+          .premultiply(new THREE.Matrix4().makeScale(along === 'x' ? -1 : 1, 1, along === 'z' ? -1 : 1))
+          .premultiply(new THREE.Matrix4().makeTranslation(c.x, c.y, c.z));
+        if (o.name.startsWith('screen_')) {
+          const off = new THREE.Vector3(); off[thin] = -Math.sign(c[thin]) * 0.07;
+          m.premultiply(new THREE.Matrix4().makeTranslation(off.x, off.y, off.z));
+        }
+        part.applyMatrix4(m);
+      }
+      if (parts.length > 1 || parts[0] !== g) this.mergeInto(g, parts);
+      g.computeVertexNormals();
+    });
+  }
+
+  /** Split a sign mesh into its separate signs (by connected vertex groups along the dominant axis gaps). */
+  splitByIsland(g) {
+    // signs of one material can sit on different walls: group triangles by which wall they are near
+    const pos = g.attributes.position, idx = g.index.array;
+    const groups = new Map();
+    for (let i = 0; i < idx.length; i += 3) {
+      const a = idx[i];
+      const key = Math.round(pos.getX(a) / 6) + ':' + Math.round(pos.getZ(a) / 6) + ':' + Math.round(pos.getY(a));
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(idx[i], idx[i + 1], idx[i + 2]);
+    }
+    // merge neighbouring keys of the same wall row (text runs can span several 6 m cells)
+    const out = [];
+    const used = new Set();
+    const tris = [...groups.values()];
+    if (tris.length <= 1) return [g];
+    // simple approach: one part per sign, where a sign = triangles whose centres are within 4 m of each other
+    const all = [];
+    for (let i = 0; i < idx.length; i += 3) all.push(i);
+    const cx = (i) => (pos.getX(idx[i]) + pos.getX(idx[i + 1]) + pos.getX(idx[i + 2])) / 3;
+    const cy = (i) => (pos.getY(idx[i]) + pos.getY(idx[i + 1]) + pos.getY(idx[i + 2])) / 3;
+    const cz = (i) => (pos.getZ(idx[i]) + pos.getZ(idx[i + 1]) + pos.getZ(idx[i + 2])) / 3;
+    const clusters = [];
+    for (const t of all) {
+      const p = [cx(t), cy(t), cz(t)];
+      let cl = clusters.find(c => Math.abs(c.y - p[1]) < 0.6 && Math.hypot(c.x - p[0], c.z - p[2]) < 4.5);
+      if (!cl) { cl = { x: p[0], y: p[1], z: p[2], tris: [] }; clusters.push(cl); }
+      cl.tris.push(t);
+    }
+    for (const cl of clusters) {
+      const geo = new THREE.BufferGeometry();
+      const verts = new Map(); const P = []; const I = [];
+      for (const t of cl.tris) for (let k = 0; k < 3; k++) {
+        const v = idx[t + k];
+        if (!verts.has(v)) { verts.set(v, P.length / 3); P.push(pos.getX(v), pos.getY(v), pos.getZ(v)); }
+        I.push(verts.get(v));
+      }
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      geo.setIndex(I);
+      out.push(geo);
+    }
+    return out;
+  }
+
+  mergeInto(g, parts) {
+    const P = [], I = [];
+    for (const p of parts) {
+      const base = P.length / 3;
+      P.push(...p.attributes.position.array);
+      for (const i of p.index.array) I.push(i + base);
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k);
+    g.setIndex(I);
   }
 
   roomEnv() {
