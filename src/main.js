@@ -9,7 +9,7 @@ if (import.meta.env.DEV) {
   // console helpers for testing: __dev.flight('rings'), __dev.room('bar')
   window.__dev = {
     async setup(cls = 'spacewing') {
-      const st = await import('./game/state.js');
+      const st = window.__S;
       if (!st.state.g) { st.state.set(st.newGame('Test')); st.addShip(st.state.g, cls, 'Testschiff'); st.state.g.credits = 50000; }
       return st.state.g;
     },

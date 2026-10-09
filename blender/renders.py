@@ -2,11 +2,13 @@
 import importlib, math, os
 import bpy
 from mathutils import Vector
-import swlib, swship, ships, stations, interiors
-for m in (swlib, swship, ships, stations, interiors):
+import swlib
+importlib.reload(swlib)
+swlib.init(REPO)
+import swship, ships, stations, interiors
+for m in (swship, ships, stations, interiors):
     importlib.reload(m)
 from swlib import G, hexc
-swlib.init(REPO)
 R = math.radians
 what = BL_ARGS[0]
 flags = BL_ARGS[1:]
@@ -23,10 +25,18 @@ def camera(loc, target, lens=35):
     return c
 
 
-def sun(rot, energy=4.0, color='#fff2e0'):
+def sun(rot, energy=4.0, color='#fff2e0', direction=None):
+    """rot: euler, or pass direction=(x,y,z) = direction the light travels."""
     l = bpy.data.lights.new('sun', 'SUN'); l.energy = energy; l.angle = R(0.6); l.color = hexc(color)[:3]
-    o = bpy.data.objects.new('sun', l); bpy.context.scene.collection.objects.link(o); o.rotation_euler = rot
+    o = bpy.data.objects.new('sun', l); bpy.context.scene.collection.objects.link(o)
+    o.rotation_euler = Vector(direction).normalized().to_track_quat('-Z', 'Y').to_euler() if direction else rot
     return o
+
+
+def hide_fields():
+    for o in bpy.data.objects:
+        if o.name.startswith('field'):
+            o.visible_camera = False
 
 
 def moon(name, tex, radius, loc, rot=(0, 0, 0)):
@@ -55,14 +65,17 @@ for l in list(bpy.data.lights):
 res = {}
 if what == 'title':
     P, E, _ = ships.spacewing()
-    interiors.setup_world_space(strength=0.7, saturn=True, sat_dir=(-0.55, 1.0, 0.16), sat_dist=2400, sat_size=700)
+    interiors.setup_world_space(strength=0.7, saturn=True, sat_dir=(-0.62, 1.0, 0.28), sat_dist=2400, sat_size=560)
     for o in [o for o in bpy.data.objects if o.name == 'SUN_BG']:
         bpy.data.objects.remove(o, do_unlink=True)
-    sun((R(70), R(-15), R(150)), 5.0)
+    sat = bpy.data.objects.get('SATURN_BG')
+    if sat:
+        sat.rotation_euler = (R(-18), R(10), R(30))
+    sun(None, 5.0, direction=(-0.55, 0.75, -0.35))
     rim = bpy.data.lights.new('rim', 'AREA'); rim.energy = 3000; rim.size = 10; rim.color = (0.55, 0.7, 1.0)
     ro = bpy.data.objects.new('rim', rim); bpy.context.scene.collection.objects.link(ro); ro.location = (-8, 14, 6)
     ro.rotation_euler = (Vector((0, 0, 0)) - ro.location).to_track_quat('-Z', 'Y').to_euler()
-    camera((9.5, -15.0, 2.2), (-2.0, 3.0, 1.8), lens=32)
+    camera((9.5, -15.0, 2.2), (-6.5, 2.0, 2.2), lens=30)
     res['r'] = save('title')
 elif what == 'hangar':
     S, Gl, Gs, X = interiors.hangar()
@@ -77,6 +90,7 @@ elif what == 'hangar':
             swship.apply_all(o)
             o.data.transform(Matrix.Rotation(R(90), 4, 'Z'))
             o.data.transform(Matrix.Translation((2, 0, 2.3)))
+    hide_fields()
     camera((-14, -10, 3.2), (4, 1, 2.6), lens=22)
     res['r'] = save('hangar')
 elif what == 'bar':
@@ -119,6 +133,7 @@ elif what == 'dock':
     for o in [o for o in bpy.data.objects if o.name == 'SUN_BG']:
         bpy.data.objects.remove(o, do_unlink=True)
     sun((R(60), R(20), R(-60)), 4.0)
+    hide_fields()
     camera((380, -260, 90), (0, 0, 0), lens=28)
     res['r'] = save('dock')
 result = res

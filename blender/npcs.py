@@ -8,6 +8,10 @@ importlib.reload(swlib); importlib.reload(swship)
 from swlib import G, hexc
 from swship import box, cyl, sphere, lathe, loft, empty, apply_all
 
+try:
+    REPO
+except NameError:
+    REPO = swlib.REPO_PATH
 swlib.init(REPO)
 R = math.radians
 WHAT = BL_ARGS[0] if BL_ARGS else 'all'
@@ -200,6 +204,32 @@ def characters():
     return out
 
 
+def portrait_only():
+    skin1 = mat('skin_dark', '#6a4632', 0.55, sss=0.15)
+    skin2 = mat('skin_light', '#d8a88a', 0.55, sss=0.15)
+    skin3 = mat('skin_mid', '#a5714e', 0.55, sss=0.15)
+    skin4 = mat('skin_pale', '#e6c0a8', 0.55, sss=0.15)
+    gold = mat('gold_coat', '#b8913d', 0.35, 0.8)
+    white = mat('white_uni', '#e8e4d8', 0.5)
+    navy = mat('navy_uni', '#23345a', 0.55)
+    blue = mat('blue_coat', '#2f5a8a', 0.6)
+    black = mat('black_coat', '#18181a', 0.5)
+    pink = mat('pink_dress', '#b8406a', 0.5)
+    robe = mat('robe', '#4b3a6b', 0.7)
+    hb = mat('hair_black', '#141210', 0.6); hg = mat('hair_grey', '#9a9894', 0.7); hblond = mat('hair_blond', '#c8a060', 0.6)
+    hred = mat('hair_red', '#8a3a1a', 0.6); hwhite = mat('hair_white', '#e8e6e0', 0.7)
+    boots = mat('boots', '#1e1a16', 0.6)
+    out = {}
+    out['varga'] = human('varga', skin4, gold, black, boots, hb, 'bun', coat=gold, coat_len=0.8, height=1.78, female=True, build=0.95)
+    out['morrow'] = human('morrow', skin2, white, white, boots, hblond, 'short', height=1.85, build=1.1)
+    out['brandt'] = human('brandt', skin2, navy, navy, boots, hg, 'cap', height=1.8, build=1.08)
+    out['noor'] = human('noor', skin3, blue, black, boots, hb, 'long', coat=blue, coat_len=0.5, female=True, height=1.7)
+    out['vesper'] = human('vesper', skin4, robe, robe, boots, hwhite, 'short', coat=robe, coat_len=0.9, height=1.72, build=0.95)
+    out['rook'] = human('rook', skin1, black, black, boots, skin1, 'short', coat=black, coat_len=0.7, height=1.88, build=1.12)
+    out['saffi'] = human('saffi', skin4, pink, pink, boots, hred, 'long', female=True, height=1.68, build=0.92)
+    return out
+
+
 def export_models():
     swlib.fresh()
     chars = characters()
@@ -225,6 +255,8 @@ def export_models():
 PORTRAITS = {
     'mags': ('#ffcf7a', '#2a1a10'), 'kix': ('#7fd4ff', '#08141c'), 'oduya': ('#8fd18f', '#0c1a10'), 'haendler': ('#d39a6a', '#1c120a'),
     'juno': ('#d7b8ff', '#140c1e'),
+    'varga': ('#f2c35a', '#1c1406'), 'morrow': ('#f2c35a', '#14100a'), 'brandt': ('#9fb4ff', '#0a0e1c'), 'noor': ('#6fc3ff', '#06121c'),
+    'vesper': ('#d7b8ff', '#100a1a'), 'rook': ('#ff5a4a', '#1a0806'), 'saffi': ('#ff8ad8', '#1a0814'),
 }
 
 
@@ -232,6 +264,7 @@ def portraits():
     """Cycles head-and-shoulders portraits for the dialogue box."""
     swlib.fresh()
     chars = characters()
+    chars.update(portrait_only())
     sc = swlib.cycles(samples=96, w=512, h=512, transform='AgX', look='AgX - Punchy', denoise=True)
     keep = {}
     for name, parts in chars.items():

@@ -53,7 +53,7 @@ export const SHIP_CLASSES = {
   wespe: {
     name: 'Wespe', maker: 'Eigenbau', role: 'Piratenjäger', price: 0, npcOnly: true,
     hull: 170, shield: 90, speed: 265, boost: 420, accel: 95, turn: 2.0, cargo: 2, guns: 2, missiles: 0,
-    energy: 90, regen: 18, laserDmg: 9, laserRate: 5, length: 11, engine: '#ff7a2a',
+    energy: 90, regen: 18, laserDmg: 8, laserRate: 3.6, length: 11, engine: '#ff7a2a',
   },
   korvette: {
     name: 'Zollkorvette', maker: 'Liga-Marine', role: 'Korvette', price: 0, npcOnly: true,

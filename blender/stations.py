@@ -8,6 +8,10 @@ importlib.reload(swlib); importlib.reload(swship)
 from swship import loft, wing, lathe, box, cyl, sphere, empty, greebles, mirror_x, apply_all, smooth
 from swship import mat_paint, mat_metal, mat_rubber, mat_emit, mat_glass
 
+try:
+    REPO
+except NameError:
+    REPO = swlib.REPO_PATH
 swlib.init(REPO)
 R = math.radians
 

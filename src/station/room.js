@@ -7,7 +7,7 @@ import { SkyLayer } from '../space/skyLayer.js';
 import { zoneAnchor } from '../space/universe.js';
 import { ShipModel, sanitizeNormals } from '../space/shipModel.js';
 
-const EXPOSURE = { kabine: 2.2, bruecke: 1.35, bar: 1.6, hangar: 1.4, aussicht: 1.8 };
+const EXPOSURE = { kabine: 1.6, bruecke: 1.35, bar: 1.6, hangar: 1.4, aussicht: 3.4 };
 const ROOM_NAMES = { bruecke: 'Kommandodeck', bar: 'Bar „Cassini-Spalt“', hangar: 'Hangar 7', kabine: 'Kabine 4-117', aussicht: 'Aussichtsplattform' };
 
 const holoVert = `#include <common>
@@ -74,13 +74,14 @@ export class RoomMode {
       } else if (n.startsWith('glow') || n.startsWith('glow_')) {
         const hex = o.userData.glow_color || '#ffffff';
         o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(n.includes('sign') || n.includes('neon') ? 3.5 : 2.5), toneMapped: false });
-      } else if (n.startsWith('glass')) {
-        o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1218, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.12, envMapIntensity: 1.5, depthWrite: false, side: THREE.DoubleSide });
+      } else if (n.startsWith('glass') || /porthole|booth_glass|dome/.test(n)) {
+        o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1218, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.08, envMapIntensity: 0.18, depthWrite: false, side: THREE.DoubleSide });
         o.renderOrder = 5;
       } else if (n.startsWith('screen')) {
         this.setupScreen(o, n.replace('screen_', ''));
       } else if (n.startsWith('field')) {
-        o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.55, 1.0).multiplyScalar(0.5), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+        o.visible = false;
+        o.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.55, 1.0).multiplyScalar(0.12), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
       }
     });
     if (!meta.signsFixed) this.mirrorBackwardSigns(root);

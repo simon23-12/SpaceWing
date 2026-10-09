@@ -235,7 +235,7 @@ export class FlightMode {
     if (ship.fireCd > 0 || ship.energy < 2) return;
     const guns = ship.gunPositions();
     const n = ship.stats.guns || 1;
-    ship.fireCd = 1 / ship.stats.laserRate;
+    ship.fireCd = (ship.isPlayer ? 1 : 1.35) / ship.stats.laserRate;
     ship.energy -= ship.isPlayer ? 2.2 : 1;
     const fwd = ship.forward(new THREE.Vector3());
     // converge on ~600 m (player) or the target lead point (AI)
@@ -246,7 +246,7 @@ export class FlightMode {
     const fireOne = (gp) => {
       const dir = aimPoint ? aimPoint.clone().sub(gp).normalize() : fwd.clone();
       if (dir.dot(fwd) < 0.97) dir.copy(fwd);
-      if (!ship.isPlayer) dir.add(new THREE.Vector3().randomDirection().multiplyScalar(0.012 * (1 - (ship.ai?.skill ?? 0.5)))).normalize();
+      if (!ship.isPlayer) dir.add(new THREE.Vector3().randomDirection().multiplyScalar(0.012 + 0.04 * (1 - (ship.ai?.skill ?? 0.5)))).normalize();
       this.bolts.fire(gp, dir, BOLT_SPEED, ship.vel, ship, ship.stats.laserDmg, color);
     };
     if (n >= 2 && guns.length >= 2) { fireOne(guns[ship.gunIdx % guns.length]); fireOne(guns[(ship.gunIdx + 1) % guns.length]); ship.gunIdx += 2; }
@@ -379,6 +379,10 @@ export class FlightMode {
     this.state = 'docking';
     const p = this.player;
     p.autopilot = { stage: 0, pts: [d.pos.clone().addScaledVector(d.dir, 450), d.pos.clone().addScaledVector(d.dir, 30), d.pos.clone().addScaledVector(d.dir, -60)] };
+    // already lined up in front of the bay: skip the approach point
+    const rel = p.pos.clone().sub(d.pos);
+    const along = rel.dot(d.dir), off = rel.clone().addScaledVector(d.dir, -along).length();
+    if (along > 0 && along < 700 && off < 150) p.autopilot.stage = 1;
     this.lock = null;
   }
 
@@ -386,11 +390,13 @@ export class FlightMode {
     const p = this.player, ap = p.autopilot;
     if (!ap) return;
     const target = ap.pts[ap.stage];
-    steerTo(p, target, true, 3);
+    const ang = steerTo(p, target, true, 3);
     const d = p.pos.distanceTo(target);
-    p.input.throttle = ap.stage === 0 ? THREE.MathUtils.clamp(d / 900, 0.15, 0.8) : 0.18;
+    const facing = Math.max(0.08, Math.cos(Math.min(ang, Math.PI / 2)));
+    p.input.throttle = (ap.stage === 0 ? THREE.MathUtils.clamp(d / 900, 0.15, 0.8) : THREE.MathUtils.clamp(d / 600, 0.12, 0.35)) * facing;
     p.input.boost = false;
-    if (d < (ap.stage === 0 ? 60 : 25)) {
+    const turnR = p.speed() / Math.max(0.2, p.stats.turn);
+    if (d < Math.max(ap.stage === 0 ? 80 : 30, turnR * 0.9)) {
       ap.stage++;
       if (ap.stage >= ap.pts.length) {
         p.autopilot = null;

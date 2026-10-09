@@ -62,7 +62,7 @@ export function updateAI(ship, flight, dt) {
       inp.throttle = dist > 900 ? 1 : dist > 300 ? 0.75 : 0.45;
       inp.boost = dist > 2500;
       const skill = ai.skill ?? 0.6;
-      if (ang < 0.06 + (1 - skill) * 0.04 && dist < 1400) inp.fire = true;
+      if (ang < 0.05 + (1 - skill) * 0.03 && dist < 1200) inp.fire = true;
       // break off when too close or when hurt
       if (dist < 140 || (ship.time - ship.lastHit < 0.1 && Math.random() < 0.15 * (1 - skill * 0.5))) {
         ai.evadeT = 1.5 + Math.random() * 2;

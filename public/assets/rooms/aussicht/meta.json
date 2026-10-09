@@ -1,0 +1,110 @@
+{
+ "interior": [
+  "dome",
+  11.0,
+  0.0
+ ],
+ "lights": [
+  {
+   "pos": [
+    0,
+    3.6,
+    0
+   ],
+   "color": "#cfe0ff",
+   "energy": 80
+  },
+  {
+   "pos": [
+    8.5,
+    0.3,
+    -0.0
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  },
+  {
+   "pos": [
+    4.25,
+    0.3,
+    -7.361
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  },
+  {
+   "pos": [
+    -4.25,
+    0.3,
+    -7.361
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  },
+  {
+   "pos": [
+    -8.5,
+    0.3,
+    -0.0
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  },
+  {
+   "pos": [
+    -4.25,
+    0.3,
+    7.361
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  },
+  {
+   "pos": [
+    4.25,
+    0.3,
+    7.361
+   ],
+   "color": "#ffd8b0",
+   "energy": 35
+  }
+ ],
+ "markers": [
+  {
+   "kind": "door",
+   "id": "bruecke",
+   "pos": [
+    0,
+    0,
+    6.4
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    1.0
+   ],
+   "label": "Lift zum Kommandodeck"
+  },
+  {
+   "kind": "spawn",
+   "id": "default",
+   "pos": [
+    0,
+    0,
+    5.6
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ]
+  }
+ ],
+ "window_dir": [
+  0,
+  0.3,
+  -1
+ ],
+ "lightScale": 2.0,
+ "signsFixed": true
+}

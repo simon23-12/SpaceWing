@@ -1,11 +1,15 @@
 """SpaceWing Blender helper library (runs inside Blender 5.x via the MCP bridge)."""
 import bpy, math, os, random
 
-ASSETS = None  # set by init()
+ASSETS = globals().get('ASSETS')  # set by init(); survives importlib.reload
+
+
+REPO_PATH = globals().get('REPO_PATH')
 
 
 def init(repo):
-    global ASSETS
+    global ASSETS, REPO_PATH
+    REPO_PATH = repo
     ASSETS = os.path.join(repo, "public", "assets")
     os.makedirs(ASSETS, exist_ok=True)
     return ASSETS

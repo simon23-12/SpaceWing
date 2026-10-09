@@ -11,6 +11,10 @@ from swlib import G, hexc
 from swship import box, cyl, sphere, lathe, loft, empty, apply_all, smooth
 from swship import mat_paint, mat_metal, mat_rubber, mat_emit, mat_glass
 
+try:
+    REPO
+except NameError:
+    REPO = swlib.REPO_PATH
 swlib.init(REPO)
 R = math.radians
 ROOMS = {}
@@ -491,10 +495,6 @@ def bruecke():
     # background people
     coat1 = mat_simple('coat1', '#3b4350', 0.8); coat2 = mat_simple('coat2', '#5a3f2e', 0.8); coat3 = mat_simple('coat3', '#2f3a2c', 0.8)
     skin = mat_simple('skin', '#b88a6a', 0.6)
-    S += figure('p1', coat1, skin, (-6.5, 6.6, 0.35), rot=R(-90), seated=False)
-    S += figure('p2', coat2, skin, (-3.2, 6.9, 0.35), rot=R(-100), seated=True)
-    S += figure('p3', coat3, skin, (11.0, -3.6, 0), rot=R(90), seated=False)
-    S += figure('p4', coat1, skin, (6.2, 2.0, 0), rot=R(200), seated=False)
     # lights for the bake
     for x in (-10, 0, 10):
         area_light(f'key{x}', (x, 0, H - 0.2), (0, 0, 0), 4.0, 600, '#ffe6c8', shape='RECTANGLE', size_y=10)
@@ -628,7 +628,7 @@ def kabine():
     S.append(box('floor', floor, (W, D, 0.1), (0, 0, -0.05)))
     S.append(box('ceil', wallm, (W, D, 0.1), (0, 0, H + 0.05)))
     S += wall('wN', wallm, (-1.6, 2.3), (1.6, 2.3), H, openings=[(1.6, 0.6, 1.2, 1.8)])
-    Gs.append(cyl('porthole', glass, 0.32, 0.04, (0, 2.3, 1.5), rot=(R(90), 0, 0), n=32))
+    Gs.append(cyl('glass_porthole', glass, 0.32, 0.04, (0, 2.3, 1.5), rot=(R(90), 0, 0), n=32))
     S.append(lathe('porthole_ring', [(-0.12, 0.33), (0.12, 0.33), (0.12, 0.42), (-0.12, 0.42)], trim, n=32))
     S[-1].location = (0, 2.3, 1.5)
     S += wall('wS', wallm, (1.6, -2.3), (-1.6, -2.3), H, openings=[(1.6, 1.0, 0, 2.1)])
@@ -701,7 +701,7 @@ def hangar():
         S.append(box(f'strut{x}', trim, (0.2, 0.2, 6.0), (x, 16.6, 3.0)))
     # control booth
     S.append(box('booth', wallm, (6, 4, 3.2), (-17, 14.8, 7.7), bevel=0.1))
-    Gs.append(box('booth_glass', mat_glass('glass_hg'), (5.6, 0.05, 1.6), (-17, 12.78, 8.0)))
+    Gs.append(box('glass_booth', mat_glass('glass_hg'), (5.6, 0.05, 1.6), (-17, 12.78, 8.0)))
     # crates and fuel tanks
     import random
     rnd = random.Random(5)
@@ -818,18 +818,28 @@ def aussicht():
 def overview(samples=256):
     """Cycles beauty render of the bridge from a high corner + hotspot rectangles."""
     S, Gl, Gs, X = bruecke()
-    setup_world_space(strength=0.9, saturn=True, sat_dir=(0.9, 0.42, 0.1), sat_dist=2600, sat_size=380)
-    sc = swlib.cycles(samples=samples, w=1920, h=1080, transform='AgX', look='AgX - Medium High Contrast', denoise=True)
+    setup_world_space(strength=0.9, saturn=True, sat_dir=(0.897, 0.126, -0.423), sat_dist=2600, sat_size=420)
+    sc = swlib.cycles(samples=samples, w=1920, h=1080, transform='AgX', look='AgX - Punchy', denoise=True, exposure=0.35)
     sc.cycles.max_bounces = 8
     # light haze
     vol = swlib.new_mat('haze'); vol.node_tree.nodes.clear(); vg = G(vol.node_tree)
     pv = vg.node('ShaderNodeVolumePrincipled'); pv.inputs['Density'].default_value = 0.012
     out = vg.node('ShaderNodeOutputMaterial'); vg.l.new(pv.outputs[0], out.inputs['Volume'])
     hz = box('haze_box', vol, (29.5, 17.5, 7.8), (0, 0, 3.95))
-    cam_d = bpy.data.cameras.new('ov_cam'); cam_d.lens = 17; cam_d.clip_end = 10000
+    cam_d = bpy.data.cameras.new('ov_cam'); cam_d.lens = 18; cam_d.clip_end = 10000
     cam = bpy.data.objects.new('ov_cam', cam_d); sc.collection.objects.link(cam)
-    cam.location = (-14.2, 3.2, 7.3)
-    target = Vector((4.0, -2.0, 0.8))
+    # cutaway: hide ceiling structure from the camera (it still casts light), make the window glass invisible
+    for o in bpy.data.objects:
+        if o.name == 'ceiling' or o.name.startswith('beam') or o.name.startswith('trough'):
+            o.visible_camera = False
+    gm = bpy.data.materials.get('glass_br')
+    if gm:
+        bsdf = gm.node_tree.nodes.get('Principled BSDF')
+        bsdf.inputs['Transmission Weight'].default_value = 1.0; bsdf.inputs['Roughness'].default_value = 0.0
+        bsdf.inputs['Coat Weight'].default_value = 0.0; bsdf.inputs['IOR'].default_value = 1.0
+        bsdf.inputs['Base Color'].default_value = (1, 1, 1, 1)
+    cam.location = (-13.0, 6.0, 12.5)
+    target = Vector((4.0, -6.0, 0.0))
     cam.rotation_euler = (target - cam.location).to_track_quat('-Z', 'Y').to_euler()
     sc.camera = cam
     # screens get placeholder emission for the render

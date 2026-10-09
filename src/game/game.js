@@ -4,7 +4,7 @@ import { Audio } from '../core/audio.js';
 import { input } from '../core/input.js';
 import { assets } from '../core/assets.js';
 import { UI } from '../ui/ui.js';
-import { state, newGame, activeShip, logEntry, addCredits, fmt } from './state.js';
+import { state, newGame, activeShip, logEntry, addCredits, fmt, addShip } from './state.js';
 import { STATIONS, shipStats } from './data.js';
 import { STORY, npcDialogue, finaleChoice, kroneEnding, PEOPLE } from './story.js';
 import { Director, onDockJobs, generateJobs } from './missions.js';
@@ -24,6 +24,7 @@ export class Game {
     this.settings = { mouseSens: 1, invertY: false, volume: 0.8 };
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { }
     this.clock = new THREE.Clock();
+    if (import.meta.env.DEV) window.__S = { state, newGame, addShip };
     addEventListener('keydown', (e) => this.onKey(e));
     addEventListener('pointerdown', () => { this.audio.start(); this.applyVolume(); }, { once: false });
     const loop = () => { requestAnimationFrame(loop); this.frame(); };
@@ -39,7 +40,7 @@ export class Game {
   setPaused(p) { this.paused = p; if (this.mode?.isFlight) this.mode.paused = p; }
 
   frame() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    const dt = Math.min(0.1, this.clock.getDelta());
     if (this.mode && !this.paused && this.mode.update) this.mode.update(dt);
     if (this.mode && this.mode.render3D !== false) this.renderer.render(dt);
     input.endFrame();
