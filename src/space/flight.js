@@ -834,6 +834,7 @@ export class FlightMode {
           if (this.time - (this.netFullT || -9) > 4) { this.netFullT = this.time; this.hud.showToast(have >= cap ? `Bergungsnetz voll (${cap} t) – in der Werkstatt aufrüsten` : 'Frachtraum voll', 2.5); }
         } else {
           rec.cargo.schrott = have + 1;
+          this.game.state.flags.firstSalvage = true;
           this.hud.showToast(`+1 t Bergungsschrott · Netz ${have + 1}/${cap} t`, 1.8);
           this.game.audio?.blip?.();
           s.life = 0;

@@ -498,6 +498,75 @@ def eisvogel():
 
 SHIPS.update({'sankt_rostig': sankt_rostig, 'mule': mule, 'lanze': lanze, 'kestrel': kestrel, 'corsair': corsair, 'korvette': korvette, 'eisvogel': eisvogel})
 
+
+def _bool(ob, cutter, op='DIFFERENCE'):
+    import bpy
+    m = ob.modifiers.new('b', 'BOOLEAN'); m.object = cutter; m.operation = op
+    swship.apply_all(ob)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    return ob
+
+
+def _simpod(part):
+    """Combat simulator capsule for the Kommandodeck: a white tub on a pedestal with seat, sticks and screens,
+    and a glass-topped hood hinged at the back (exported separately as prop_simpod_hatch)."""
+    paint = mat_paint('hull_pod', '#d9dfe5', color2='#2c4a60', wear=0.25, rust=0.0, dirt=0.3, metal=0.3, rough=0.32,
+                      scale=1.6, stripe=('y', 0.9, 0.12), stripe_color='#2aa0d0')
+    metal = mat_metal('metal_pod', '#5c6168', 0.38, metal=0.8, grime=0.3)
+    dark = mat_rubber('dark_pod', '#16181b')
+    seatm = mat_rubber('seat_pod', '#2a3440', 0.6)
+    cyan = mat_emit('glow_pod', '#4ad0ff', 8)
+    amber = mat_emit('glow_pod_amber', '#ffb050', 6)
+    glass = mat_glass('glass_pod', '#0a1820')
+    RIM = 1.06
+    secs = [dict(y=1.42, w=0.5, h=0.36, e=3.0), dict(y=1.2, w=1.35, h=0.8, e=3.2), dict(y=0.6, w=1.68, h=1.0, e=3.6),
+            dict(y=-0.6, w=1.7, h=1.02, e=3.6), dict(y=-1.25, w=1.45, h=0.9, e=3.4), dict(y=-1.5, w=0.7, h=0.5, e=3.0)]
+    P, E = [], []
+    if part == 'body':
+        tub = loft('tub', [dict(s, z=0.86) for s in secs], paint, n=48)
+        top = box('tub_cut', paint, (4, 4, 2), (0, 0, RIM + 1.0))
+        _bool(tub, top)
+        inner = loft('tub_in', [dict(s, w=s['w'] * 0.84, h=s['h'] * 0.84, z=0.98) for s in secs], paint, n=48)
+        _bool(tub, inner)
+        P.append(tub)
+        P.append(cyl('pedestal', metal, 0.55, 0.42, (0, 0, 0.21), rot=(0, 0, 0), n=32, r2=0.75))
+        P.append(cyl('foot', dark, 1.05, 0.08, (0, 0, 0.04), rot=(0, 0, 0), n=48))
+        P.append(lathe('foot_ring', [(-0.015, 1.03), (0.015, 1.03), (0.015, 1.07), (-0.015, 1.07)], cyan, n=64))
+        P[-1].rotation_euler = (R(90), 0, 0); P[-1].location = (0, 0, 0.085)
+        for sx in (-1, 1):   # rim light strips
+            P.append(box(f'rim_led{sx}', cyan, (0.03, 1.5, 0.025), (0.79 * sx, -0.05, RIM + 0.005)))
+        # seat, reclined, with headrest
+        P.append(box('seat', seatm, (0.62, 0.62, 0.14), (0, -0.35, 0.6), rot=(R(-6), 0, 0), bevel=0.05))
+        P.append(box('backrest', seatm, (0.6, 0.14, 0.8), (0, -0.82, 0.98), rot=(R(-22), 0, 0), bevel=0.05))
+        P.append(box('headrest', seatm, (0.36, 0.12, 0.22), (0, -1.0, 1.42), rot=(R(-22), 0, 0), bevel=0.04))
+        # control console and screens in front, two sticks
+        P.append(box('console', metal, (1.0, 0.36, 0.3), (0, 0.85, 0.86), rot=(R(-25), 0, 0), bevel=0.04))
+        for k, x in enumerate((-0.3, 0.0, 0.3)):
+            P.append(box(f'screen{k}', cyan if k != 1 else amber, (0.26, 0.02, 0.17), (x, 0.66, 1.0), rot=(R(-25), 0, R(-12 * (k - 1)))))
+        for sx in (-1, 1):
+            P.append(cyl(f'stick{sx}', dark, 0.025, 0.32, (0.36 * sx, 0.15, 0.78), rot=(R(-10), 0, 0), n=10))
+            P.append(sphere(f'stick_top{sx}', dark, 0.05, (0.36 * sx, 0.12, 0.95), scale=(1, 1, 1.3)))
+            P.append(box(f'armrest{sx}', seatm, (0.12, 0.6, 0.08), (0.38 * sx, -0.15, 0.72), bevel=0.03))
+        # hinge blocks at the back
+        for sx in (-1, 1):
+            P.append(box(f'hinge_block{sx}', metal, (0.16, 0.2, 0.18), (0.45 * sx, -1.42, RIM), bevel=0.03))
+        E = [empty('hinge', (0, -1.45, RIM))]
+        return P, E, dict(dist=7, center=(0, 0, 0.8))
+    # hood: upper half of a slightly larger shell, glass window on top, hinged at the back
+    hood = loft('hood', [dict(s, w=s['w'] * 1.02, h=s['h'] * 1.3, z=RIM, e=2.3) for s in secs], paint, n=48)
+    _bool(hood, box('hood_cut', paint, (4, 4, 2), (0, 0, RIM - 1.0)))
+    _bool(hood, loft('hood_in', [dict(s, y=s['y'] * 0.94, w=s['w'] * 0.93, h=s['h'] * 1.2, z=RIM, e=2.3) for s in secs], paint, n=48))
+    _bool(hood, sphere('hood_window', paint, 1.0, (0, 0.2, RIM + 0.62), scale=(0.5, 0.95, 0.3)))
+    P.append(hood)
+    P.append(sphere('canopy_glass', glass, 1.0, (0, 0.2, RIM + 0.22), scale=(0.56, 1.02, 0.42)))
+    for sx in (-1, 1):
+        P.append(box(f'hood_led{sx}', cyan, (0.03, 1.5, 0.025), (0.84 * sx, -0.05, RIM + 0.03)))
+    P.append(box('hood_handle', metal, (0.3, 0.06, 0.05), (0, 1.36, RIM + 0.14), bevel=0.02))
+    return P, [empty('hinge', (0, -1.45, RIM))], dict(dist=7, center=(0, 0, 1.0))
+
+
+SHIPS.update({'prop_simpod': lambda: _simpod('body'), 'prop_simpod_hatch': lambda: _simpod('hood')})
+
 if __name__ != 'ships':  # executed via the bridge (not imported)
     ship_id = BL_ARGS[0]
     flags = BL_ARGS[1:]

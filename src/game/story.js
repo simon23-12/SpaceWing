@@ -55,7 +55,8 @@ function tree(who, intro, topics, bye = 'Bis dann.') {
     t.a.forEach((line, k) => {
       const [w, text] = Array.isArray(line) ? line : [who, line];
       const last = k === t.a.length - 1;
-      steps.push(say(w, text, { label: k === 0 ? 't' + i : undefined, ...(last ? { go: 'menu', act: t.act } : {}) }));
+      // topics that open a panel (workshop, shipyard, job board) end the conversation, so the dialogue box does not cover the panel
+      steps.push(say(w, text, { label: k === 0 ? 't' + i : undefined, ...(last ? (t.close ? { end: true, act: t.act } : { go: 'menu', act: t.act }) : {}) }));
     });
   });
   steps.push(say(who, ['Sonst noch was?', 'Noch eine Frage?', 'Was noch?'][topics.length % 3], { label: 'menu', choices }));
@@ -141,14 +142,14 @@ export function npcDialogue(game, npc) {
     ], 'Danke, Kix.');
   }
   if (npc === ODUYA) return tree(ODUYA, 'Söldnerbörse Cassini. Aufträge am Terminal, Beschwerden bei der Stationsmeisterin, Trinkgeld bei mir.', [
-    { q: 'Zeig mir die Aufträge.', a: ['Bitte sehr. Frisch vom Netz.'], act: (gm) => gm.ui.openBoerse() },
+    { q: 'Zeig mir die Aufträge.', a: ['Bitte sehr. Frisch vom Netz.'], act: (gm) => gm.ui.openBoerse(), close: true },
     { q: 'Wer zahlt am besten?', a: ['Das Konsortium zahlt gut und vergisst nichts. Das Kollektiv zahlt wenig und vergisst nie, wer geholfen hat. Die Ringgilde zahlt in bar und in Schnaps.', 'Kopfgelder auf Schakale zahlt die Börse selbst. Die sind ehrlich verdient.'] },
     { q: 'Was hat es mit dem Zoll auf sich?', a: ['Die Liga der Inneren Welten sagt, der Saturn soll seinen Anteil an der Ordnung des Systems zahlen. Das Konsortium sagt, die Liga soll sich um ihre eigenen Planeten kümmern.', 'Ich sage: Solange beide streiten, gibt es Arbeit.'] },
     { q: 'Wo kann ich das Kämpfen üben?', a: ['Im Gefechtssimulator, hier auf dem Kommandodeck, am Westende. Er lädt dein eigenes Schiff, und wenn du abgeschossen wirst, stehst du einfach wieder auf.'] },
     { q: 'Wie werde ich bekannter?', a: ['Verdien Geld. Ab zwanzigtausend Kredits nennt man dich hier Frachtpilot, dann öffnet sogar das Herschel-Depot auf Mimas seine Tore.'] },
   ], 'Danke, Femi.');
   if (npc === 'haendler') return tree('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', [
-    { q: 'Zeig mir Schiffe und Waren.', a: ['Leg los. Umbauen und Lackieren macht übrigens Yara, unten in ihrer Werkstatt in Hangar 7.'], act: (gm) => gm.ui.openWerft() },
+    { q: 'Zeig mir Schiffe und Waren.', a: ['Leg los. Umbauen und Lackieren macht übrigens Yara, unten in ihrer Werkstatt in Hangar 7.'], act: (gm) => gm.ui.openWerft(), close: true },
     { q: 'Was kann ein Sprungtriebwerk?', a: [jumpHint.replace('Lenka baut dir eins ein.', 'Ich baue es dir ein.'), 'Ohne Sprung brauchst du für den Weg nach Titan zwei Wochen Fusionsbrand. Mit Sprung einen Herzschlag und einen Kater.'] },
     { q: 'Lohnt sich ein Apartment?', a: ['Wenn du auf zwei Stationen eins besitzt, reist du per Transit-Kapsel hin und her, ohne zu fliegen. Dein Schiff kommt mit dem Frachtdienst nach.', 'Kabine 4-117 kannst du hier am Terminal in deiner Kabine kaufen. Dann ist auch Schluss mit der Miete.'] },
     { q: 'Welches Schiff als Nächstes?', a: ['Die Kestrel ist ein echter Jäger. Die Mule fährt Fracht, viel Fracht. Wer Geld hat, nimmt die Corsair und wird in Ruhe gelassen.'] },
@@ -191,7 +192,7 @@ export function npcDialogue(game, npc) {
     { q: 'Und der Handelskrieg?', a: ['Wenn Titan oder die Liga unsere Quelle blockieren, verdurstet der halbe Saturn. Das wissen alle. Genau deshalb haben wir Angst.'] },
   ], 'Gute Reise.');
   if (npc === 'crew_d') return tree(npc, g.ships.length ? 'Willkommen in meiner Werkstatt. Was soll ich an deinem Schiff schrauben?' : 'Yara, Mechanikerin. Das hier ist meine Werkstatt. Komm wieder, wenn du ein eigenes Schiff hast.', [
-    { q: 'Bau mir was ein. (Werkstatt)', if: g.ships.length > 0, a: ['Zeig her, was du an Kredits hast. Mods, Reparaturen, neuer Lack. Alles, was die alte Dame aushält.'], act: (gm) => gm.ui.openWerkstatt() },
+    { q: 'Bau mir was ein. (Werkstatt)', if: g.ships.length > 0, a: ['Zeig her, was du an Kredits hast. Mods, Reparaturen, neuer Lack. Alles, was die alte Dame aushält.'], act: (gm) => gm.ui.openWerkstatt(), close: true },
     { q: 'Wie verdiene ich am Anfang Geld?', a: ['Fracht. Zwischen Cassini, dem Bergbauposten Inktomi und dem Depot L4 gibt es immer etwas zu fahren, ganz ohne Sprung.', 'Und wenn dich Schakale überfallen: Nachbrenner und weg, die Wespen holen dich hier im Rhea-System nicht ein. Oder du schießt sie ab und sammelst die Trümmer ein. Schrott kauft jede Station.'] },
     { q: 'Was bringt ein Bergungsnetz?', a: ['Ab Werk passen zwei Tonnen Trümmer ins Netz der Spacewing. Jede Stufe, die ich dir einbaue, drei Tonnen mehr. Bei den Preisen für Schrott rechnet sich das schnell.'] },
     { q: 'Was würdest du an der Spacewing verbessern?', a: ['Erst das Sprungtriebwerk, sonst bleibst du ewig bei Rhea. Dann Schilde. Die SW-2 hat einen Rumpf wie ein Panzer, aber Schilde wie ein Regenschirm.'] },

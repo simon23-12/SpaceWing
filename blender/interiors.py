@@ -743,8 +743,7 @@ def kabine():
     S.append(box('galley_top', wood, (0.62, 0.78, 0.04), (-2.18, -0.95, 0.92)))
     S.append(box('dispenser', trim, (0.3, 0.3, 0.45), (-2.3, -1.12, 1.17), bevel=0.02))
     S.append(box('dispenser_glow', led_cool, (0.01, 0.12, 0.05), (-2.14, -1.12, 1.3)))
-    S.append(cyl('kettle', ceramic, 0.07, 0.16, (-2.15, -0.72, 1.02), rot=(0, 0, 0), n=16))
-    S.append(cyl('cup0', ceramic, 0.04, 0.09, (-2.0, -0.88, 0.985), rot=(0, 0, 0), n=12))
+    marker('gadget_spot', 'espresso', (-2.2, -0.72, 0.94), R(0))   # the espresso machine stands here (runtime model)
     # jacket on a hook and boots by the door
     S.append(cyl('hook', trim, 0.015, 0.1, (-2.43, -1.75, 1.75), rot=(0, R(90), 0), n=8))
     S.append(box('jacket', leather, (0.12, 0.5, 0.75), (-2.38, -1.75, 1.36), rot=(R(3), R(4), 0), bevel=0.05))
@@ -778,6 +777,21 @@ def kabine():
     for y in (-1.6, -1.4):
         S.append(box(f'locker_handle{y}', trim, (0.03, 0.02, 0.22), (1.84, y, 1.1)))
     S.append(box('locker_tag', mat_simple('tag', '#d8c890', 0.6), (0.01, 0.2, 0.08), (1.85, -1.5, 1.7)))
+    # display shelf for keepsakes from missions (the objects themselves are added at runtime)
+    vy0, vy1 = -0.95, 0.55
+    S.append(box('vit_back', mat_simple('vit_back', '#1c2026', 0.6), (0.03, vy1 - vy0, 1.45), (2.47, (vy0 + vy1) / 2, 1.5)))
+    for sy in (vy0, vy1):
+        S.append(box(f'vit_side{sy}', wood, (0.3, 0.04, 1.45), (2.33, sy, 1.5)))
+    for k, z in enumerate((0.78, 1.18, 1.58, 1.98, 2.22)):
+        S.append(box(f'vit_board{k}', wood, (0.3, vy1 - vy0, 0.03), (2.33, (vy0 + vy1) / 2, z)))
+        if k < 4:
+            S.append(box(f'vit_led{k}', led_cool, (0.02, vy1 - vy0 - 0.1, 0.012), (2.2, (vy0 + vy1) / 2, z + 0.37)))
+    for row, z in enumerate((0.795, 1.195, 1.595)):
+        for col, y in enumerate((-0.68, -0.2, 0.28)):
+            marker('slot', f'v{row}{col}', (2.32, y, z), R(180))
+    for k, x in enumerate((0.3, 1.0)):
+        marker('slot', f'sill{k}', (x, Y1 - 0.2, 0.555), R(-90))
+    point_light('vit_l', (2.15, -0.2, 1.9), 5, '#cfe8ff', 0.05)
     # poster next to the door (holo print)
     S.append(box('poster', poster, (0.62, 0.01, 0.86), (1.55, Y0 + 0.14, 1.45)))
     Gl.append(text_mesh('poster_t1', 'ROCHE-GRENZE', mat_emit('glow_neon_pink', '#ff4ac8', 10), 0.075, (1.55, Y0 + 0.155, 1.62), rot=(R(90), 0, R(180))))

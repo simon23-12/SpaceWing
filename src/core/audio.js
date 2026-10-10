@@ -245,6 +245,18 @@ export class Audio {
     const g = C.createGain(); this.env(g, t, 0.05, 0.35, 0.9);
     n.connect(f).connect(g).connect(this.sfx); n.start(t); n.stop(t + 1);
   }
+  /** Espresso machine: pump buzz and a hiss of steam. */
+  espresso() {
+    if (!this.ctx) return;
+    const C = this.ctx, t = C.currentTime;
+    const o = C.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 118;
+    const f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+    const g = C.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.12, t + 0.1); g.gain.setValueAtTime(0.12, t + 1.6); g.gain.linearRampToValueAtTime(0.0001, t + 1.9);
+    o.connect(f).connect(g).connect(this.sfx); o.start(t); o.stop(t + 2);
+    const n = this.noiseSource(); const nf = C.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 3500; nf.Q.value = 0.7;
+    const ng = C.createGain(); ng.gain.setValueAtTime(0.0001, t + 1.7); ng.gain.linearRampToValueAtTime(0.18, t + 1.8); ng.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+    n.connect(nf).connect(ng).connect(this.sfx); n.start(t + 1.6); n.stop(t + 2.9);
+  }
   lockTone() { this.beep(1320, 0.12, 0.08); setTimeout(() => this.beep(1320, 0.12, 0.08), 140); }
   blip() { this.beep(880, 0.05, 0.04); }
   click() { this.beep(1400, 0.03, 0.03, 'triangle'); }

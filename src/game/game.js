@@ -9,6 +9,7 @@ import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation } fro
 import { STORY, npcDialogue, finaleChoice, kroneEnding, PEOPLE } from './story.js';
 import { Director, onDockJobs, generateJobs } from './missions.js';
 import { FlightMode } from '../space/flight.js';
+import { checkGadgets, GADGETS } from '../station/gadgets.js';
 import { RoomMode } from '../station/room.js';
 import { ZONES } from '../space/universe.js';
 
@@ -118,6 +119,7 @@ export class Game {
   /** Announce moons that became reachable since the last check (the game's levels). */
   checkUnlocks() {
     const g = this.state;
+    for (const G of checkGadgets(g)) { this.ui.notify(`<b style="color:var(--warm)">NEU IN DEINER KABINE</b><br>${G.name}`); logEntry(g, `Erinnerungsstück: ${G.name}`); }
     g.moonsOpen = g.moonsOpen || ['rhea'];
     for (const id of MOON_ORDER) {
       if (g.moonsOpen.includes(id) || !MOONS[id].unlock(g)) continue;
@@ -237,6 +239,14 @@ export class Game {
       this.save(); return;
     }
     if (m.kind === 'ship') return this.launch();
+    if (m.kind === 'gadget') {
+      const G = GADGETS[m.id];
+      if (m.id !== 'espresso') { this.ui.notify(`<b style="color:var(--warm)">${G.name}</b><br>${G.text}`); return; }
+      if (g.credits < 1) { this.ui.notify('Kein Kredit, kein Espresso.'); return; }
+      g.credits -= 1; this.ui.refreshTopbar(); this.audio.espresso?.(); room.brewEspresso?.();
+      this.ui.notify(['Ein Espresso. Schwarz wie der Raum zwischen den Ringen. −1 Cr', 'Kurz, stark, heiß. Deck 4 hat schlechtere Ideen gehabt. −1 Cr', 'Die Maschine zischt zufrieden. −1 Cr'][Math.floor(Math.random() * 3)]);
+      return;
+    }
     if (m.kind === 'band') { this.ui.notify('„Roche-Grenze“ – Saffi Lindqvist (Gesang, hier: Saxofon-Hologramm), Bass, Rhodes. Live mit 2,3 s Lichtverzögerung.'); return; }
     if (m.kind === 'terminal') {
       if (m.id === 'boerse') return this.ui.openBoerse();

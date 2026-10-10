@@ -9,6 +9,7 @@ import { ShipModel } from '../space/shipModel.js';
 import { NPC } from './npc.js';
 import { DeckDoor, Lift } from './deck.js';
 import { BARKS, PEOPLE } from '../game/story.js';
+import { GADGETS } from './gadgets.js';
 
 /*
  * Hochstation Cassini, Deck 4: one continuous, walkable level. Every room (Blender-baked GLB + lightmap)
@@ -286,6 +287,7 @@ export class RoomMode {
     const holo = this.parts.bruecke?.meta.holo;
     if (holo) this.holoTable(this.parts.bruecke.toWorld(holo));
     if (this.parts.bruecke) this.simPod(this.parts.bruecke.toWorld([-12.2, 0, -3.2]));
+    if (this.parts.kabine) jobs.push(this.placeGadgets());
     const pad = this.parts.hangar?.meta.pad;
     if (pad) {
       const ship = this.game.launchShipRecord();
@@ -300,32 +302,59 @@ export class RoomMode {
     for (const n of this.npcs) { n.obj.visible = sees.includes(n.room); if (n.extra) n.extra.visible = n.obj.visible; }
   }
 
-  /** Combat simulator pod: a cockpit shell under a holographic hood, with a sign. */
-  simPod(pos) {
-    const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = Math.PI / 2;
-    const metal = new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.45, metalness: 0.7 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.7, metalness: 0.3 });
-    const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color('#4ad0ff').multiplyScalar(2), toneMapped: false });
-    const holo = new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
-    const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.x = rx; g.add(m); return m; };
-    add(new THREE.CylinderGeometry(1.35, 1.45, 0.25, 40), metal, 0, 0.125);
-    add(new THREE.TorusGeometry(1.38, 0.03, 8, 64), glow, 0, 0.26, 0, Math.PI / 2);
-    add(new THREE.BoxGeometry(0.7, 0.12, 0.7), dark, 0, 0.62);                       // seat
-    add(new THREE.BoxGeometry(0.7, 0.8, 0.12), dark, 0, 1.0, 0.36);                   // backrest
-    add(new THREE.CylinderGeometry(0.12, 0.18, 0.4, 12), metal, 0, 0.45);
-    add(new THREE.BoxGeometry(0.9, 0.08, 0.35), metal, 0, 0.95, -0.45, -0.4);         // console
-    add(new THREE.BoxGeometry(0.7, 0.4, 0.02), glow, 0, 1.18, -0.55, -0.25);         // screen
-    const hood = add(new THREE.SphereGeometry(1.25, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), holo, 0, 0.3);
-    const ring = add(new THREE.TorusGeometry(1.26, 0.02, 6, 64), glow, 0, 1.1, 0, Math.PI / 2);
-    // sign
+  /** Keepsakes in the cabin: the espresso machine on the galley counter, everything else in the display shelf. */
+  async placeGadgets() {
+    const g = this.game.state;
+    const owned = (g.gadgets || ['espresso']).slice();
+    if (!owned.includes('espresso')) owned.unshift('espresso');
+    const spot = this.markers.find(m => m.kind === 'gadget_spot' && m.id === 'espresso');
+    const slots = this.markers.filter(m => m.kind === 'slot').sort((a, b) => (a.id[0] === 'v' ? 0 : 1) - (b.id[0] === 'v' ? 0 : 1) || a.id.localeCompare(b.id));   // shelf first, then the window sill
+    let si = 0;
+    for (const id of owned) {
+      const G = GADGETS[id]; if (!G) continue;
+      const m = id === 'espresso' ? spot : slots[si++];
+      if (!m) continue;
+      const obj = await G.build();
+      obj.position.copy(m.pos);
+      obj.rotation.y = Math.atan2(m.dir.x, m.dir.z);
+      if (id !== 'espresso') obj.scale.setScalar(1.6);
+      this.scene.add(obj);
+      if (id === 'espresso') this.espressoObj = obj;
+      this.markers.push({ kind: 'gadget', id, room: 'kabine', pos: m.pos.clone().add(new THREE.Vector3(0, id === 'espresso' ? -0.5 : -0.7, 0)), dir: m.dir.clone(), label: id === 'espresso' ? 'Espresso ziehen (1 Cr)' : 'Ansehen: ' + G.name });
+    }
+  }
+
+  brewEspresso() {
+    const e = this.espressoObj; if (!e) return;
+    const cup = e.position.clone().add(new THREE.Vector3(0, 0.12, 0).applyEuler(e.rotation)).add(new THREE.Vector3(0, 0, 0.15).applyEuler(e.rotation));
+    const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+    for (let i = 0; i < 14; i++) {
+      const sp = new THREE.Sprite(mat.clone()); sp.position.copy(cup); sp.scale.setScalar(0.03);
+      this.scene.add(sp);
+      this.animated.push({ kind: 'steam', sp, t: -1.7 - i * 0.09, base: cup.clone(), drift: new THREE.Vector3((Math.random() - 0.5) * 0.04, 0, (Math.random() - 0.5) * 0.04) });
+    }
+  }
+
+  /** Combat simulator capsule (Blender model): the glass hood swings open on its rear hinge when you come close. */
+  async simPod(pos) {
+    const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = -Math.PI / 2;
+    this.scene.add(g);
+    const [body, hood] = await Promise.all([ShipModel.load('prop_simpod').catch(() => null), ShipModel.load('prop_simpod_hatch').catch(() => null)]);
+    if (body) { body.update(0, 0); g.add(body.root); }
+    let pivot = null;
+    if (hood) {
+      const hinge = (body?.root.getObjectByName('hinge') || hood.root.getObjectByName('hinge'))?.position.clone() || new THREE.Vector3(0, 1.06, 1.45);
+      pivot = new THREE.Group(); pivot.position.copy(hinge); g.add(pivot);
+      hood.root.position.copy(hinge).negate(); pivot.add(hood.root); hood.update(0, 0);
+    }
+    // sign above
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
     const x = cv.getContext('2d'); x.fillStyle = '#7fe0ff'; x.font = '600 52px Rajdhani, sans-serif'; x.textAlign = 'center'; x.fillText('GEFECHTSSIMULATOR', 256, 64);
     const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-    const sign = add(new THREE.PlaneGeometry(2.4, 0.45), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, color: new THREE.Color(1.6, 1.6, 1.6) }), 0, 2.2);
-    sign.userData.billboard = true;
-    this.scene.add(g);
-    this.animated.push({ kind: 'sim', hood, ring, sign });
-    const box = new THREE.Box3(new THREE.Vector3(-1.3, 0, -1.3), new THREE.Vector3(1.3, 2.4, 1.3));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.45), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    sign.position.set(0, 2.6, 0); g.add(sign);
+    this.animated.push({ kind: 'sim', pivot, sign, open: 0, pod: g });
+    const box = new THREE.Box3(new THREE.Vector3(-0.95, 0, -1.55), new THREE.Vector3(0.95, 2.0, 1.55));
     g.updateMatrixWorld(true);
     (this.shipBoxes ||= []).push({ box, inv: g.matrixWorld.clone().invert(), m: g.matrixWorld.clone() });
     this.markers.push({ kind: 'terminal', id: 'sim', label: 'Gefechtssimulator', room: 'bruecke', pos: pos.clone(), dir: new THREE.Vector3(1, 0, 0) });
@@ -505,9 +534,19 @@ export class RoomMode {
     }
     for (const a of this.animated) {
       if (a.kind === 'band') a.mat.uniforms.time.value = this.time;
+      else if (a.kind === 'steam') {
+        a.t += dt;
+        if (a.t < 0) continue;
+        const k = a.t / 2.2;
+        a.sp.position.copy(a.base).addScaledVector(a.drift, k * 3).add(new THREE.Vector3(0, k * 0.35, 0));
+        a.sp.scale.setScalar(0.03 + k * 0.1); a.sp.material.opacity = Math.max(0, 0.35 * (1 - k)) * Math.min(1, a.t * 4);
+        if (k >= 1) { this.scene.remove(a.sp); a.done = true; }
+      }
       else if (a.kind === 'sim') {
-        a.ring.position.y = 0.4 + (Math.sin(this.time * 0.9) * 0.5 + 0.5) * 1.1;
-        a.hood.material.opacity = 0.12 + 0.06 * Math.sin(this.time * 2.3);
+        const near = a.pod.position.distanceTo(this.pos) < 3.4;
+        if (near !== a.wasNear) { a.wasNear = near; this.game.audio?.door?.(near, a.pod.position, true); }
+        a.open += ((near ? 1 : 0) - a.open) * Math.min(1, dt * 2.2);
+        if (a.pivot) a.pivot.rotation.x = THREE.MathUtils.smoothstep(a.open, 0, 1) * 1.15;
         a.sign.lookAt(this.camera.position.x, a.sign.getWorldPosition(new THREE.Vector3()).y, this.camera.position.z);
       }
       else if (a.kind === 'holo') {
@@ -516,6 +555,7 @@ export class RoomMode {
         a.moons.forEach(m => { m.userData.a += dt * m.userData.s; m.position.set(Math.cos(m.userData.a) * m.userData.r, Math.sin(m.userData.a) * m.userData.r * 0.34, Math.sin(m.userData.a) * m.userData.r * 0.94); });
       }
     }
+    if (this.animated.some(a => a.done)) this.animated = this.animated.filter(a => !a.done);
     for (const w of this.walkers) this.walk(w, dt);
     for (const n of this.npcs) {
       if (!n.obj.visible) continue;
@@ -621,11 +661,11 @@ export class RoomMode {
       if (!best || score < best.score) best = { m, score };
     };
     for (const m of this.markers) {
-      if (!['npc', 'terminal', 'ship', 'band'].includes(m.kind)) continue;
+      if (!['npc', 'terminal', 'ship', 'band', 'gadget'].includes(m.kind)) continue;
       let p = m.pos.clone(); p.y += m.kind === 'npc' ? (m.seated ? 0.9 : 1.2) : 1.0;
       if (m.kind === 'ship' && this.shipModel) p = this.shipModel.root.getWorldPosition(new THREE.Vector3());
       if (m.kind === 'npc' && !this.npcs.some(n => n.id === m.id)) continue;
-      consider(m, p, m.kind === 'ship' ? 14 : m.kind === 'band' ? 6 : 2.6, m.kind === 'ship' ? 0.6 : 0.75);
+      consider(m, p, m.kind === 'ship' ? 14 : m.kind === 'band' ? 6 : m.kind === 'gadget' ? 1.9 : 2.6, m.kind === 'ship' ? 0.6 : m.kind === 'gadget' ? 0.86 : 0.75);
     }
     for (const n of this.npcs) {
       if (n.holo || n.marker?.kind === 'npc' || !n.obj.visible) continue;
