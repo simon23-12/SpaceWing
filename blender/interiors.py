@@ -882,8 +882,10 @@ def hangar():
     marker('ship', 'ship', (2, 0, 0.2), R(0), label='Einsteigen und starten')
     # ---- Yara Benedek's workshop in the north-east corner (under the catwalk)
     red = mat_paint('toolchest', '#a8241c', color2='#5a1410', wear=0.5, dirt=0.4, scale=3, panel=0.4)
-    steel = mat_metal('bench_steel', '#8a8d92', 0.3, metal=0.9, scale=3)
-    peg = mat_simple('pegboard', '#3a3d42', 0.8)
+    steel = mat_metal('bench_steel', '#a4a8ae', 0.42, metal=0.15, scale=3)   # matte: baked lighting cannot show metal reflections
+    wsm = mat_metal('ws_matte', '#6e737a', 0.55, metal=0.1, grime=0.5, scale=3)
+    engm = mat_paint('ws_engine_paint', '#8a8f95', color2='#5a5f66', wear=0.6, dirt=0.5, metal=0.1, rough=0.5, scale=2)
+    peg = mat_simple('pegboard', '#5c6066', 0.8)
     floorpaint = mat_simple('ws_floor', '#3c3f45', 0.85)
     tank_g = mat_paint('gas_green', '#2f6a3a', wear=0.5, dirt=0.4, scale=3, panel=0.0)
     tank_r = mat_paint('gas_red', '#8a2a20', wear=0.5, dirt=0.4, scale=3, panel=0.0)
@@ -892,20 +894,20 @@ def hangar():
         S.append(box(f'ws_line{cx}{cy}', hazard, (sx, sy, 0.014), (cx, cy, 0.008)))
     for k, bx in enumerate((12.5, 15.5)):
         S.append(box(f'ws_bench{k}', steel, (2.6, 0.95, 0.06), (bx, 15.95, 0.95)))
-        S.append(box(f'ws_bench_body{k}', trim, (2.5, 0.85, 0.85), (bx, 15.95, 0.47), bevel=0.02))
+        S.append(box(f'ws_bench_body{k}', wsm, (2.5, 0.85, 0.85), (bx, 15.95, 0.47), bevel=0.02))
         S.append(box(f'ws_peg{k}', peg, (2.5, 0.04, 1.4), (bx, 16.84, 1.9)))
         for t in range(7):   # tools on the pegboard
             tx = bx - 1.0 + t * 0.33
             if t % 3 == 0: S.append(box(f'ws_wrench{k}{t}', steel, (0.05, 0.03, 0.42), (tx, 16.8, 1.85), rot=(0, R(8), 0)))
             elif t % 3 == 1: S.append(cyl(f'ws_driver{k}{t}', red, 0.025, 0.3, (tx, 16.8, 1.95), rot=(0, 0, 0), n=8))
             else: S.append(box(f'ws_hammer{k}{t}', dark, (0.16, 0.05, 0.08), (tx, 16.79, 2.15)))
-        S.append(box(f'ws_lamp{k}', trim, (1.2, 0.18, 0.08), (bx, 15.95, 2.7)))
+        S.append(box(f'ws_lamp{k}', wsm, (1.2, 0.18, 0.08), (bx, 15.95, 2.7)))
         S.append(box(f'ws_lamp_glow{k}', led, (1.1, 0.12, 0.02), (bx, 15.95, 2.655)))
         S.append(cyl(f'ws_lamp_wire{k}', dark, 0.01, 3.3, (bx, 15.95, 4.35), rot=(0, 0, 0), n=6))
         point_light(f'ws_pl{k}', (bx, 15.6, 2.4), 160, '#ffd9a8', 0.3)
     S.append(box('ws_vise', dark, (0.2, 0.3, 0.18), (11.6, 15.7, 1.07)))
-    S.append(box('ws_part', trim, (0.6, 0.4, 0.25), (15.2, 15.9, 1.1), rot=(0, 0, R(12)), bevel=0.04))
-    S.append(cyl('ws_partcyl', trim, 0.16, 0.5, (16.2, 15.8, 1.14), rot=(0, R(90), 0), n=16))
+    S.append(box('ws_part', wsm, (0.6, 0.4, 0.25), (15.2, 15.9, 1.1), rot=(0, 0, R(12)), bevel=0.04))
+    S.append(cyl('ws_partcyl', wsm, 0.16, 0.5, (16.2, 15.8, 1.14), rot=(0, R(90), 0), n=16))
     # rolling tool chest
     S.append(box('ws_chest', red, (1.3, 0.65, 1.05), (9.2, 15.9, 0.6), bevel=0.02))
     for d in range(5):
@@ -914,23 +916,23 @@ def hangar():
         S.append(cyl(f'ws_wheel{sx}', dark, 0.06, 0.05, (9.2 + sx, 15.7, 0.06), rot=(0, R(90), 0), n=12))
     # engine on an assembly stand
     # engine on an assembly stand (axis along x)
-    S.append(cyl('ws_engine', steel, 0.55, 2.2, (14.0, 11.8, 1.25), rot=(0, R(90), 0), n=32))
-    S.append(cyl('ws_engine_bell', trim, 0.62, 0.7, (15.4, 11.8, 1.25), rot=(0, R(90), 0), n=32, r2=0.45))
+    S.append(cyl('ws_engine', engm, 0.55, 2.2, (14.0, 11.8, 1.25), rot=(0, R(90), 0), n=32))
+    S.append(cyl('ws_engine_bell', wsm, 0.62, 0.7, (15.4, 11.8, 1.25), rot=(0, R(90), 0), n=32, r2=0.45))
     S.append(cyl('ws_engine_intake', dark, 0.42, 0.06, (12.88, 11.8, 1.25), rot=(0, R(90), 0), n=32))
     for k, ex in enumerate((13.2, 13.9, 14.6)):
-        S.append(cyl(f'ws_engine_band{k}', trim, 0.58, 0.08, (ex, 11.8, 1.25), rot=(0, R(90), 0), n=32))
+        S.append(cyl(f'ws_engine_band{k}', wsm, 0.58, 0.08, (ex, 11.8, 1.25), rot=(0, R(90), 0), n=32))
     S.append(box('ws_engine_box', red, (0.5, 0.35, 0.3), (13.9, 11.8, 1.85), bevel=0.03))
     for sx in (-0.9, 0.9):
         S.append(box(f'ws_stand{sx}', hazard, (0.12, 0.12, 0.75), (14.0 + sx, 11.8, 0.38)))
-    S.append(box('ws_stand_base', trim, (2.2, 0.9, 0.08), (14.0, 11.8, 0.04)))
-    S.append(box('ws_cradle', trim, (2.0, 0.2, 0.12), (14.0, 11.8, 0.72)))
+    S.append(box('ws_stand_base', wsm, (2.2, 0.9, 0.08), (14.0, 11.8, 0.04)))
+    S.append(box('ws_cradle', wsm, (2.0, 0.2, 0.12), (14.0, 11.8, 0.72)))
     # welding bottles and a stack of hull plates
     for k, (x, m) in enumerate(((18.6, tank_g), (19.0, tank_r))):
         S.append(cyl(f'ws_gas{k}', m, 0.17, 1.4, (x, 16.3, 0.7), rot=(0, 0, 0), n=16))
     for k in range(4):
         S.append(box(f'ws_plate{k}', mat_paint('ws_plate_m', '#a8602f', color2='#8b8f8c', wear=0.8, rust=0.5, dirt=0.6, scale=2),
                      (1.6, 0.05, 1.1), (17.8, 10.0 + k * 0.07, 0.6), rot=(R(-12), 0, 0)))
-    S.append(box('ws_shelf', trim, (0.5, 2.4, 2.2), (19.1, 13.4, 1.1), bevel=0.02))
+    S.append(box('ws_shelf', wsm, (0.5, 2.4, 2.2), (19.1, 13.4, 1.1), bevel=0.02))
     for k in range(6):
         S.append(box(f'ws_bin{k}', mat_simple(f'bin{k % 3}', ['#2f5a8a', '#c8901a', '#5a5d62'][k % 3], 0.6), (0.4, 0.6, 0.3), (19.1 - 0.05, 12.6 + (k % 3) * 0.75, 0.55 + (k // 3) * 0.8)))
     Gl.append(text_mesh('ws_sign', 'WERKSTATT · Y. BENEDEK', mat_emit('glow_sign_ws', '#ffb050', 8), 0.32, (13.5, 16.86, 3.25), rot=(R(90), 0, R(180))))
