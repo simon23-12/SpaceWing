@@ -1,4 +1,4 @@
-# SpaceWing – Die Ringe des Kronos
+# SpaceWing Saturn
 
 *Story-Bibel. Saturnsystem, Jahr 2260.*
 
@@ -23,6 +23,20 @@ Der wichtigste Rohstoff ist **Helium‑3**. Ohne He‑3 laufen keine Fusionsantr
 | **B‑Ring‑Abbaufeld** | Revier der Ringgilde. Eisbrocken von Kieselgröße bis Hausgröße. Navigation nach Gefühl. |
 | **Das Gewölbe** (Iapetus) | In den Äquatorgrat des zweifarbigen Mondes gebaut. Sitz des Archivs. Offiziell eine Universität. |
 | **Schakalnest** (Phoebe) | Piratenbasis auf dem dunklen, rückläufigen Außenmond. |
+
+### Die fünf Monde (Level)
+
+Das Spiel ist in fünf Mondsysteme gegliedert. Jedes ist ein Level mit eigener Station, Stimmung und Rolle im Handelskrieg. Man reist per Hyperraumsprung. Dafür braucht das Schiff ein Sprungtriebwerk passender Klasse, und der Mond muss freigeschaltet sein.
+
+| Mond | Station | Sprungklasse | Freigeschaltet durch | Rolle im Handelskrieg | Stimmung |
+|---|---|---|---|---|---|
+| **Rhea** | Hochstation Cassini | – | Start | Neutraler Freihafen, Söldnerbörse, Heimat | grau, hell, belebt; Strahlenkrater Inktomi |
+| **Enceladus** | Quelle | I | Mission 1 „Eisfracht“ | Wasser für das ganze System, Kollektiv | weiß, eisblau, Geysire, Tigerstreifen |
+| **Mimas** | Herschel‑Depot (+ Gildenhalle am Ringrand) | I | „Ordnung durch Zoll“ oder Rang Frachtpilot | Schwarzmarkt, Ringgilde, Cassini‑Teilung | dunkel, rostrot, „Todesstern“‑Krater |
+| **Titan** | Kraken‑Hafen | II | „Ordnung durch Zoll“ | Methan, He‑3‑Raffinerien, Konsortium | orange, golden, Dunst |
+| **Iapetus** | Das Gewölbe (+ Phoebe weit draußen) | III | „Funkstille“ | Archiv, Vesper‑Prognose, Schakalnest | violett, unheimlich, schwarz‑weiß |
+
+Saturn steht in jedem Level am Himmel und ist im HUD als Fixpunkt markiert. Auf jeder Station kann man ein Apartment kaufen. Wer zwei besitzt, reist per Transit‑Kapsel zwischen ihnen.
 
 ### Fraktionen
 

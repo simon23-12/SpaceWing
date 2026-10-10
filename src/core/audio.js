@@ -1,5 +1,12 @@
 // Procedural audio: SFX synthesis, ambient score and a live jazz trio for the bar. No samples.
 
+const MOON_PROGS = {
+  rhea: { prog: [[50, 57, 62, 65, 69], [46, 53, 58, 62, 65], [48, 55, 60, 64, 67], [45, 52, 57, 60, 64]], bells: 0.22, bellOct: 24, pad: 1 },          // D dorian
+  enceladus: { prog: [[52, 59, 64, 68, 71], [54, 61, 66, 70, 73], [52, 59, 63, 68, 71], [49, 56, 61, 64, 68]], bells: 0.4, bellOct: 24, pad: 0.8 },  // E lydian, glassy
+  mimas: { prog: [[45, 52, 55, 58], [46, 53, 58, 61], [43, 50, 55, 58], [46, 49, 53, 58]], bells: 0.08, bellOct: 12, pad: 1.2 },                    // A phrygian, dark
+  titan: { prog: [[48, 55, 60, 64, 67], [46, 53, 58, 62, 65], [53, 60, 65, 69, 72], [51, 58, 63, 67, 70]], bells: 0.16, bellOct: 24, pad: 1.1 },     // C mixolydian, warm
+  iapetus: { prog: [[49, 55, 61, 65], [51, 57, 63, 67], [47, 53, 59, 63], [49, 53, 57, 63]], bells: 0.3, bellOct: 19, pad: 0.9 },                     // whole-tone, eerie
+};
 const NOTE = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
 export class Audio {
@@ -191,12 +198,15 @@ export class Audio {
     }
   }
 
-  // ambient: slow evolving pads in D dorian / aeolian + sparse bells, pulse when in combat
+  /** Each moon has its own harmonic colour for the flight score. */
+  setMoon(id) { this.moon = id; }
+
+  // ambient: slow evolving pads + sparse bells, pulse when in combat. Harmony depends on the moon.
   ambientBeat(s, t, spb) {
-    const prog = [[50, 57, 62, 65, 69], [46, 53, 58, 62, 65], [48, 55, 60, 64, 67], [45, 52, 57, 60, 64]];
-    const chord = prog[Math.floor(s.bar / 2) % prog.length];
-    if (s.beat % 8 === 0) for (const m of chord) this.pad(NOTE(m), t, spb * 8.5, 0.035);
-    if (Math.random() < 0.22) this.bell(NOTE(chord[Math.floor(Math.random() * chord.length)] + 24), t, 0.03);
+    const P = MOON_PROGS[s.mode === 'space' ? (this.moon || 'rhea') : 'rhea'];
+    const chord = P.prog[Math.floor(s.bar / 2) % P.prog.length];
+    if (s.beat % 8 === 0) for (const m of chord) this.pad(NOTE(m), t, spb * 8.5, 0.035 * P.pad);
+    if (Math.random() < P.bells) this.bell(NOTE(chord[Math.floor(Math.random() * chord.length)] + P.bellOct), t, 0.03);
     if (s.combat > 0.2) {
       this.pluck(NOTE(chord[0] - 12), t, 0.12 * s.combat, 0.25);
       if (s.beat % 2 === 0) this.kick(t, 0.25 * s.combat);

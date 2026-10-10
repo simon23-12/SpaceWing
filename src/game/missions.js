@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { STATIONS, COMMODITIES, SHIP_CLASSES } from './data.js';
+import { STATIONS, COMMODITIES, SHIP_CLASSES, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from './data.js';
 import { ZONES, travelInfo } from '../space/universe.js';
 import { addCredits, logEntry, fmt, activeShip, cargoFree } from './state.js';
 import { STORY } from './story.js';
@@ -59,17 +59,22 @@ export function scriptContext(flight) {
 function rnd(seed) { let s = seed >>> 0; return () => ((s = Math.imul(s ^ (s >>> 15), 2246822507) + 0x9e3779b9 >>> 0) / 4294967296); }
 
 const STATION_IDS = () => Object.keys(STATIONS).filter(s => !STATIONS[s].locked);
+/** Stations / zones in moon systems the player has unlocked (the levels). */
+const openStations = (g) => STATION_IDS().filter(s => MOONS[moonOfStation(s)]?.unlock(g));
+const openZones = (g) => MOON_ORDER.filter(m => MOONS[m].unlock(g)).flatMap(m => MOONS[m].zones).filter(z => !ZONES[z].hostile);
+const jumpNote = (from, toZone) => { const a = moonOfZone(from), b = moonOfZone(toZone); return a === b ? '' : ` Sprungklasse ${JUMP_CLASS[MOONS[b].jump]} nötig.`; };
 
 export function generateJobs(g, station) {
   const key = station + ':' + g.day;
   if (g.jobBoard[station]?.key === key) return g.jobBoard[station].jobs;
   const r = rnd(g.day * 7919 + station.length * 31 + (g.kills || 0));
   const jobs = [];
-  const others = STATION_IDS().filter(s => s !== station);
+  const others = openStations(g).filter(s => s !== station);
   const n = 4 + Math.floor(r() * 3);
   const tier = Math.min(4, Math.floor((g.earned || 0) / 15000));
   for (let i = 0; i < n; i++) {
-    const kind = r() < 0.6 ? 'fracht' : r() < 0.6 ? 'kopfgeld' : 'eskorte';
+    let kind = r() < 0.6 ? 'fracht' : r() < 0.6 ? 'kopfgeld' : 'eskorte';
+    if (kind === 'fracht' && !others.length) kind = r() < 0.6 ? 'kopfgeld' : 'eskorte';
     const id = `J${g.day}-${station}-${i}`;
     if (kind === 'fracht') {
       const to = others[Math.floor(r() * others.length)];
@@ -82,15 +87,15 @@ export function generateJobs(g, station) {
       const client = ['Kollektiv-Versorgung', 'Hallström Nachfolge GmbH', 'Ringgilde Clan Abara', 'Konsortiums-Logistik', 'Freie Händler Rhea', 'Dr. Ibe Medizintechnik'][Math.floor(r() * 6)];
       jobs.push({ id, kind, from: station, to, com, amount, pay, risk, client,
         title: `Fracht: ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name}`,
-        text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}` });
+        text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` });
     } else if (kind === 'kopfgeld') {
-      const zones = ['rhea', 'enceladus', 'rings', 'mimas', 'titan'];
+      const zones = openZones(g).filter(z => z !== 'iapetus');
       const zone = zones[Math.floor(r() * zones.length)];
       const count = 2 + Math.floor(r() * (2 + tier));
       const pay = Math.round((700 + count * 420 + tier * 300) / 10) * 10;
       jobs.push({ id, kind, zone, count, pay, client: 'Söldnerbörse',
         title: `Kopfgeld: ${count} Schakale bei ${ZONES[zone].name.split(' ·')[0]}`,
-        text: `Eine Schakal-Rotte lauert bei ${ZONES[zone].name}. Zahlung pro Abschuss, Bonus bei Vollzug.` });
+        text: `Eine Schakal-Rotte lauert bei ${ZONES[zone].name}. Zahlung pro Abschuss, Bonus bei Vollzug.${jumpNote(STATIONS[station].zone, zone)}` });
     } else {
       const zone = STATIONS[station].zone;
       const pay = Math.round((1200 + tier * 500 + r() * 600) / 10) * 10;

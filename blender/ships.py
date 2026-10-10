@@ -50,66 +50,73 @@ def nav_lights(left, right, tail, glow_r, glow_g, glow_w):
 # ------------------------------------------------------------------------------------------- ships
 
 def spacewing():
-    """Hawker-Lindqvist SW-2 'Spacewing' – Teo Okafor's old courier fighter. Faded orange, rusty."""
+    """Hawker-Lindqvist SW-2 'Spacewing' - Teo Okafor's old courier interceptor. A flat wedge with two big
+    rear engine nacelles, cockpit far forward, swivel cannons on the nacelle flanks. Faded orange, rusty."""
     paint = mat_paint('hull_sw', '#a8602f', color2='#8b8f8c', wear=0.85, rust=0.55, dirt=0.7, metal=0.2, rough=0.55,
-                      stripe=('y', 4.5, 0.45))
+                      stripe=('y', 4.9, 0.3))
     metal = mat_metal('metal_sw', '#6a6c70', 0.42, metal=0.7, grime=0.6)
     dark = mat_rubber('dark_sw', '#1c1d1f')
     glow = mat_emit('glow_engine_sw', '#7fb6ff', 10)
     gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
     glass = mat_glass('glass_sw', '#0b1218')
     P = []
+    # wedge body: pointed nose, widening to a flat trapezoid that carries the engines
     fus = loft('fuselage', [
-        dict(y=6.9, w=0.06, h=0.05, z=-0.12),
-        dict(y=6.4, w=0.62, h=0.42, z=-0.08, e=2.2),
-        dict(y=5.4, w=1.15, h=0.86, z=-0.02, e=2.6, flat=0.8),
-        dict(y=4.0, w=1.6, h=1.25, z=0.08, e=3.0, flat=0.75),
-        dict(y=2.2, w=1.95, h=1.45, z=0.14, e=3.2, flat=0.75),
-        dict(y=0.0, w=2.25, h=1.42, z=0.1, e=3.4, flat=0.8),
-        dict(y=-2.6, w=2.4, h=1.28, z=0.06, e=3.6, flat=0.85),
-        dict(y=-4.6, w=2.1, h=1.12, z=0.06, e=3.6),
-        dict(y=-6.0, w=1.65, h=0.95, z=0.1, e=3.2),
-        dict(y=-6.35, w=1.35, h=0.75, z=0.1, e=3.0),
-    ], paint, n=40)
+        dict(y=6.3, w=0.08, h=0.05, z=-0.05),
+        dict(y=5.7, w=0.75, h=0.26, z=-0.04, e=3.0),
+        dict(y=4.2, w=1.9, h=0.58, z=0.0, e=4.0),
+        dict(y=2.2, w=3.1, h=0.82, z=0.0, e=4.5),
+        dict(y=0.0, w=4.25, h=0.98, z=0.0, e=5.0),
+        dict(y=-2.4, w=5.0, h=1.04, z=0.0, e=5.5),
+        dict(y=-4.3, w=5.2, h=0.96, z=0.0, e=5.5),
+        dict(y=-4.75, w=4.7, h=0.7, z=0.0, e=4.5),
+    ], paint, n=44, sharp=30)
     P.append(fus)
-    # canopy + frame
-    P.append(sphere('canopy', glass, 1.0, (0, 3.15, 0.62), scale=(0.62, 1.75, 0.5)))
-    P.append(box('canopy_frame', metal, (0.06, 2.2, 0.05), (0, 3.0, 1.115), rot=(R(4), 0, 0)))
-    # wings
-    P.append(wing('wing', paint, root_y=-1.6, root_chord=4.4, tip_chord=1.3, span=4.4, sweep=-2.6, dihedral=-0.35,
-                  thick=0.16, x0=0.9, z0=-0.15))
-    # wingtip cannon pods
-    for sx in (1,):
-        P.append(cyl('pod', metal, 0.17, 2.6, (5.25, -2.6, -0.5)))
-        P.append(cyl('barrel', dark, 0.06, 1.8, (5.25, -0.5, -0.5)))
-        P.append(cyl('muzzle', metal, 0.085, 0.25, (5.25, 0.45, -0.5)))
-    for o in P[-3:]:
-        mirror_x_world(o)
-    # engines
-    eng, ex = engine_pod('eng', 1.45, 0.3, -1.2, -6.4, 0.62, paint, metal, glow)
+    # cockpit tub + bubble canopy, well forward of the engines
+    P.append(loft('cockpit_tub', [
+        dict(y=3.9, w=0.3, h=0.2, z=0.3), dict(y=3.3, w=1.1, h=0.8, z=0.42, e=3.0),
+        dict(y=1.4, w=1.5, h=1.1, z=0.5, e=3.4), dict(y=-0.4, w=1.3, h=0.95, z=0.45, e=3.4), dict(y=-1.6, w=0.6, h=0.4, z=0.36, e=3.0),
+    ], paint, n=32))
+    P.append(sphere('canopy', glass, 1.0, (0, 1.75, 0.98), scale=(0.58, 1.3, 0.5)))
+    P.append(box('canopy_frame', metal, (0.06, 2.3, 0.05), (0, 1.7, 1.47), rot=(R(3), 0, 0)))
+    for y in (1.0, 2.4):
+        P.append(box(f'canopy_rib{y}', metal, (1.1, 0.06, 0.05), (0, y, 1.38 - abs(y - 1.75) * 0.22)))
+    # big engine nacelles on the rear flanks
+    eng, ex = engine_pod('eng', 2.75, 0.0, 0.2, -5.95, 0.84, paint, metal, glow, n=32)
     P += eng
-    # tail fins on nacelles
-    for side in (1,):
-        f = wing('fin', paint, root_y=-5.2, root_chord=2.4, tip_chord=0.9, span=1.7, sweep=-1.1, dihedral=0.0,
+    for k, (y, rr) in enumerate(((-1.4, 0.88), (-3.4, 0.88))):
+        ring = lathe(f'eng_band{k}', [(y + 0.12, rr), (y - 0.12, rr)], metal, n=32, axis_pos=(2.75, 0, 0.0))
+        P.append(ring); mirror_x_world(ring)
+    # stabiliser fins above and below each nacelle
+    for k, (rot, z) in enumerate(((R(-90), 0.72), (R(90), -0.72))):
+        f = wing(f'fin{k}', paint, root_y=-4.6, root_chord=2.2, tip_chord=0.8, span=1.25 if k == 0 else 0.95, sweep=-1.0,
                  thick=0.12, x0=0.0, z0=0.0, mirror=False)
-        f.rotation_euler = (0, R(-72), 0)
-        f.location = (1.55, 0, 0.75)
-        P.append(f)
+        f.rotation_euler = (0, rot, 0)
+        f.location = (2.75, 0, z)
         swship.apply_all(f)
-        mirror_x(f)
-    # belly intake & details
-    P.append(box('intake', dark, (1.0, 1.6, 0.3), (0, 0.8, -0.7), bevel=0.05))
-    P.append(box('spine', metal, (0.5, 3.4, 0.25), (0, -2.2, 0.82), bevel=0.04))
-    P.append(cyl('antenna', metal, 0.02, 1.1, (0.3, -3.8, 1.3), rot=(R(-30), 0, 0)))
-    P.append(cyl('antenna2', metal, 0.015, 0.7, (-0.35, -2.5, 1.15), rot=(R(-20), 0, 0)))
+        P.append(f); mirror_x(f)
+    # swivel laser cannons on the outer nacelle flanks
+    for nm, ob in (('mount', box('mount', metal, (0.5, 1.1, 0.34), (3.55, -0.9, 0.0), bevel=0.05)),
+                   ('pod', cyl('pod', metal, 0.19, 1.9, (3.85, -0.7, 0.0))),
+                   ('barrel', cyl('barrel', dark, 0.065, 1.9, (3.85, 1.1, 0.0))),
+                   ('muzzle', cyl('muzzle', metal, 0.09, 0.28, (3.85, 2.1, 0.0)))):
+        P.append(ob); mirror_x_world(ob)
+    # details
+    P.append(box('intake', dark, (1.6, 0.9, 0.18), (0, -0.6, -0.55), bevel=0.04))
+    P.append(loft('spine', [dict(y=-1.4, w=0.2, h=0.1, z=0.45), dict(y=-2.2, w=0.9, h=0.5, z=0.5, e=3), dict(y=-4.2, w=1.0, h=0.55, z=0.5, e=3), dict(y=-4.7, w=0.8, h=0.3, z=0.45)], metal, n=24))
+    for sx in (-1, 1):
+        P.append(cyl(f'intake_fan{sx}', dark, 0.56, 0.06, (2.75 * sx, 0.25, 0.0), n=32))
+    P.append(box('rear_plate', metal, (3.4, 0.25, 0.5), (0, -4.7, 0.0), bevel=0.04))
+    P.append(cyl('antenna', metal, 0.02, 1.0, (0.45, -3.6, 0.95), rot=(R(-30), 0, 0)))
+    P.append(cyl('antenna2', metal, 0.015, 0.6, (-0.5, -2.2, 0.85), rot=(R(-20), 0, 0)))
     grb = mat_metal('greeble_sw', '#8a8c8f', 0.5, metal=0.5)
-    P += greebles(fus, grb, count=34, size=(0.14, 0.38), height=(0.02, 0.06), seed=3,
-                  region=lambda h: not (h.z > 0.25 and 0.9 < h.y < 5.4) and h.y < 4.8)
-    P += nav_lights((-5.25, -3.95, -0.5), (5.25, -3.95, -0.5), (0, -6.4, 0.75), gr, gg, gw)
-    E = [empty('exhaust_0', (-1.45, -7.25, 0.3)), empty('exhaust_1', (1.45, -7.25, 0.3)),
-         empty('gun_0', (-5.25, 0.6, -0.5)), empty('gun_1', (5.25, 0.6, -0.5)),
-         empty('cockpit', (0, 3.2, 0.95))]
-    return P, E, dict(dist=26, center=(0, 0, 0))
+    P += greebles(fus, grb, count=40, size=(0.14, 0.4), height=(0.02, 0.06), seed=3,
+                  region=lambda h: h.z > 0.3 and not (abs(h.x) < 1.0 and -1.8 < h.y < 4.0) and h.y < 4.4)
+    P += nav_lights((-3.85, -1.7, 0.22), (3.85, -1.7, 0.22), (0, -4.85, 0.4), gr, gg, gw)
+    E = [empty('exhaust_0', (-2.75, -6.7, 0.0)), empty('exhaust_1', (2.75, -6.7, 0.0)),
+         empty('gun_0', (-3.85, 2.3, 0.0)), empty('gun_1', (3.85, 2.3, 0.0)),
+         empty('cockpit', (0, 1.6, 0.95))]
+    return P, E, dict(dist=22, center=(0, 0, 0))
 
 
 def wespe():

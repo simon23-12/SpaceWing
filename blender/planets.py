@@ -45,6 +45,13 @@ def one_crater(g, d, center, radius, depth, rim=0.4):
     return g.mul(g.add(g.add(bowl, g.mul(peak, inside)), rimv), depth)
 
 
+def cap(g, d, center, radius):
+    """0..1 distance (in units of radius) from a direction on the sphere."""
+    c = np.array(center, float); c /= np.linalg.norm(c)
+    ang = g.math("ARCCOSINE", g.mn(g.dot(d, tuple(c)), 1.0))
+    return g.div(ang, radius)
+
+
 def hout(g, h, gain=0.5):
     return g.clamp01(g.add(0.5, g.mul(h, gain)))
 
@@ -107,7 +114,16 @@ def rhea(g, d, uv):
     x, y, z = g.sep(d)
     wisp, _ = g.noise(g.combine(g.mul(x, 2.0), g.mul(y, 2.0), g.mul(z, 14.0)), 2.0, 6, 0.65)
     trailing = g.smooth(g.mul(z, -1.0), 0.0, 0.6)
-    col = g.mix(g.mul(g.mul(g.smooth(wisp, 0.55, 0.75), trailing), 0.6), col, g.rgb("#e9e6df"))
+    col = g.mix(g.mul(g.mul(g.smooth(wisp, 0.5, 0.72), trailing), 0.85), col, g.rgb("#f2efe8"))
+    # Inktomi: young bright crater with a splash of rays, facing the station's orbit
+    ink = (-0.25, 0.42, -0.87)
+    xk = cap(g, d, ink, 0.07)
+    rays_n, _ = g.noise(g.vscale(d, 1.0), 9.0, 2, 0.5)
+    ang_n, _ = g.noise(g.vadd(g.vscale(d, 22.0), (3.1, 1.7, 0.4)), 1.0, 2, 0.5)
+    rays = g.mul(g.smooth(xk, 9.0, 1.0), g.smooth(ang_n, 0.52, 0.66))
+    halo = g.smooth(xk, 2.4, 0.6)
+    col = g.mix(g.clamp01(g.add(g.mul(rays, 0.95), g.mul(halo, 0.9))), col, g.rgb("#fbfaf6"))
+    h = g.add(h, one_crater(g, d, ink, 0.07, 0.5))
     return {"color": col, "height": hout(g, h)}
 
 
@@ -139,7 +155,15 @@ def mimas(g, d, uv):
     p = dict(craters=[(3.5, 0.6, 0.4), (9.0, 0.65, 0.25), (24.0, 0.7, 0.13), (60.0, 0.75, 0.06)],
              ramp=[(0.2, "#88857f"), (0.6, "#a8a59f"), (0.9, "#c4c1ba")], seed=4.0)
     h, col = moon_generic(g, d, p)
-    h = g.add(h, one_crater(g, d, (0.0, 0.0, 1.0), 0.42, 1.1, rim=0.5))
+    hz = (-0.45, 0.25, -0.86)   # faces the Herschel-Depot zone
+    h = g.add(h, one_crater(g, d, hz, 0.36, 1.4, rim=0.6))
+    x = cap(g, d, hz, 0.36)
+    floor_ = g.smooth(x, 0.95, 0.75)
+    col = g.mix(g.mul(floor_, 0.55), col, g.rgb("#6b6862"))
+    rimc = g.math("EXPONENT", g.mul(g.pow(g.mul(g.sub(x, 1.0), 6.0), 2.0), -1.0))
+    col = g.mix(g.mul(rimc, 0.7), col, g.rgb("#d8d5ce"))
+    peak = g.smooth(x, 0.16, 0.0)
+    col = g.mix(g.mul(peak, 0.85), col, g.rgb("#e2dfd8"))
     return {"color": col, "height": hout(g, h, 0.4)}
 
 
@@ -159,8 +183,10 @@ def enceladus(g, d, uv):
     xr = g.add(g.mul(x, 0.8), g.mul(z, 0.6))
     wob, _ = g.noise(g.vscale(d, 6.0), 1.0, 3, 0.5)
     stripe = g.math("SINE", g.mul(g.add(xr, g.mul(g.sub(wob, 0.5), 0.08)), 33.0))
-    stripes = g.mul(g.smooth(g.abs(stripe), 0.12, 0.0), g.smooth(y, -0.72, -0.82))
-    col = g.mix(g.mul(stripes, 0.8), col, g.rgb("#6f8ea6"))
+    stripes = g.mul(g.smooth(g.abs(stripe), 0.2, 0.0), g.smooth(y, -0.55, -0.7))
+    col = g.mix(g.mul(stripes, 0.95), col, g.rgb("#4f7896"))
+    glowz = g.smooth(y, -0.5, -0.75)
+    col = g.mix(g.mul(glowz, 0.25), col, g.rgb("#cfe6f5"))
     h = g.sub(h, g.mul(stripes, 0.35))
     return {"color": col, "height": hout(g, h)}
 
@@ -185,12 +211,14 @@ def iapetus(g, d, uv):
              ramp=[(0.2, "#b8b1a4"), (0.6, "#d3cdc1"), (0.9, "#e6e1d7")], seed=6.0)
     h, col = moon_generic(g, d, p)
     edge, _ = g.noise(g.vscale(d, 1.0), 4.0, 8, 0.65)
-    lead = g.add(g.dot(d, (0.0, 0.12, 0.99)), g.mul(g.sub(edge, 0.5), 0.45))
+    lead = g.add(g.dot(d, (0.54, 0.05, -0.84)), g.mul(g.sub(edge, 0.5), 0.45))
     dark = g.smooth(lead, 0.18, 0.32)
     col = g.mix(dark, col, g.ramp(edge, [(0.3, "#1d1712"), (0.7, "#3a2c20")]))
     ridge = g.math("EXPONENT", g.mul(g.pow(g.div(y, 0.025), 2.0), -1.0))
     rn, _ = g.noise(g.vscale(d, 8.0), 1.0, 4, 0.5)
     h = g.add(h, g.mul(ridge, g.add(0.6, g.mul(rn, 0.6))))
+    ridge_c = g.mul(g.math("EXPONENT", g.mul(g.pow(g.div(y, 0.035), 2.0), -1.0)), g.smooth(rn, 0.35, 0.6))
+    col = g.mix(g.mul(ridge_c, 0.6), col, g.rgb("#efe9dc"))
     return {"color": col, "height": hout(g, h, 0.4)}
 
 

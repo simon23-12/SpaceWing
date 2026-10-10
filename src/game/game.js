@@ -5,7 +5,7 @@ import { input } from '../core/input.js';
 import { assets } from '../core/assets.js';
 import { UI } from '../ui/ui.js';
 import { state, newGame, activeShip, logEntry, addCredits, fmt, addShip } from './state.js';
-import { STATIONS, shipStats } from './data.js';
+import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation } from './data.js';
 import { STORY, npcDialogue, finaleChoice, kroneEnding, PEOPLE } from './story.js';
 import { Director, onDockJobs, generateJobs } from './missions.js';
 import { FlightMode } from '../space/flight.js';
@@ -99,13 +99,29 @@ export class Game {
     m.dispose?.();
     this.ui.closeOverview();
     this.audio.setEngine(false);
+    this.renderer.setMood(null);
     this.mode = null;
   }
 
   // ------------------------------------------------------------------ station
+  /** Announce moons that became reachable since the last check (the game's levels). */
+  checkUnlocks() {
+    const g = this.state;
+    g.moonsOpen = g.moonsOpen || ['rhea'];
+    for (const id of MOON_ORDER) {
+      if (g.moonsOpen.includes(id) || !MOONS[id].unlock(g)) continue;
+      g.moonsOpen.push(id);
+      const M = MOONS[id];
+      logEntry(g, `Neues Ziel freigeschaltet: ${M.name} (Sprungklasse ${JUMP_CLASS[M.jump]})`);
+      this.ui.notify(`<b style="color:${M.color}">NEUER MOND: ${M.name.toUpperCase()}</b><br>${STATIONS[M.station].name} · Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig`);
+      this.audio?.coins?.();
+    }
+  }
+
   async enterStation(stationId, opts = {}) {
     const g = this.state;
     g.location = stationId; g.docked = true;
+    this.checkUnlocks();
     if (STATIONS[stationId].walkable) return this.toOverview();
     return this.dockMenu(stationId);
   }
@@ -150,8 +166,8 @@ export class Game {
     await this.ui.dialog([
       { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117, die kleinste Kabine auf dem Ring.' },
       { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Bezahlte Miete: noch drei Nächte. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.` },
-      { who: 'comp', text: 'Empfehlung: Arbeit finden. Die Bar „Cassini-Spalt“ liegt am Kommandodeck. Barkeeper wissen alles.' },
-      { who: 'comp', text: 'Steuerung: Klicken zum Umsehen, WASD zum Gehen, E zum Benutzen. Mit Tab geht es zur Brückenübersicht.' },
+      { who: 'comp', text: 'Empfehlung: Arbeit finden. Die Bar „Cassini-Spalt“ liegt am Ende des Ringgangs, links aus deiner Tür. Barkeeper wissen alles.' },
+      { who: 'comp', text: 'Steuerung: Klicken zum Umsehen, WASD zum Gehen, Shift zum Laufen, E zum Benutzen und Sprechen. Tab öffnet den Deckplan.' },
     ]);
   }
 
@@ -173,19 +189,24 @@ export class Game {
     this.mode = { kind: 'dock', render3D: false };
     const el = document.createElement('div');
     el.className = 'overview';
-    const bg = stationId === 'gewoelbe' ? 'assets/ui/vault.jpg' : 'assets/ui/dock.jpg';
+    const bg = { gewoelbe: 'assets/ui/vault.jpg', kraken: 'assets/ui/kraken.jpg', quelle: 'assets/ui/quelle.jpg', herschel: 'assets/ui/herschel.jpg' }[stationId] || 'assets/ui/dock.jpg';
+    const M = MOONS[moonOfStation(stationId)];
     el.innerHTML = `<div class="img" style="inset:0;background-image:url(${assets.url(bg)}), url(${assets.url('assets/stations/station_small/preview.jpg')});filter:brightness(.8)"></div>`;
     el.appendChild(this.ui.topbar());
     const panel = document.createElement('div');
     panel.className = 'sidehint';
     panel.style.cssText = 'top:80px;bottom:auto;left:40px;max-width:480px;display:flex;flex-direction:column;gap:10px;padding:20px';
-    panel.innerHTML = `<b style="font-size:24px">${st.name.toUpperCase()}</b><div>${st.blurb}</div>
+    panel.innerHTML = `<div style="letter-spacing:.3em;font-family:var(--f-head);color:${M?.color || '#9fd6ff'}">${(M?.name || '').toUpperCase()} · ${M?.tag || ''}</div><b style="font-size:24px">${st.name.toUpperCase()}</b><div>${st.blurb}</div>
       <button class="btn" data-a="boerse">Söldnerbörse</button><button class="btn" data-a="markt">Markt</button><button class="btn" data-a="werft">Werft &amp; Reparatur</button>
+      ${st.apartment ? `<button class="btn" data-a="apt">${this.state.apartments?.[stationId] ? '⌂ Apartment &amp; Transit' : 'Apartment kaufen'}</button>` : ''}
+      <button class="btn" data-a="map">Systemkarte</button>
       <button class="btn warm" data-a="launch">Abflug</button>`;
     panel.querySelector('[data-a="boerse"]').onclick = () => this.ui.openBoerse();
     panel.querySelector('[data-a="markt"]').onclick = () => this.ui.openMarket();
     panel.querySelector('[data-a="werft"]').onclick = () => this.ui.openWerft();
     panel.querySelector('[data-a="launch"]').onclick = () => this.launch();
+    panel.querySelector('[data-a="apt"]')?.addEventListener('click', () => this.ui.openApartment(stationId));
+    panel.querySelector('[data-a="map"]').onclick = () => this.ui.openMap(null);
     el.appendChild(panel);
     document.getElementById('ui').appendChild(el);
     generateJobs(this.state, stationId);
@@ -197,11 +218,14 @@ export class Game {
   async onInteract(room, m) {
     const g = this.state;
     this.audio.click();
-    if (m.kind === 'door') {
-      if (m.id === 'bruecke') return this.enterRoom('bruecke', 'from_' + room.roomId);
-      return this.enterRoom(m.id, 'default');
+    if (m.kind === 'npc' || m.kind === 'person') {
+      input.unlock();
+      room.setTalking?.(m.id, true);
+      await this.ui.dialog(npcDialogue(this, m.id));
+      room.setTalking?.(m.id, false);
+      this.checkUnlocks();
+      this.save(); return;
     }
-    if (m.kind === 'npc') { input.unlock(); await this.ui.dialog(npcDialogue(this, m.id)); this.save(); return; }
     if (m.kind === 'ship') return this.launch();
     if (m.kind === 'band') { this.ui.notify('„Roche-Grenze“ – Saffi Lindqvist (Gesang, hier: Saxofon-Hologramm), Bass, Rhodes. Live mit 2,3 s Lichtverzögerung.'); return; }
     if (m.kind === 'terminal') {
@@ -222,10 +246,11 @@ export class Game {
     await this.fadeOut(1.0);
     g.day++;
     // rent once the first three nights are over
-    if (g.day > 3) { const rent = 25; g.credits -= rent; logEntry(g, `Kabinenmiete −${rent} Cr`); }
+    const rentDue = g.day > 3 && !g.apartments?.[g.location];
+    if (rentDue) { const rent = 25; g.credits -= rent; logEntry(g, `Kabinenmiete −${rent} Cr`); }
     for (const s of g.ships) s.hull = Math.min(1, s.hull + 0.02);
     this.save();
-    this.ui.notify(`Tag ${g.day}. ${g.day > 3 ? 'Kabinenmiete abgebucht.' : 'Du fühlst dich ausgeruht.'}`);
+    this.ui.notify(`Tag ${g.day}. ${rentDue ? 'Kabinenmiete abgebucht.' : 'Du fühlst dich ausgeruht.'}`);
     this.ui.refreshTopbar();
     await this.fadeIn(1.0);
   }
@@ -274,16 +299,35 @@ export class Game {
     f.dispose = () => { f._unlock(); prevDispose(); };
   }
 
-  travel(flight, zoneId) {
+  travel(flight, zoneId, jump = false) {
     input.unlock();
-    flight.travelTo(zoneId, () => this.arrive(flight, zoneId));
+    flight.travelTo(zoneId, () => this.arrive(flight, zoneId), { jump });
+  }
+
+  /** Transit capsule between two owned apartments (no flight). */
+  async teleport(stationId) {
+    const g = this.state;
+    if (!g.apartments?.[stationId] || !g.apartments?.[g.location]) { this.ui.notify('Transit nur zwischen eigenen Apartments.'); return; }
+    const M = MOONS[moonOfStation(stationId)];
+    await this.fadeOut(0.5);
+    await this.leaveMode();
+    this.ui.clear();
+    this.mode = { kind: 'transit', render3D: false };
+    this.audio?.burn?.();
+    await this.ui.transitScreen(`TRANSIT · ${M.name.toUpperCase()}`, STATIONS[stationId].flat);
+    g.day += 1;
+    logEntry(g, `Transit nach ${STATIONS[stationId].name}`);
+    g.location = stationId; g.docked = true;
+    this.save();
+    await this.enterStation(stationId);
   }
 
   async arrive(flight, zoneId) {
     const rec = flight.player.record;
+    const jumped = !!flight.travel?.jump;
     this.syncShipState(flight);
-    this.state.day += 0;
-    await this.startFlight(zoneId, 'arrive', rec);
+    if (jumped) this.state.day += 1;
+    await this.startFlight(zoneId, 'arrive', rec, { jumped });
   }
 
   syncShipState(flight) {
@@ -354,7 +398,7 @@ export class Game {
     }[g.flags.endingShown];
     const el = document.createElement('div');
     el.className = 'modal';
-    el.innerHTML = `<div class="panel" style="width:min(760px,92vw)"><div class="body" style="text-align:center;padding:40px;font-size:20px;line-height:1.6">${text}<br><br><span class="dim" style="font-size:15px">SPACEWING · Die Ringe des Kronos<br>Danke fürs Spielen. Das System bleibt offen für freies Spiel.</span><br><br><button class="btn warm">Weiter</button></div></div>`;
+    el.innerHTML = `<div class="panel" style="width:min(760px,92vw)"><div class="body" style="text-align:center;padding:40px;font-size:20px;line-height:1.6">${text}<br><br><span class="dim" style="font-size:15px">SPACEWING SATURN<br>Danke fürs Spielen. Das System bleibt offen für freies Spiel.</span><br><br><button class="btn warm">Weiter</button></div></div>`;
     document.getElementById('ui').appendChild(el);
     await new Promise(r => el.querySelector('button').onclick = r);
     el.remove();

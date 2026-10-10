@@ -30,21 +30,6 @@
  ],
  "markers": [
   {
-   "kind": "door",
-   "id": "bruecke",
-   "pos": [
-    0,
-    0,
-    1.9
-   ],
-   "dir": [
-    0.0,
-    0.0,
-    1.0
-   ],
-   "label": "Zum Kommandodeck"
-  },
-  {
    "kind": "terminal",
    "id": "kabine_terminal",
    "pos": [

@@ -180,6 +180,34 @@ def spot_light(name, loc, target, energy, color='#ffffff', angle=60, blend=0.5):
     return lo
 
 
+def plant(name, mat, base, n=18, length=0.9, seed=1):
+    """Potted fern/palm: curved, tapering leaf blades (thin solids so both sides render)."""
+    import random
+    rnd = random.Random(seed)
+    bm = bmesh.new()
+    bx, by, bz = base
+    for k in range(n):
+        a = 2 * math.pi * k / n + rnd.uniform(-0.2, 0.2)
+        L = length * rnd.uniform(0.7, 1.15)
+        rise = rnd.uniform(0.5, 0.95)
+        d = Vector((math.cos(a), math.sin(a), 0))
+        side = Vector((-math.sin(a), math.cos(a), 0))
+        rows = []
+        for i in range(9):
+            t = i / 8
+            c = Vector((bx, by, bz)) + d * (t * L) + Vector((0, 0, math.sin(t * math.pi * 0.75) * L * rise * 0.6 - t * t * L * 0.25))
+            w = 0.075 * L * math.sin(math.pi * min(1, t * 1.15 + 0.05)) * (1 - 0.35 * t) + 0.004
+            rows.append((bm.verts.new(c - side * w), bm.verts.new(c + Vector((0, 0, 0.012)) ), bm.verts.new(c + side * w)))
+        for r0, r1 in zip(rows, rows[1:]):
+            bm.faces.new((r0[0], r1[0], r1[1], r0[1])); bm.faces.new((r0[1], r1[1], r1[2], r0[2]))
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob)
+    ob.data.materials.append(mat)
+    for p_ in ob.data.polygons: p_.use_smooth = True
+    sd = ob.modifiers.new('thick', 'SOLIDIFY'); sd.thickness = 0.01; sd.offset = 0.0
+    return ob
+
+
 def marker(kind, ident, loc, rot_z=0.0, **props):
     """Interactables, doors, spawns, npc spots. Stored in meta.json (three.js coordinates)."""
     fwd = Vector((math.cos(rot_z), math.sin(rot_z), 0))
@@ -314,23 +342,14 @@ def denoise(rgb, passes=2, sigma=0.06):
 
 
 def cull_hidden(ob, interior):
-    """Delete faces that can never be seen from inside the room (outer wall skins, floor underside, roof)."""
+    """Delete faces that can never be seen: undersides below the floor. Outer walls and roofs stay, because on
+    the continuous deck rooms are seen from corridors and from the observation dome."""
     if not interior:
         return
     bm = bmesh.new(); bm.from_mesh(ob.data)
     kind = interior[0]
-    dead = []
-    for f in bm.faces:
-        c = f.calc_center_median()
-        if kind == 'box':
-            x0, x1, y0, y1, z0, z1 = interior[1:]
-            e = 0.03
-            if c.x < x0 - e or c.x > x1 + e or c.y < y0 - e or c.y > y1 + e or c.z < z0 - e or c.z > z1 + e:
-                dead.append(f)
-        elif kind == 'dome':
-            r0, z0 = interior[1:]
-            if math.hypot(c.x, c.y) > r0 + 0.35 or c.z < z0 - 0.03:
-                dead.append(f)
+    z0 = interior[5] if kind == 'box' else interior[2]
+    dead = [f for f in bm.faces if f.normal.z < -0.7 and f.calc_center_median().z < z0 - 0.03]
     bmesh.ops.delete(bm, geom=dead, context='FACES')
     bm.to_mesh(ob.data); bm.free()
     ob.data.update()
@@ -424,11 +443,10 @@ def bruecke():
     S.append(box('sill', trim, (26.4, 0.7, 0.12), (0, Y1 - 0.3, 0.78)))
     S.append(box('sill_led', led_c, (26.0, 0.04, 0.04), (0, Y1 - 0.66, 0.7)))
     # south wall: bar door, quarters door, two counters
-    doorsS = [(-10.5, 'BAR „CASSINI-SPALT“', 'bar', 2.8, 3.3), (-5.0, 'QUARTIERE', 'kabine', 2.4, 3.2)]
+    doorsS = [(-10.5, 'RINGGANG · BAR', 'bar', 2.8, 3.3), (-5.0, 'RINGGANG · QUARTIERE', 'kabine', 2.4, 3.2)]
     S += wall('wS', wallm, (X1, Y0), (X0, Y0), H, openings=[(X1 - x, w, 0.0, h) for x, _, _, w, h in doorsS])
     def door(k, x, y, ang, label, target, dw, dh, inward):
         dpos = Vector((x, y, 0)) - inward * 0.2
-        S.append(box(f'door{k}', hazard if target == 'hangar' else trim, (dw, 0.1, dh), (dpos.x, dpos.y, dh / 2), rot=(0, 0, ang)))
         S.append(box(f'doorframe{k}', dark, (dw + 0.6, 0.4, 0.3), (x, y, dh + 0.15), rot=(0, 0, ang)))
         for sx in (-1, 1):
             off = Vector((math.cos(ang), math.sin(ang), 0)) * (dw / 2 + 0.2) * sx
@@ -437,7 +455,6 @@ def bruecke():
         sign_col = '#ff5ad0' if target == 'bar' else '#ffd36a' if target == 'hangar' else '#9fe0ff'
         Gl.append(text_mesh(f'sign{k}', label, mat_emit('glow_sign_' + target, sign_col, 8), 0.38 if target != 'bar' else 0.34,
                             (x + inward.x * 0.25, y + inward.y * 0.25, dh + 0.9), rot=(R(90), 0, ang + R(180))))
-        marker('door', target, (x + inward.x * 1.3, y + inward.y * 1.3, 0), math.atan2(-inward.y, -inward.x), label=label)
         INFO.setdefault('hotspots', []).append({'id': target, 'label': label, 'objs': [f'door{k}', f'sign{k}', f'doorframe{k}']})
     for k, (x, label, target, w, h) in enumerate(doorsS):
         door(k, x, Y0, 0.0, label, target, w, h, Vector((0, 1, 0)))
@@ -461,7 +478,7 @@ def bruecke():
         marker('npc', 'oduya' if target == 'boerse' else 'haendler', (x, Y0 + 0.85, 0), R(90))
         INFO.setdefault('hotspots', []).append({'id': target, 'label': label, 'objs': [f'counter{k}', f'screen_{target}', f'csign{k}', f'screenframe{k}']})
     # east wall: hangar (big) + lift to the observation deck
-    doorsE = [(-2.0, 'HANGAR', 'hangar', 4.6, 4.8), (5.5, 'AUSSICHT', 'aussicht', 2.4, 3.2)]
+    doorsE = [(-2.0, 'HANGAR', 'hangar', 3.0, 3.4), (5.5, 'AUSSICHT · LIFT', 'aussicht', 2.4, 3.2)]
     S += wall('wE', wallm, (X1, Y1), (X1, Y0), H, openings=[(Y1 - y, w, 0.0, h) for y, _, _, w, h in doorsE])
     for k, (y, label, target, w, h) in enumerate(doorsE):
         door(10 + k, X1, y, R(90), label, target, w, h, Vector((-1, 0, 0)))
@@ -587,10 +604,12 @@ def bar():
             cx, cy = x + 0.85 * math.cos(a), y + 0.85 * math.sin(a)
             S += chair(f'ch{i}{k}', leather, trim, (cx, cy, 0), rot=a + R(90))
             if (i * 3 + k) % 4 == 1 and i != 0:
-                S += figure(f'pat{i}{k}', [coatA, coatB, coatC][(i + k) % 3], skin, (cx, cy, 0), rot=a + R(90), seated=True, hat=hat if k == 2 else None)
+                marker('patron', f'seat{i}{k}', (cx, cy, 0), a + math.pi, seated=True)
     # Mags' table = table 0 near the window
     marker('npc', 'mags', (-1.5, 3.8 + 0.85, 0), R(-90), seated=True)
     marker('npc', 'kix', (6.3, -0.5, 0), R(180))
+    marker('patron', 'counter0', (3.75, -2.6, 0), R(0), seated=False)
+    marker('patron', 'counter1', (3.8, 1.3, 0), R(-10), seated=False)
     marker('band', 'band', (-5.4, 3.4, 0.36), R(-45))
     # neon sign above bar
     Gl.append(text_mesh('neon_bar', 'CASSINI-SPALT', mat_emit('glow_neon_pink', '#ff4ac8', 10), 0.55, (7.55, -0.5, 3.75), rot=(R(90), 0, R(-90))))
@@ -606,10 +625,8 @@ def bar():
     point_light('bar_l', (6.0, -0.5, 2.6), 90, '#ffb070', 0.3)
     point_light('stage_l', (-5.4, 3.4, 3.2), 140, '#c070ff', 0.4)
     spot_light('stage_spot', (-3.5, 1.5, H - 0.3), (-5.4, 3.4, 0.4), 260, '#ffd0ff', 45)
-    # door
-    S.append(box('door', trim, (2.4, 0.1, 3.0), (-5.0, -6.2, 1.5)))
+    # doorway to the Ringgang (sliding door is dynamic, see deck())
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (2.6, 0.05, 0.06), (-5.0, -5.85, 3.25)))
-    marker('door', 'bruecke', (-5.0, -4.9, 0), R(-90), label='Zum Kommandodeck')
     marker('spawn', 'default', (-5.0, -4.6, 0), R(90))
     marker('terminal', 'bar_order', (4.2, -1.0, 0), R(0), label='Drink bestellen')
     INFO['window_dir'] = b2t((0, 1, 0))
@@ -655,9 +672,7 @@ def kabine():
     S.append(box('ceil_led', led, (0.6, 1.4, 0.02), (0, 0, H - 0.02)))
     point_light('cl', (0, 0.3, H - 0.3), 25, '#ffe0c0', 0.3)
     point_light('bl', (-1.0, 1.0, 1.7), 6, '#ffd0a0', 0.1)
-    S.append(box('door', trim, (1.0, 0.1, 2.1), (0, -2.38, 1.05)))
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (1.1, 0.04, 0.04), (0, -2.2, 2.2)))
-    marker('door', 'bruecke', (0, -1.9, 0), R(-90), label='Zum Kommandodeck')
     marker('terminal', 'kabine_terminal', (0.9, 0.4, 0), R(0), label='Terminal (Speichern · Logbuch)')
     marker('terminal', 'bett', (-0.6, 1.0, 0), R(180), label='Schlafen (neuer Tag)')
     marker('spawn', 'default', (0, -1.5, 0), R(90))
@@ -733,10 +748,8 @@ def hangar():
         for x in (-12, 0, 12):
             S.append(box(f'wl{x}{y}', amber, (2.0, 0.05, 0.15), (x, y * 1.255, 3.0)))
     # door to the bridge
-    S.append(box('door', hazard, (2.6, 0.12, 3.2), (-22.2, 9.0, 1.6), rot=(0, 0, R(90))))
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (0.05, 2.8, 0.06), (-21.8, 9.0, 3.45)))
     Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, 0, 10), rot=(R(90), 0, R(90))))
-    marker('door', 'bruecke', (-20.5, 9.0, 0), R(180), label='Zum Kommandodeck')
     marker('ship', 'ship', (2, 0, 0.2), R(0), label='Einsteigen und starten')
     marker('terminal', 'hangar_werft', (-17, 10.5, 0), R(90), label='Werft-Terminal')
     marker('spawn', 'default', (-19.5, 9.0, 0), R(0))
@@ -749,7 +762,8 @@ def aussicht():
     floor = mat_floor('floor_au', '#26282b', 1.5)
     trim = mat_metal('trim_au', '#7a7d82', 0.3, metal=0.9, scale=2)
     wood = mat_wood('wood_au', '#6a4a30')
-    plant = mat_simple('plant', '#2f5a2a', 0.7)
+    plant_m = mat_simple('plant', '#2e5a26', 0.7)
+    plant_m2 = mat_simple('plant2', '#4a7a32', 0.7)
     soil = mat_simple('soil', '#2a1e16', 0.95)
     led = light_mat('led_au', '#a8d8ff', 25)
     glass = mat_glass('glass_au'); glass.node_tree.nodes['Principled BSDF'].inputs['Transmission Weight'].default_value = 1.0
@@ -757,6 +771,9 @@ def aussicht():
     Rr = 11.0
     INFO['interior'] = ('dome', Rr, 0.0)
     S.append(cyl('floor', floor, Rr, 0.3, (0, 0, -0.15), rot=(0, 0, 0), n=96))
+    hole = cyl('floor_hole', floor, 1.55, 1.0, (0, -8.6, 0), rot=(0, 0, 0), n=40)
+    bm_ = S[-1].modifiers.new('hole', 'BOOLEAN'); bm_.object = hole; bm_.operation = 'DIFFERENCE'
+    apply_all(S[-1]); bpy.data.objects.remove(hole)
     # dome ribs and glass
     for k in range(16):
         a = R(22.5 * k)
@@ -798,21 +815,201 @@ def aussicht():
         x, y = 3.0 * math.cos(a), 3.0 * math.sin(a)
         S.append(cyl(f'planter{k}', trim, 0.9, 0.7, (x, y, 0.35), rot=(0, 0, 0), n=32))
         S.append(cyl(f'soil{k}', soil, 0.85, 0.05, (x, y, 0.7), rot=(0, 0, 0), n=32))
-        for j in range(9):
-            b = R(40 * j)
-            S.append(sphere(f'leaf{k}{j}', plant, 0.35, (x + 0.45 * math.cos(b), y + 0.45 * math.sin(b), 1.0 + 0.2 * (j % 3)), scale=(1, 0.6, 1.4)))
+        S.append(plant(f'fern{k}', plant_m, (x, y, 0.72), n=22, length=1.25, seed=k + 3))
+        S.append(plant(f'fern_in{k}', plant_m2, (x, y, 0.72), n=10, length=0.75, seed=k + 11))
     # lift at the south edge, so you enter looking across the dome
-    S.append(cyl('lift', trim, 1.4, 3.0, (0, -8.6, 1.5), rot=(0, 0, 0), n=32))
-    Gl.append(text_mesh('sign_lift', 'LIFT · KOMMANDODECK', mat_emit('glow_sign_au', '#9fe0ff', 8), 0.18, (0, -7.18, 2.4), rot=(R(90), 0, R(180))))
-    S.append(box('lift_door', mat_rubber('dark_au'), (1.2, 0.05, 2.2), (0, -7.19, 1.1)))
+    # glass lift enclosure (the cabin itself is dynamic); opening faces north into the dome
+    S.append(lathe('lift_collar', [(-0.02, 1.55), (0.02, 1.55), (0.02, 1.8), (-0.02, 1.8)], trim, n=48))
+    S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (0, -8.6, 0)
+    S.append(lathe('lift_cap', [(2.95, 0.0), (3.1, 0.0), (3.1, 1.75), (2.95, 1.75)], trim, n=48))
+    S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (0, -8.6, 0)
+    for k in range(10):
+        a = R(36 * k + 18)
+        if abs(math.sin(a) - 1) < 0.35:
+            continue
+        S.append(box(f'lift_post{k}', trim, (0.08, 0.08, 2.95), (1.62 * math.cos(a), -8.6 + 1.62 * math.sin(a), 1.47)))
+    Gl.append(text_mesh('sign_lift', 'LIFT · KOMMANDODECK', mat_emit('glow_sign_au', '#9fe0ff', 8), 0.18, (0, -8.6, 3.3), rot=(R(90), 0, R(180))))
     point_light('fill1', (0, 0, 3.6), 80, '#cfe0ff', 1.0)
     for k in range(6):
         a = R(60 * k)
         point_light(f'up{k}', (8.5 * math.cos(a), 8.5 * math.sin(a), 0.3), 35, '#ffd8b0', 0.2)
     area_light('saturnshine', (0, 6, 7), (R(-50), 0, 0), 8, 250, '#ffe2b8')
-    marker('door', 'bruecke', (0, -6.4, 0), R(-90), label='Lift zum Kommandodeck')
     marker('spawn', 'default', (0, -5.6, 0), R(90))
     INFO['window_dir'] = b2t((0, 1, 0.3))
+    return S, Gl, Gs, X
+
+
+# =============================================================================== the continuous deck
+# Room placement in Blender world coordinates: (translation, rotation about Z in degrees).
+LAYOUT = {'bruecke': ((0.0, 0.0, 0.0), 0), 'bar': ((-28.0, -3.25, 0.0), 0), 'kabine': ((-20.0, -15.05, 0.0), 180),
+          'hangar': ((45.0, -11.0, 0.0), 0), 'aussicht': ((21.0, 14.1, 17.0), 0)}
+LIFT = dict(x=21.0, y=5.5, z0=0.0, z1=17.0, r=1.45)
+
+
+def hull_box(name, mat, x0, x1, y0, y1, z0, z1, cuts):
+    """Outer skin of a module (faces point outwards, invisible from inside). Doorways are cut out."""
+    b = box(name, mat, (x1 - x0, y1 - y0, z1 - z0), ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))
+    apply_all(b)
+    for i, (cx, cy, cz, sx, sy, sz) in enumerate(cuts):
+        if x0 - 1 < cx < x1 + 1 and y0 - 1 < cy < y1 + 1 and z0 - 1 < cz < z1 + 1:
+            c = box(f'{name}_cut{i}', mat, (sx, sy, sz), (cx, cy, cz))
+            md = b.modifiers.new('cut', 'BOOLEAN'); md.object = c; md.operation = 'DIFFERENCE'; md.solver = 'EXACT'
+            apply_all(b)
+            bpy.data.objects.remove(c)
+    return b
+
+
+@room
+def deck():
+    """Corridors that join all rooms into one walkable deck: the Ringgang (bar, quarters), the hangar
+    corridor and the lift lobby with the glass lift up to the observation dome. Also the station's outer skin."""
+    floor = mat_floor('floor_dk', '#2c2f33', 1.5)
+    wallm = mat_wall('wall_dk', '#8e9196', '#72767c', scale=1.2, dirt=0.5)
+    trim = mat_metal('trim_dk', '#5d6064', 0.4, metal=0.9, scale=2)
+    dark = mat_rubber('dark_dk', '#18191b')
+    hazard = mat_paint('haz_dk', '#c8901a', wear=0.6, dirt=0.4, stripe=('z', 0.0, 50.0), stripe_color='#d8a020', scale=2, panel=0.0)
+    led_w = light_mat('led_dk_warm', '#ffd8a8', 16)
+    led_c = light_mat('led_dk_cool', '#a8d8ff', 14)
+    glass = mat_glass('glass_dk'); glass.node_tree.nodes['Principled BSDF'].inputs['Transmission Weight'].default_value = 1.0
+    hullm = mat_simple('hull_ext', '#4a4e55', 0.55, 0.5)
+    S, Gl, Gs, X = [], [], [], []
+    INFO['interior'] = None
+    sgn = lambda t, col: mat_emit('glow_sign_dk_' + col.strip('#'), col, 8)
+    # ---------------------------------------------------------------- Ringgang (x -35.8..-2.2, y -12.9..-9.4)
+    RX0, RX1, H = -35.8, -2.2, 3.4
+    S.append(box('rg_floor', floor, (RX1 - RX0, 3.5, 0.2), ((RX0 + RX1) / 2, -11.15, -0.1)))
+    S.append(box('rg_ceil', wallm, (RX1 - RX0, 3.5, 0.2), ((RX0 + RX1) / 2, -11.15, H + 0.1)))
+    al = lambda x: x - RX0
+    S += wall('rgN', wallm, (RX0, -9.55), (RX1, -9.55), H, openings=[(al(-33), 2.4, 0, 3.0), (al(-10.5), 2.8, 0, 3.3), (al(-5.0), 2.4, 0, 3.2)])
+    # thin south wall in front of the quarters (cabin 4-117's own wall sits right behind it)
+    S += wall('rgS', wallm, (RX1, -12.56), (RX0, -12.56), H, thick=0.12, openings=[(RX1 - (-20.0), 1.0, 0, 2.1)])
+    S += wall('rgW', wallm, (RX0 + 0.1, -12.9), (RX0 + 0.1, -9.4), H)
+    S += wall('rgE', wallm, (RX1 - 0.1, -9.4), (RX1 - 0.1, -12.9), H)
+    # jambs filling the gap between the Ringgang wall and the Kommandodeck wall at its two doors
+    for x, w, h in ((-10.5, 2.8, 3.3), (-5.0, 2.4, 3.2)):
+        for sx in (-1, 1):
+            S.append(box(f'rg_jamb{x}{sx}', trim, (0.2, 0.42, h), (x + sx * (w / 2 + 0.1), -9.28, h / 2)))
+        S.append(box(f'rg_lintel{x}', trim, (w + 0.4, 0.42, H - h), (x, -9.28, h + (H - h) / 2)))
+    for sx in (-1, 1):
+        S.append(box(f'rg_jambbar{sx}', trim, (0.2, 0.2, 3.0), (-33 + sx * 1.3, -9.4, 1.5)))
+    # wainscot, baseboard LEDs, ceiling lights, ducts
+    S.append(box('rg_base_n', led_c, (RX1 - RX0 - 0.4, 0.03, 0.03), ((RX0 + RX1) / 2, -9.7, 0.06)))
+    S.append(box('rg_base_s', led_c, (RX1 - RX0 - 0.4, 0.03, 0.03), ((RX0 + RX1) / 2, -12.47, 0.06)))
+    for x in range(-34, -2, 4):
+        S.append(box(f'rg_light{x}', led_w, (1.6, 0.4, 0.03), (x + 0.5, -11.15, H - 0.01)))
+        S.append(box(f'rg_rib{x}', trim, (0.25, 3.3, 0.18), (x - 1.5, -11.15, H - 0.09)))
+    for k, y in enumerate((-9.95, -12.35)):
+        S.append(cyl(f'rg_duct{k}', trim, 0.11, RX1 - RX0 - 0.4, ((RX0 + RX1) / 2, y, H - 0.35), rot=(0, R(90), 0), n=12))
+    for x in range(-34, -2, 8):
+        area_light(f'rg_al{x}', (x + 2, -11.15, H - 0.05), (0, 0, 0), 1.2, 140, '#ffe2c0', size_y=0.6)
+    # neighbouring quarters (locked) along the south wall + our cabin 4-117
+    for k, x in enumerate((-32.5, -28.5, -24.5, -15.5, -11.5, -7.5, -4.0)):
+        num = f'4-{109 + 2 * k + (2 if x > -20 else 0)}'
+        S.append(box(f'cab_door{k}', trim, (1.0, 0.06, 2.1), (x, -12.44, 1.05), bevel=0.01))
+        S.append(box(f'cab_frame{k}', dark, (1.3, 0.06, 2.3), (x, -12.47, 1.15)))
+        Gl.append(box(f'cab_led{k}', mat_emit('glow_lock_red', '#ff3a2a', 6), (0.05, 0.02, 0.05), (x + 0.62, -12.4, 1.2)))
+        Gl.append(text_mesh(f'cab_num{k}', num, sgn('', '#9fe0ff'), 0.16, (x, -12.42, 2.45), rot=(R(90), 0, R(180))))
+    Gl.append(text_mesh('cab_num_own', '4-117', sgn('', '#ffd36a'), 0.18, (-20, -12.42, 2.6), rot=(R(90), 0, R(180))))
+    Gl.append(box('cab_led_own', mat_emit('glow_lock_green', '#3aff6a', 6), (0.05, 0.02, 0.05), (-19.38, -12.42, 1.2)))
+    # signs on the north wall (read from inside the corridor)
+    Gl.append(text_mesh('rg_sign_bar', 'CASSINI-SPALT', mat_emit('glow_neon_pink', '#ff4ac8', 10), 0.24, (-33, -9.4, 3.12), rot=(R(90), 0, 0)))
+    Gl.append(text_mesh('rg_sign_hub', 'KOMMANDODECK', sgn('', '#9fe0ff'), 0.16, (-10.5, -9.08, 3.36 - 0.02), rot=(R(90), 0, 0)))
+    Gl.append(text_mesh('rg_sign_hub2', 'KOMMANDODECK', sgn('', '#9fe0ff'), 0.16, (-5.0, -9.08, 3.3), rot=(R(90), 0, 0)))
+    Gl.append(text_mesh('rg_title', 'RINGGANG · DECK 4 · QUARTIERE 4-109 BIS 4-123', sgn('', '#9fe0ff'), 0.14, (-24.5, -9.43, 2.75), rot=(R(90), 0, 0)))
+    # props: benches, vending machine, plants
+    for x in (-26.5, -13.5):
+        S.append(box(f'rg_bench{x}', trim, (1.8, 0.45, 0.42), (x, -9.95, 0.21), bevel=0.03))
+    S.append(box('vending', trim, (0.9, 0.7, 2.0), (-17.2, -9.95, 1.0), bevel=0.03))
+    Gl.append(box('vending_front', mat_emit('glow_vend', '#ffb060', 4), (0.75, 0.02, 1.2), (-17.2, -10.31, 1.25)))
+    Gl.append(text_mesh('vending_txt', 'KAFFEE · 3 Cr', sgn('', '#fff2d0'), 0.08, (-17.2, -10.33, 1.95), rot=(R(90), 0, 0)))
+    plant_dk = mat_simple('plant_dk', '#2f5a2a', 0.7)
+    for x in (-30.5, -6.8):
+        S.append(cyl(f'rg_pot{x}', trim, 0.3, 0.6, (x, -9.95, 0.3), rot=(0, 0, 0), n=20))
+        S.append(plant(f'rg_fern{x}', plant_dk, (x, -9.95, 0.6), n=16, length=0.7, seed=int(-x)))
+    # ---------------------------------------------------------------- hangar corridor (x 15.125..22.875, y -3.5..-0.5)
+    HX0, HX1, HH = 15.125, 22.875, 3.6
+    S.append(box('hc_floor', floor, (HX1 - HX0, 3.5, 0.2), ((HX0 + HX1) / 2, -2.0, -0.1)))
+    S.append(box('hc_ceil', wallm, (HX1 - HX0, 3.5, 0.2), ((HX0 + HX1) / 2, -2.0, HH + 0.1)))
+    S += wall('hcN', wallm, (HX0, -0.375), (HX1, -0.375), HH)
+    S += wall('hcS', wallm, (HX1, -3.625), (HX0, -3.625), HH)
+    S.append(box('hc_haz_n', hazard, (HX1 - HX0, 0.03, 0.5), ((HX0 + HX1) / 2, -0.5, 0.25)))
+    S.append(box('hc_haz_s', hazard, (HX1 - HX0, 0.03, 0.5), ((HX0 + HX1) / 2, -3.5, 0.25)))
+    S.append(box('hc_lintel_h', trim, (0.25, 3.25, HH - 3.2), (HX1 - 0.05, -2.0, 3.2 + (HH - 3.2) / 2)))
+    for y in (-3.4, -0.6):    # the hangar doorway is narrower than the corridor
+        S.append(box(f'hc_cap{y}', wallm, (0.08, 0.22, HH), (HX1 - 0.04, y, HH / 2)))
+    S.append(box('hc_lintel_w', trim, (0.1, 3.25, HH - 3.4), (HX0 + 0.05, -2.0, 3.4 + (HH - 3.4) / 2)))
+    for x in (17.0, 19.5, 22.0):
+        S.append(box(f'hc_light{x}', led_c, (1.2, 0.5, 0.03), (x, -2.0, HH - 0.01)))
+    area_light('hc_al', (19.0, -2.0, HH - 0.05), (0, 0, 0), 2.0, 160, '#d8e8ff', size_y=0.8)
+    Gl.append(text_mesh('hc_sign', 'HANGAR 7 · BUCHT C', sgn('', '#ffd36a'), 0.22, (19.0, -0.52, 2.6), rot=(R(90), 0, R(180))))
+    Gl.append(text_mesh('hc_sign2', 'ACHTUNG · DRUCKSCHOTT', sgn('', '#ffd36a'), 0.14, (19.0, -3.48, 2.6), rot=(R(90), 0, 0)))
+    # ---------------------------------------------------------------- lift corridor + lobby
+    L = LIFT
+    S.append(box('lc_floor', floor, (22.8 - 15.1, 3.9, 0.2), ((22.8 + 15.1) / 2, 5.5, -0.1)))
+    S += wall('lcN', wallm, (15.1, 6.825), (19.4, 6.825), 3.2)
+    S += wall('lcS', wallm, (19.4, 4.175), (15.1, 4.175), 3.2)
+    S.append(box('lc_ceil', wallm, (19.4 - 15.1, 2.9, 0.2), ((19.4 + 15.1) / 2, 5.5, 3.3)))
+    S += wall('lbN', wallm, (19.3, 7.425), (22.8, 7.425), 3.2)
+    S += wall('lbS', wallm, (22.8, 3.575), (19.3, 3.575), 3.2)
+    S += wall('lbE', wallm, (22.7, 7.5), (22.7, 3.5), 3.2, thick=0.2)
+    S += wall('lbWn', wallm, (19.4, 6.7), (19.4, 7.55), 3.2)
+    S += wall('lbWs', wallm, (19.4, 3.45), (19.4, 4.3), 3.2)
+    lceil = box('lb_ceil', wallm, (3.5, 4.1, 0.2), ((19.3 + 22.8) / 2, 5.5, 3.3))
+    cutc = cyl('lb_cut', wallm, 1.66, 1.0, (L['x'], L['y'], 3.3), rot=(0, 0, 0), n=40)
+    md = lceil.modifiers.new('hole', 'BOOLEAN'); md.object = cutc; md.operation = 'DIFFERENCE'
+    apply_all(lceil); bpy.data.objects.remove(cutc)
+    S.append(lceil)
+    S.append(box('lc_light', led_c, (2.0, 0.4, 0.03), (17.2, 5.5, 3.19)))
+    area_light('lc_al', (17.2, 5.5, 3.15), (0, 0, 0), 1.6, 110, '#d8e8ff', size_y=0.6)
+    Gl.append(text_mesh('lc_sign', 'AUSSICHTSKUPPEL · LIFT', sgn('', '#9fe0ff'), 0.16, (17.2, 6.68, 2.6), rot=(R(90), 0, R(180))))
+    # glass lift shaft from the lobby floor up to the dome floor
+    S.append(lathe('shaft_base', [(-0.02, 1.62), (0.02, 1.62), (0.02, 1.85), (-0.02, 1.85)], trim, n=48))
+    S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (L['x'], L['y'], 0.0)
+    for zc in (3.25, 6.0, 8.7, 11.4, 14.1, 16.6):
+        S.append(lathe(f'shaft_ring{zc}', [(-0.08, 1.62), (0.08, 1.62), (0.08, 1.74), (-0.08, 1.74)], trim, n=48))
+        S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (L['x'], L['y'], zc)
+    for k, a in enumerate((45, 135, 225, 315)):
+        S.append(box(f'shaft_rail{k}', trim, (0.1, 0.1, L['z1'] - 0.3), (L['x'] + 1.68 * math.cos(R(a)), L['y'] + 1.68 * math.sin(R(a)), (L['z1'] - 0.3) / 2)))
+    tube = lathe('glass_shaft', [(3.35, 1.6), (16.6, 1.6)], glass, n=48, cap=False)
+    tube.rotation_euler = (R(90), 0, 0); tube.location = (L['x'], L['y'], 0.0)
+    Gs.append(tube)
+    for k in range(8):                       # ground floor enclosure, open to the west (door is dynamic)
+        a = R(45 * k + 22.5)
+        if math.cos(a) < -0.5:
+            continue
+        Gs.append(box(f'glass_shaftlow{k}', glass, (1.2, 0.03, 3.15), (L['x'] + 1.6 * math.cos(a), L['y'] + 1.6 * math.sin(a), 1.6), rot=(0, 0, a + R(90))))
+    # ---------------------------------------------------------------- outer skin (exported, not baked)
+    cuts = [(-33, -9.4, 1.5, 2.4, 1.6, 3.0), (-10.5, -9.28, 1.65, 2.8, 1.6, 3.3), (-5.0, -9.28, 1.6, 2.4, 1.6, 3.2),
+            (-20, -12.75, 1.05, 1.0, 1.6, 2.1), (15.0, -2.0, 1.7, 1.6, 3.0, 3.4), (23.0, -2.0, 1.6, 1.6, 2.6, 3.2),
+            (15.0, 5.5, 1.6, 1.6, 2.4, 3.2), (L['x'], L['y'], 16.0, 3.3, 3.3, 4.0)]
+    # (rooms keep their own baked outer walls and roofs; only the dome's underside needs a skin)
+    under = cyl('hull_dome', hullm, 11.4, 0.3, (21.0, 14.1, 16.6), rot=(0, 0, 0), n=64)
+    md = under.modifiers.new('hole', 'BOOLEAN'); md.object = cyl('cutd', hullm, 1.66, 1.0, (21.0, 5.5, 16.6), rot=(0, 0, 0), n=40); md.operation = 'DIFFERENCE'
+    apply_all(under); bpy.data.objects.remove(bpy.data.objects['cutd'])
+    X.append(under)
+    # ---------------------------------------------------------------- metadata for the runtime
+    INFO['layout'] = {k: {'pos': b2t(v[0]), 'rotY': math.radians(v[1])} for k, v in LAYOUT.items()}
+    INFO['lift'] = {'pos': b2t((L['x'], L['y'], 0.0)), 'y0': L['z0'], 'y1': L['z1'], 'r': L['r']}
+    def door(id_, pos, normal, w, h, label, kind='door', level=None):
+        d = {'id': id_, 'pos': b2t(pos), 'normal': b2t(normal), 'w': w, 'h': h, 'label': label, 'kind': kind}
+        if level is not None:
+            d['level'] = level
+        INFO.setdefault('doors', []).append(d)
+    door('bar', (-33, -9.4, 0), (0, 1, 0), 2.4, 3.0, 'Bar „Cassini-Spalt“')
+    door('hub_bar', (-10.5, -9.28, 0), (0, 1, 0), 2.8, 3.3, 'Kommandodeck')
+    door('hub_kab', (-5.0, -9.28, 0), (0, 1, 0), 2.4, 3.2, 'Kommandodeck')
+    door('kabine', (-20, -12.75, 0), (0, 1, 0), 1.0, 2.1, 'Kabine 4-117')
+    door('hub_hangar', (15.0, -2.0, 0), (1, 0, 0), 3.0, 3.4, 'Hangar 7', kind='heavy')
+    door('hangar', (23.0, -2.0, 0), (1, 0, 0), 2.6, 3.2, 'Hangar 7', kind='heavy')
+    door('hub_lift', (15.0, 5.5, 0), (1, 0, 0), 2.4, 3.2, 'Lift')
+    door('lift_low', (L['x'] - 1.6, L['y'], 0), (1, 0, 0), 1.3, 2.6, 'Lift', kind='lift', level=0)
+    door('lift_high', (L['x'], L['y'] + 1.6, L['z1']), (0, 1, 0), 1.3, 2.6, 'Lift', kind='lift', level=1)
+    for x in (-30, -24, -16, -9, -4):
+        marker('walk', 'rg', (x, -11.0, 0))
+    marker('spawn', 'default', (-14.0, -11.0, 0), R(0))
+    marker('crew', 'rg0', (-13.6, -10.45, 0), R(-90), seated=True)
+    marker('crew', 'hc0', (21.2, -1.0, 0), R(-120), seated=False)
+    INFO['window_dir'] = b2t((0, 1, 0))
     return S, Gl, Gs, X
 
 
@@ -905,5 +1102,5 @@ if __name__ != 'interiors':  # executed via the bridge (not imported)
             res['preview'] = swlib.save_render(os.path.join(outdir, 'preview.jpg'), fmt='JPEG')
         else:
             setup_world_space(strength=0.35, saturn=False)
-            res['glb'] = bake_room(name, S, Gl, Gs, X, outdir, size={'kabine': 2048, 'bar': 3072, 'aussicht': 3072}.get(name, 4096), samples=samples)
+            res['glb'] = bake_room(name, S, Gl, Gs, X, outdir, size={'kabine': 2048, 'bar': 3072, 'aussicht': 3072, 'deck': 4096}.get(name, 4096), samples=samples)
     result = res

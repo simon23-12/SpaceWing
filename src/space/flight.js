@@ -9,7 +9,8 @@ import { Station, bakedMaterial } from './station.js';
 import { assets } from '../core/assets.js';
 import { Debris } from './debris.js';
 import { input } from '../core/input.js';
-import { FACTIONS } from '../game/data.js';
+import { FACTIONS, MOONS, moonOfZone } from '../game/data.js';
+import { Streaks } from '../ui/streaks.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
 const BOLT_SPEED = 900;
@@ -81,6 +82,10 @@ export class FlightMode {
 
     this.hud = new HUD();
     this.hud.setZone(this.zone.name);
+    this.moon = MOONS[moonOfZone(this.zoneId)];
+    this.game.renderer.setMood(this.moon?.mood);
+    this.game.audio?.setMoon?.(moonOfZone(this.zoneId));
+    if (this.opts.jumped) this.arrivalFx();
     await this.loadCockpit();
     this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
     this.updateCamera(1, true);
@@ -413,21 +418,77 @@ export class FlightMode {
     if (ap.stage === 2 && !ap.faded) { ap.faded = true; this.game.fadeOut(1.6); }
   }
 
-  /** Fusion-drive transfer to another zone with a sky fly-through. */
-  travelTo(zoneId, onArrive) {
+  /** Fusion-drive transfer within a moon system, or a hyperspace jump to another moon. */
+  travelTo(zoneId, onArrive, { jump = false } = {}) {
     if (this.state !== 'flying') return;
     const from = this.anchor, to = zoneAnchor(zoneId);
     const dir = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize();
     this.state = 'travel';
-    this.travel = { t: 0, dir, from, to, zoneId, onArrive, info: travelInfo(this.zoneId, zoneId) };
+    this.travel = { t: 0, dir, from, to, zoneId, onArrive, jump, info: travelInfo(this.zoneId, zoneId) };
     this.player.autopilot = { travel: true };
-    this.hud.setObjective(`Fusionsbrand nach ${ZONES[zoneId].name}`);
-    this.say('Bordcomputer', `Kurs berechnet. Transferzeit ${this.travel.info.hours.toFixed(1)} Stunden. Ausrichtung läuft.`, 'neutral', 3);
+    const M = MOONS[moonOfZone(zoneId)];
+    if (jump) {
+      this.hud.setObjective(`Hyperraumsprung nach ${M.name}`);
+      this.say('Bordcomputer', `Sprungtriebwerk lädt. Ziel: ${M.name}-Orbit. Ausrichtung auf den Sprungvektor.`, 'neutral', 3);
+    } else {
+      this.hud.setObjective(`Fusionsbrand nach ${ZONES[zoneId].name}`);
+      this.say('Bordcomputer', `Kurs berechnet. Transferzeit ${this.travel.info.hours.toFixed(1)} Stunden. Ausrichtung läuft.`, 'neutral', 3);
+    }
+  }
+
+  /** Hyperspace: 3 s charge, flash, tunnel of streaks, arrive. */
+  updateJump(dt) {
+    const tr = this.travel, p = this.player;
+    const target = p.pos.clone().addScaledVector(tr.dir, 5000);
+    const g = this.game.renderer.grade.uniforms;
+    if (tr.t < 3.2) {
+      steerTo(p, target, false, 2.5);
+      p.input.throttle = 0.25;
+      const k = tr.t / 3.2;
+      this.hud.showToast(`SPRUNGTRIEBWERK ${Math.round(k * 100)} %`, 0.2);
+      this.warp = k * 0.15;
+      if (!tr.hum) { tr.hum = true; this.game.audio?.burn?.(); }
+      return;
+    }
+    if (!tr.burn) {
+      tr.burn = true;
+      this.streaks = new Streaks(document.getElementById('ui'), { count: 480, speed: 0.5, vx: 0.5, vy: 0.5, alpha: 0, color: [170, 210, 255], z: 1 });
+      this.game.audio?.burn?.();
+    }
+    p.input.pitch = p.input.yaw = p.input.roll = 0;
+    p.input.throttle = 1; p.input.boost = true; p.energy = p.stats.energy;
+    const T = 3.0;
+    const k = THREE.MathUtils.clamp((tr.t - 3.2) / T, 0, 1);
+    g.flash.value = Math.max(0, 1 - (tr.t - 3.2) * 3) * 0.9 + Math.max(0, (k - 0.85) / 0.15) * 0.9;
+    const e = k * k * (3 - 2 * k);
+    this.anchorOverride = [0, 1, 2].map(i => tr.from[i] + (tr.to[i] - tr.from[i]) * e);
+    this.warp = 0.6 + Math.sin(k * Math.PI) * 0.6;
+    this.streaks.set({ alpha: Math.min(1, (tr.t - 3.2) * 2), speed: 1 + Math.sin(k * Math.PI) * 8 });
+    if (k >= 1 && !tr.done) {
+      tr.done = true;
+      this.game.fadeOut(0.25).then(() => { this.streaks?.dispose(); this.streaks = null; tr.onArrive && tr.onArrive(); });
+    }
+  }
+
+  /** Arrival after a jump: streaks die down, the flash fades. */
+  arrivalFx() {
+    const st = new Streaks(document.getElementById('ui'), { count: 400, speed: 6, vx: 0.5, vy: 0.5, alpha: 1, color: [170, 210, 255], z: 1 });
+    const g = this.game.renderer.grade.uniforms;
+    const t0 = performance.now();
+    const tick = () => {
+      const k = (performance.now() - t0) / 1600;
+      st.set({ speed: Math.max(0.1, 6 * (1 - k)), alpha: Math.max(0, 1 - k) });
+      g.flash.value = Math.max(0, 0.8 - k * 2);
+      if (k < 1) requestAnimationFrame(tick); else st.dispose();
+    };
+    tick();
+    this.say('Bordcomputer', `Sprung abgeschlossen. ${this.moon?.name || ''}-Orbit. Saturn als Referenzpunkt erfasst.`, 'neutral', 4);
   }
 
   updateTravel(dt) {
     const tr = this.travel, p = this.player;
     tr.t += dt;
+    if (tr.jump) return this.updateJump(dt);
     const target = p.pos.clone().addScaledVector(tr.dir, 5000);
     if (tr.t < 2.5) {
       steerTo(p, target, false, 2.5);
@@ -630,6 +691,7 @@ export class FlightMode {
   }
 
   dispose() {
+    this.streaks?.dispose();
     this.hud.dispose();
     this.game.ui.cockpit(false);
     this.scene.traverse(o => { if (o.geometry && !o.geometry.userData?.shared) o.geometry.dispose?.(); });

@@ -7,10 +7,10 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 // Final grade: subtle vignette + film grain + chromatic fringe at the edges.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, grain: { value: 0.035 }, hit: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, grain: { value: 0.035 }, hit: { value: 0 }, tint: { value: [1, 1, 1] }, tintAmt: { value: 0 }, flash: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float time, vignette, grain, hit; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float time, vignette, grain, hit, tintAmt, flash; uniform vec3 tint; varying vec2 vUv;
     float rnd(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time*61.0) * 43758.5453); }
     void main(){
       vec2 c = vUv - 0.5; float d = dot(c,c);
@@ -19,9 +19,12 @@ const GradeShader = {
       col.r = texture2D(tDiffuse, vUv + off).r;
       col.g = texture2D(tDiffuse, vUv).g;
       col.b = texture2D(tDiffuse, vUv - off).b;
+      float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(col, mix(col, vec3(lum), 0.25) * tint, tintAmt);
       col *= 1.0 - vignette * smoothstep(0.08, 0.6, d);
       col += (rnd(vUv*1000.0) - 0.5) * grain;
       col = mix(col, vec3(1.0,0.25,0.15), hit * smoothstep(0.05, 0.45, d));
+      col = mix(col, vec3(0.85, 0.93, 1.0), flash);
       gl_FragColor = vec4(col, 1.0);
     }`,
 };
@@ -79,6 +82,15 @@ export class Renderer {
     this.gl.setSize(w, h, false);
     this.composer.setSize(w, h);
     for (const c of this.cameras) { c.aspect = w / h; c.updateProjectionMatrix(); }
+  }
+
+  /** Per-moon colour mood (null resets). */
+  setMood(m) {
+    const u = this.grade.uniforms;
+    u.tint.value = m ? m.tint : [1, 1, 1];
+    u.tintAmt.value = m ? m.amt : 0;
+    this.gl.toneMappingExposure = m ? m.exposure : 1.0;
+    u.flash.value = 0;
   }
 
   render(dt) {

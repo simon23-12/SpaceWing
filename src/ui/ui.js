@@ -1,10 +1,11 @@
 import { assets } from '../core/assets.js';
-import { SHIP_CLASSES, UPGRADES, MAX_UPGRADE, upgradePrice, PAINTS, PAINT_PRICE, shipStats, COMMODITIES, STATIONS, FACTIONS } from '../game/data.js';
+import { SHIP_CLASSES, UPGRADES, MAX_UPGRADE, maxLevel, upgradePrice, PAINTS, PAINT_PRICE, shipStats, COMMODITIES, STATIONS, FACTIONS, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from '../game/data.js';
 import { activeShip, cargoUsed, cargoFree, addCredits, fmt, rank, price, availableAt, logEntry, addShip } from '../game/state.js';
 import { generateJobs, acceptJob, abandonJob } from '../game/missions.js';
 import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
+import { Streaks } from './streaks.js';
 
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -42,7 +43,7 @@ export class UI {
     setTimeout(() => d.remove(), 5000);
   }
 
-  clear() { for (const el of [...this.root.children]) if (el !== this.notifs && !el.classList.contains('hud')) el.remove(); this.modalStack = []; }
+  clear() { for (const el of [...this.root.children]) if (el !== this.notifs && !el.classList.contains('hud')) { el._cleanup?.(); el.remove(); } this.modalStack = []; }
 
   get modalOpen() { return this.modalStack.length > 0 || !!this.dlg; }
 
@@ -50,14 +51,17 @@ export class UI {
   title({ hasSave, onNew, onContinue }) {
     const el = $(`<div class="title">
       <div class="bgimg" style="background-image:url(${assets.url('assets/ui/title.jpg')})"></div>
-      <h1>SPACEWING</h1><h2>DIE RINGE DES KRONOS · 2260</h2>
+      <h1>SPACEWING</h1><h2>SATURN</h2>
       <div class="menu">
         ${hasSave ? '<button class="btn warm" data-a="cont">Fortsetzen</button>' : ''}
         <button class="btn" data-a="new">Neues Spiel</button>
         <button class="btn" data-a="help">Steuerung</button>
       </div>
-      <div class="foot">Ein Söldnerspiel im Saturnsystem · Grafik gerendert in Blender · Musik live synthetisiert</div>
+      <div class="credit">Von Simon</div>
     </div>`);
+    // speed streaks drifting through the picture, slowly, towards the station
+    const streaks = new Streaks(el, { count: 150, speed: 1.5, vx: 0.66, vy: 0.55, alpha: 0.85, color: [205, 228, 255], z: 0 });
+    el._cleanup = () => streaks.dispose();
     el.querySelector('[data-a="new"]').onclick = () => {
       this.sfx();
       const menu = el.querySelector('.menu');
@@ -65,16 +69,33 @@ export class UI {
         <input maxlength="16" value="Wren" spellcheck="false"><button class="btn warm" data-a="go">Los geht’s</button><button class="btn small" data-a="back">Zurück</button>`;
       const inp = menu.querySelector('input'); inp.focus(); inp.select();
       input.enabled = false;
-      const go = () => { input.enabled = true; onNew((inp.value || 'Wren').trim()); };
+      const go = () => { input.enabled = true; streaks.dispose(); onNew((inp.value || 'Wren').trim()); };
       menu.querySelector('[data-a="go"]').onclick = go;
       inp.onkeydown = (e) => { if (e.key === 'Enter') go(); };
-      menu.querySelector('[data-a="back"]').onclick = () => { input.enabled = true; el.remove(); this.title({ hasSave, onNew, onContinue }); };
+      menu.querySelector('[data-a="back"]').onclick = () => { input.enabled = true; streaks.dispose(); el.remove(); this.title({ hasSave, onNew, onContinue }); };
     };
-    const c = el.querySelector('[data-a="cont"]'); if (c) c.onclick = () => { this.sfx(); onContinue(); };
+    const c = el.querySelector('[data-a="cont"]'); if (c) c.onclick = () => { this.sfx(); streaks.dispose(); onContinue(); };
     el.querySelector('[data-a="help"]').onclick = () => { this.sfx(); this.controlsPanel(); };
     this.root.appendChild(el);
     this.titleEl = el;
     return el;
+  }
+
+  /** Full-screen transit / jump tunnel. Resolves after `sec` seconds. */
+  transitScreen(label, sub = '', sec = 2.8) {
+    const el = $(`<div class="transit"><div class="tl"><div class="lbl">${esc(label)}</div><div class="sub">${esc(sub)}</div></div></div>`);
+    this.root.appendChild(el);
+    const st = new Streaks(el, { count: 420, speed: 0.2, vx: 0.5, vy: 0.5, alpha: 1, color: [170, 210, 255], z: 0 });
+    const t0 = performance.now();
+    return new Promise(res => {
+      const tick = () => {
+        const k = (performance.now() - t0) / 1000 / sec;
+        st.set({ speed: 0.2 + Math.sin(Math.min(1, k) * Math.PI) * 7 });
+        if (k < 1) requestAnimationFrame(tick); else { st.dispose(); el.remove(); res(); }
+      };
+      this.fadeIn(0.3);
+      tick();
+    });
   }
 
   loading(label = 'LADE') {
@@ -145,13 +166,22 @@ export class UI {
     if (old) old.replaceWith(this.topbar());
   }
 
+  /** Warning line if a mission zone lies in a moon system the active ship cannot jump to yet. */
+  jumpNeed(zone) {
+    const mid = zone && moonOfZone(zone);
+    if (!mid) return '';
+    const need = MOONS[mid].jump, ship = activeShip(this.g), have = ship ? shipStats(ship).jump : 0;
+    if (mid === moonOfStation(this.g.location) || have >= need) return '';
+    return `<p class="bad" style="margin:4px 0 8px">Ziel ${MOONS[mid].name}: Sprungtriebwerk Klasse ${JUMP_CLASS[need]} nötig (Werft).</p>`;
+  }
+
   storyHint() {
     const g = this.g;
     const st = STORY[g.story];
     if (!st || g.story === 'ende') return g.flags.endingShown ? '<b>FREIES SPIEL</b><br>Die Geschichte ist erzählt. Das Saturnsystem bleibt offen für Aufträge, Handel und Kopfgelder.' : '';
     if (g.story === 'prolog') return '<b>PROLOG · DREI NÄCHTE MIETE</b><br>40 Kredits auf dem Konto, kein Schiff. Geh in die Bar und hör dich um.';
     if (g.story === 'eisfracht' && !g.flags['accepted:eisfracht']) return '<b>EISFRACHT</b><br>Kix meinte, die Alte am Fenstertisch der Bar sucht einen Piloten.';
-    if (g.flags['accepted:' + g.story]) return `<b>${esc(st.title.toUpperCase())}</b><br>${esc(st.brief)}`;
+    if (g.flags['accepted:' + g.story]) return `<b>${esc(st.title.toUpperCase())}</b><br>${esc(st.brief)}${this.jumpNeed(st.zone)}`;
     if (g.story === 'funkstille') return '<b>FUNKSTILLE</b><br>Von Mags fehlt jede Spur. Vielleicht weiß Kix in der Bar mehr.';
     if (g.story === 'kassini') return '<b>DIE KASSINI-TEILUNG</b><br>Mags und Juno warten in der Bar. Es ist Zeit für eine Entscheidung.';
     if (st.available && st.available(g)) return `<b>NEUE STORYMISSION</b><br>„${esc(st.title)}“ wartet an der Söldnerbörse.`;
@@ -194,7 +224,7 @@ export class UI {
       const st = STORY[g.story];
       let html = '<div class="cards">';
       if (st && st.available && st.available(g) && !g.flags['accepted:' + g.story] && st.giver !== 'kix' && st.giver !== 'juno') {
-        html += `<div class="card story"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p><div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1">Annehmen</button></div></div>`;
+        html += `<div class="card story"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p>${this.jumpNeed(st.zone)}<div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1">Annehmen</button></div></div>`;
       }
       if (g.story === 'kassini' && !g.flags.ending && g.flags['done:schakalnest']) {
         html += `<div class="card story"><div class="meta">STORY</div><h4>Die Kassini-Teilung</h4><p>Mags und Juno warten in der Bar auf deine Entscheidung.</p></div>`;
@@ -306,9 +336,9 @@ export class UI {
       <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 10px">UPGRADES</h4><table class="grid">`;
     for (const [k, u] of Object.entries(UPGRADES)) {
       const lv = ship.upgrades[k] || 0;
-      const p = lv < MAX_UPGRADE ? upgradePrice(ship.cls, k, lv) : null;
-      html += `<tr><td><b>${u.name}</b><div class="dim" style="font-size:12px">${u.desc}</div></td>
-        <td><div class="pips">${Array.from({ length: MAX_UPGRADE }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></td>
+      const p = lv < maxLevel(k) ? upgradePrice(ship.cls, k, lv) : null;
+      html += `<tr${k === 'jump' ? ' style="background:rgba(255,207,122,.06)"' : ''}><td><b>${u.name}</b>${k === 'jump' ? ` <span class="warm">Klasse ${JUMP_CLASS[lv]}</span>` : ''}<div class="dim" style="font-size:12px">${u.desc}</div></td>
+        <td><div class="pips">${Array.from({ length: maxLevel(k) }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></td>
         <td class="num">${p != null ? `<button class="btn small" data-up="${k}" ${g.credits < p ? 'disabled' : ''}>${fmt(p)} Cr</button>` : '<span class="good">MAX</span>'}</td></tr>`;
     }
     html += `</table><h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:18px 0 8px">LACKIERUNG · ${PAINT_PRICE} Cr</h4><div class="swatches">`;
@@ -388,11 +418,45 @@ export class UI {
         <div class="statgrid"><span>Rufzeichen</span><b>${esc(g.callsign)}</b><span></span><span>Rang</span><b>${rank(g)}</b><span></span>
         <span>Kredits</span><b class="warm">${fmt(g.credits)}</b><span></span><span>Verdient</span><b>${fmt(g.earned)}</b><span></span><span>Abschüsse</span><b>${g.kills}</b><span></span><span>Tag</span><b>${g.day}</b><span></span></div>
         <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">RUF</h4><div class="statgrid">${reps}</div>
-        <div style="display:flex;gap:8px;margin-top:16px"><button class="btn small warm" data-save>Speichern</button><button class="btn small" data-story>Story-Bibel</button></div>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn small warm" data-save>Speichern</button><button class="btn small" data-apt>Apartments &amp; Transit</button><button class="btn small" data-story>Story-Bibel</button></div>
         </div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">LOGBUCH</h4>
         <div style="max-height:52vh;overflow:auto;font-size:14px;line-height:1.6">${g.log.map(l => `<div><span class="dim">Tag ${l.day}</span> · ${esc(l.text)}</div>`).join('') || '<span class="dim">Noch leer.</span>'}</div></div></div>`;
       body.querySelector('[data-save]').onclick = () => { this.game.save(); this.notify('Spielstand gespeichert'); this.sfx('coins'); };
+      body.querySelector('[data-apt]').onclick = () => this.openApartment(g.location);
       body.querySelector('[data-story]').onclick = () => window.open('https://github.com/simon23-12/SpaceWing/blob/main/docs/STORY.md', '_blank');
+    });
+  }
+
+  /** Buy an apartment at a station; once you own two, you can transit between them. */
+  openApartment(stationId) {
+    const st = STATIONS[stationId];
+    this.panel('Apartments', `${st.name} · Transit zwischen eigenen Apartments`, (body, rebuild) => {
+      const g = this.g;
+      g.apartments = g.apartments || {};
+      const own = !!g.apartments[stationId];
+      let html = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">HIER</h4>`;
+      if (!st.apartment) html += '<p class="dim">Auf dieser Station werden keine Wohnungen verkauft.</p>';
+      else if (own) html += `<p><b class="good">⌂ ${esc(st.flat)}</b><br><span class="dim">Dein Eigentum. Keine Miete, ein Bett, ein Transit-Anschluss.</span></p>`;
+      else html += `<p><b>${esc(st.flat)}</b><br><span class="dim">Mit eigener Transit-Kapsel ins Quanten-Relais der Stationen.</span></p><button class="btn warm" data-buy ${g.credits < st.apartment ? 'disabled' : ''}>Kaufen · ${fmt(st.apartment)} Cr</button>`;
+      html += `<p class="dim" style="margin-top:16px;line-height:1.5">Wer auf zwei Stationen ein Apartment besitzt, reist per Transit-Kapsel ohne Flug zwischen ihnen. Dein aktives Schiff wird vom Frachtdienst mitgenommen.</p></div><div>
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">TRANSIT</h4>`;
+      const others = MOON_ORDER.map(m => MOONS[m].station).filter(sid => sid !== stationId);
+      for (const sid of others) {
+        const S = STATIONS[sid], M = MOONS[moonOfStation(sid)];
+        const has = !!g.apartments[sid], open = M.unlock(g);
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0;padding:8px;border:1px solid var(--line)">
+          <div><b style="color:${M.color}">${M.name}</b> · ${esc(S.name)}<div class="dim" style="font-size:12px">${has ? '⌂ ' + esc(S.flat) : open ? `Kein Apartment (${fmt(S.apartment)} Cr vor Ort)` : 'Mond noch gesperrt'}</div></div>
+          ${has && own ? `<button class="btn small warm" data-go="${sid}">Transit</button>` : ''}</div>`;
+      }
+      html += `</div></div>`;
+      body.innerHTML = html;
+      body.querySelector('[data-buy]')?.addEventListener('click', () => {
+        if (g.credits < st.apartment) return;
+        g.credits -= st.apartment; g.apartments[stationId] = true;
+        logEntry(g, `Apartment gekauft: ${st.flat}, ${st.name}`);
+        this.sfx('coins'); this.notify('Apartment gekauft. Willkommen zu Hause.'); this.game.save(); rebuild(); this.refreshTopbar();
+      });
+      body.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { this.closeTop(); this.game.teleport(b.dataset.go); });
     });
   }
 
@@ -400,69 +464,92 @@ export class UI {
   openMap(flight) {
     const g = this.g;
     const here = flight ? flight.zoneId : STATIONS[g.location].zone;
-    let sel = null;
-    const wrap = this.panel('Systemkarte', flight ? 'Fusionsantrieb bereit · Ziel wählen' : 'Saturnsystem · Ansicht', (body) => {
-      body.innerHTML = `<div class="mapwrap"><canvas width="900" height="666"></canvas><div class="dest"><div class="destinfo">Wähle ein Ziel auf der Karte.</div><div class="list"></div></div></div>`;
+    const hereMoon = moonOfZone(here);
+    const ship = flight ? (flight.player.record?.cls ? flight.player.record : null) : activeShip(g);
+    const jumpCls = ship ? shipStats(ship).jump : 0;
+    let selMoon = hereMoon, selZone = null;
+    const wrap = this.panel('Systemkarte · Saturn', flight ? `Sprungtriebwerk: Klasse ${JUMP_CLASS[jumpCls]} · Ziel wählen` : 'Die fünf Monde · Saturn ist dein Fixpunkt', (body) => {
+      body.innerHTML = `<div class="mapwrap"><canvas width="900" height="666"></canvas><div class="dest"><div class="destinfo"></div><div class="list"></div></div></div>`;
       const cv = body.querySelector('canvas'), ctx = cv.getContext('2d');
       const info = body.querySelector('.destinfo'), list = body.querySelector('.list');
-      const zones = Object.entries(ZONES).filter(([id]) => id !== 'iapetus' || g.flags.gewoelbeOpen || STORY[g.story]?.zone === 'iapetus' || g.flags['accepted:gewoelbe']);
-      // log-radial projection of the ring plane
       const proj = (p) => {
         const r = Math.hypot(p[0], p[2]); const a = Math.atan2(p[2], p[0]);
-        const k = Math.log10(Math.max(r, 60000) / 60000) / Math.log10(13e6 / 60000);
-        const R = 60 + k * 300;
+        const k = Math.log10(Math.max(r, 60000) / 60000) / Math.log10(4.2e6 / 60000);
+        const R = 70 + k * 300;
         return [450 + Math.cos(a) * R, 333 + Math.sin(a) * R * 0.62];
       };
+      const open = (id) => MOONS[id].unlock(g);
       const draw = () => {
         ctx.clearRect(0, 0, 900, 666);
-        // orbits
         ctx.strokeStyle = 'rgba(120,200,255,0.12)';
-        for (const b of Object.values(BODIES)) {
-          const r = Math.hypot(b.pos[0], b.pos[2]); const k = Math.log10(r / 60000) / Math.log10(13e6 / 60000); const R = 60 + k * 300;
+        for (const id of MOON_ORDER) {
+          const b = BODIES[id]; const r = Math.hypot(b.pos[0], b.pos[2]); const k = Math.log10(r / 60000) / Math.log10(4.2e6 / 60000); const R = 70 + k * 300;
           ctx.beginPath(); ctx.ellipse(450, 333, R, R * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
         }
-        // Saturn + rings
-        ctx.fillStyle = '#d8c08a'; ctx.beginPath(); ctx.arc(450, 333, 22, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(220,200,160,.6)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(450, 333, 44, 14, -0.3, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+        const grd = ctx.createRadialGradient(440, 325, 4, 450, 333, 30); grd.addColorStop(0, '#f4e2b8'); grd.addColorStop(1, '#a8885a');
+        ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(450, 333, 26, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(230,210,170,.7)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(450, 333, 52, 15, -0.3, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+        ctx.fillStyle = '#e8d4a8'; ctx.font = '600 15px Rajdhani, sans-serif'; ctx.fillText('SATURN', 428, 380);
         ctx.font = '600 24px Rajdhani, sans-serif';
-        for (const [id, z] of zones) {
-          const [x, y] = proj(zoneAnchor(id));
-          const isHere = id === here, isSel = id === sel;
-          const story = STORY[g.story]?.zone === id && g.flags['accepted:' + g.story];
-          const job = g.jobs.some(j => (j.kind === 'fracht' && STATIONS[j.to].zone === id) || ((j.kind === 'kopfgeld' || j.kind === 'eskorte') && j.zone === id));
-          ctx.fillStyle = z.hostile ? '#ff5a4a' : isHere ? '#7fe08a' : '#7fd4ff';
-          ctx.beginPath(); ctx.arc(x, y, isSel ? 12 : 8, 0, Math.PI * 2); ctx.fill();
-          if (isSel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
-          if (story) { ctx.strokeStyle = '#ffcf7a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
-          ctx.fillStyle = isHere ? '#bff5c4' : '#d8e6ef';
-          ctx.fillText(z.name.split(' · ')[0] + (isHere ? ' (hier)' : '') + (job ? ' ◆' : ''), x + 16, y + 8);
+        for (const id of MOON_ORDER) {
+          const M = MOONS[id];
+          const [x, y] = proj(BODIES[id].pos);
+          const isHere = id === hereMoon, isSel = id === selMoon, ok = open(id);
+          const story = STORY[g.story] && g.flags['accepted:' + g.story] && M.zones.includes(STORY[g.story].zone);
+          ctx.globalAlpha = ok ? 1 : 0.45;
+          ctx.fillStyle = M.color; ctx.beginPath(); ctx.arc(x, y, isSel ? 13 : 9, 0, Math.PI * 2); ctx.fill();
+          if (isSel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 19, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
+          if (story) { ctx.strokeStyle = '#ffcf7a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 26, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
+          ctx.fillStyle = isHere ? '#bff5c4' : ok ? '#d8e6ef' : '#8a96a0';
+          const apt = g.apartments?.[M.station] ? ' ⌂' : '';
+          ctx.fillText(`${M.name}${isHere ? ' (hier)' : ''}${ok ? '' : ' 🔒'}${apt}`, x + 18, y + 8);
+          ctx.globalAlpha = 1;
         }
       };
-      const pick = (id) => {
-        sel = id; draw(); this.sfx('blip');
-        const z = ZONES[id];
-        if (id === here) { info.innerHTML = `<b>${z.name}</b><br>Du bist hier.`; return; }
-        const t = travelInfo(here, id);
-        const fuelCost = Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
-        info.innerHTML = `<b>${z.name}</b><br>Entfernung: ${fmt(t.distance)} km<br>Transferzeit: ${t.hours.toFixed(1)} h<br>Treibstoff (He-3): ${fuelCost} Cr${z.hostile ? '<br><span class="bad">Feindliches Gebiet</span>' : ''}`;
-        if (flight) {
-          const b = $(`<button class="btn warm" style="margin-top:10px">Fusionsbrand zünden</button>`);
-          const blocked = flight.ships.some(s => s.alive && flight.isHostile(s, flight.player) && s.pos.distanceTo(flight.player.pos) < 2500);
-          if (blocked) b.disabled = true, b.textContent = 'Feinde zu nah';
-          if (g.credits < fuelCost) b.disabled = true, b.textContent = 'Zu wenig Kredits für Treibstoff';
-          b.onclick = () => { g.credits -= fuelCost; wrap._close(); this.game.travel(flight, id); };
-          info.appendChild(b);
+      const zoneButtons = (mid) => {
+        const M = MOONS[mid];
+        const ok = open(mid);
+        let html = `<b style="font-size:20px;color:${M.color}">${M.name.toUpperCase()}</b> <span class="dim">· ${M.tag}</span><br><span style="line-height:1.45">${M.desc}</span><br>`;
+        html += `<span class="dim">Sprungklasse ${JUMP_CLASS[M.jump] || '–'} · Station: ${STATIONS[M.station].name}${g.apartments?.[M.station] ? ' · ⌂ Apartment' : ''}</span>`;
+        if (!ok) html += `<br><span class="bad">Gesperrt.</span> Freischalten: ${M.why}`;
+        info.innerHTML = html;
+        list.innerHTML = '';
+        if (!ok) return;
+        for (const zid of M.zones) {
+          const z = ZONES[zid];
+          const row = $(`<div style="margin-top:10px"><div><b>${esc(z.name)}</b>${zid === here ? ' <span class="good">(hier)</span>' : ''}${z.hostile ? ' <span class="bad">feindlich</span>' : ''}</div></div>`);
+          if (flight && zid !== here) {
+            const jump = mid !== hereMoon;
+            const t = travelInfo(here, zid);
+            const borrowed = flight.player.record?.uid?.startsWith('TEMP');   // story ships: the owner pays the fuel
+            const fuelCost = borrowed ? 0 : jump ? Math.round((260 + M.jump * 180) * (g.flags.zoll ? 1.4 : 1)) : Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
+            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Hyperraumsprung' : 'Fusionsbrand'} · ${fuelCost} Cr</button>`);
+            const blocked = flight.ships.some(s => s.alive && flight.isHostile(s, flight.player) && s.pos.distanceTo(flight.player.pos) < 2500);
+            if (jump && jumpCls < M.jump) b.disabled = true, b.textContent = `Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig (Werft)`;
+            else if (blocked) b.disabled = true, b.textContent = 'Feinde zu nah';
+            else if (g.credits < fuelCost) b.disabled = true, b.textContent = 'Zu wenig Kredits für Treibstoff';
+            b.onclick = () => { g.credits -= fuelCost; wrap._close(); this.game.travel(flight, zid, jump); };
+            row.appendChild(b);
+          }
+          list.appendChild(row);
+        }
+        if (!flight && mid !== hereMoon && g.apartments?.[M.station] && g.apartments?.[g.location] && g.docked) {
+          const b = $(`<button class="btn warm" style="margin-top:12px">Apartment-Transit nach ${esc(M.name)}</button>`);
+          b.onclick = () => { wrap._close(); this.game.teleport(M.station); };
+          list.appendChild(b);
         }
       };
-      list.innerHTML = zones.map(([id, z]) => `<button class="btn small" data-z="${id}">${z.name.split(' · ')[0]}</button>`).join('');
-      list.querySelectorAll('[data-z]').forEach(b => b.onclick = () => pick(b.dataset.z));
+      const pick = (id) => { selMoon = id; draw(); this.sfx('blip'); zoneButtons(id); };
       cv.onclick = (e) => {
         const r = cv.getBoundingClientRect(); const mx = (e.clientX - r.left) * 900 / r.width, my = (e.clientY - r.top) * 666 / r.height;
-        let best = null, bd = 30;
-        for (const [id] of zones) { const [x, y] = proj(zoneAnchor(id)); const d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = id; } }
+        let best = null, bd = 34;
+        for (const id of MOON_ORDER) { const [x, y] = proj(BODIES[id].pos); const d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = id; } }
         if (best) pick(best);
       };
-      draw();
+      const tabs = $(`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>`);
+      for (const id of MOON_ORDER) { const b = $(`<button class="btn small">${MOONS[id].name}${open(id) ? '' : ' 🔒'}</button>`); b.onclick = () => pick(id); tabs.appendChild(b); }
+      info.before(tabs);
+      pick(selMoon);
     }, { onClose: () => { if (flight) flight.paused = false; } });
     if (flight) flight.paused = true;
     return wrap;
@@ -533,9 +620,9 @@ export class UI {
   controlsPanel() {
     this.panel('Steuerung', '', (body) => {
       body.innerHTML = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">IM ALL</h4><table class="grid">
-        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte und Fusionsbrand'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table></div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">AUF DER STATION</h4><table class="grid">
-        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen'], ['Tab', 'Zur Brückenübersicht'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table><p class="dim" style="margin-top:14px">Maus-Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
         <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren</label>
         <p class="dim" style="margin-top:10px">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div></div>`;

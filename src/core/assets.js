@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -8,6 +9,7 @@ class Assets {
     this.manager = new THREE.LoadingManager();
     this.texLoader = new THREE.TextureLoader(this.manager);
     this.gltfLoader = new GLTFLoader(this.manager);
+    this.gltfLoader.setMeshoptDecoder(MeshoptDecoder);   // NPCs are meshopt-compressed (tools/pack_npcs.sh)
     this.textures = new Map();
     this.models = new Map();
     this.json = new Map();

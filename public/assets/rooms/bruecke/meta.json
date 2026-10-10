@@ -8,37 +8,73 @@
   0.0,
   8.0
  ],
- "markers": [
+ "hotspots": [
   {
-   "kind": "door",
    "id": "bar",
-   "pos": [
-    -10.5,
-    0,
-    7.7
-   ],
-   "dir": [
-    0.0,
-    0.0,
-    1.0
-   ],
-   "label": "BAR \u201eCASSINI-SPALT\u201c"
+   "label": "RINGGANG \u00b7 BAR",
+   "objs": [
+    "door0",
+    "sign0",
+    "doorframe0"
+   ]
   },
   {
-   "kind": "door",
    "id": "kabine",
-   "pos": [
-    -5.0,
-    0,
-    7.7
-   ],
-   "dir": [
-    0.0,
-    0.0,
-    1.0
-   ],
-   "label": "QUARTIERE"
+   "label": "RINGGANG \u00b7 QUARTIERE",
+   "objs": [
+    "door1",
+    "sign1",
+    "doorframe1"
+   ]
   },
+  {
+   "id": "boerse",
+   "label": "S\u00d6LDNERB\u00d6RSE",
+   "objs": [
+    "counter0",
+    "screen_boerse",
+    "csign0",
+    "screenframe0"
+   ]
+  },
+  {
+   "id": "werft",
+   "label": "WERFT & MARKT",
+   "objs": [
+    "counter1",
+    "screen_werft",
+    "csign1",
+    "screenframe1"
+   ]
+  },
+  {
+   "id": "hangar",
+   "label": "HANGAR",
+   "objs": [
+    "door10",
+    "sign10",
+    "doorframe10"
+   ]
+  },
+  {
+   "id": "aussicht",
+   "label": "AUSSICHT \u00b7 LIFT",
+   "objs": [
+    "door11",
+    "sign11",
+    "doorframe11"
+   ]
+  },
+  {
+   "id": "karte",
+   "label": "Systemkarte",
+   "objs": [
+    "holo_base",
+    "holo_top"
+   ]
+  }
+ ],
+ "markers": [
   {
    "kind": "terminal",
    "id": "boerse",
@@ -96,36 +132,6 @@
     0.0,
     -1.0
    ]
-  },
-  {
-   "kind": "door",
-   "id": "hangar",
-   "pos": [
-    13.7,
-    0,
-    2.0
-   ],
-   "dir": [
-    1.0,
-    0.0,
-    0.0
-   ],
-   "label": "HANGAR"
-  },
-  {
-   "kind": "door",
-   "id": "aussicht",
-   "pos": [
-    13.7,
-    0,
-    -5.5
-   ],
-   "dir": [
-    1.0,
-    0.0,
-    0.0
-   ],
-   "label": "AUSSICHT"
   },
   {
    "kind": "terminal",
@@ -210,72 +216,6 @@
     -1.0,
     0.0,
     -0.0
-   ]
-  }
- ],
- "hotspots": [
-  {
-   "id": "bar",
-   "label": "BAR \u201eCASSINI-SPALT\u201c",
-   "objs": [
-    "door0",
-    "sign0",
-    "doorframe0"
-   ]
-  },
-  {
-   "id": "kabine",
-   "label": "QUARTIERE",
-   "objs": [
-    "door1",
-    "sign1",
-    "doorframe1"
-   ]
-  },
-  {
-   "id": "boerse",
-   "label": "S\u00d6LDNERB\u00d6RSE",
-   "objs": [
-    "counter0",
-    "screen_boerse",
-    "csign0",
-    "screenframe0"
-   ]
-  },
-  {
-   "id": "werft",
-   "label": "WERFT & MARKT",
-   "objs": [
-    "counter1",
-    "screen_werft",
-    "csign1",
-    "screenframe1"
-   ]
-  },
-  {
-   "id": "hangar",
-   "label": "HANGAR",
-   "objs": [
-    "door10",
-    "sign10",
-    "doorframe10"
-   ]
-  },
-  {
-   "id": "aussicht",
-   "label": "AUSSICHT",
-   "objs": [
-    "door11",
-    "sign11",
-    "doorframe11"
-   ]
-  },
-  {
-   "id": "karte",
-   "label": "Systemkarte",
-   "objs": [
-    "holo_base",
-    "holo_top"
    ]
   }
  ],

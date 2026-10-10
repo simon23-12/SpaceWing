@@ -195,6 +195,27 @@ export class HUD {
       ctx.fillStyle = '#ffd36a';
       ctx.fillText(`${w.label}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 14, sp.y + 4);
     }
+    // Saturn: always marked, the fixed point you navigate by
+    {
+      const an = flight.anchorOverride || flight.anchor;
+      const dist = Math.hypot(an[0], an[1], an[2]);
+      const ds = new THREE.Vector3(-an[0], -an[1], -an[2]).normalize();
+      const sp = this.project(cam, cam.getWorldPosition(new THREE.Vector3()).addScaledVector(ds, 5000));
+      const lbl = `SATURN  ${(dist / 1000).toFixed(0)} Tkm`;
+      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) {
+        this.edgeArrow(ctx, sp, '#e8c88a', false);
+        let dx = sp.x - W / 2, dy = sp.y - H / 2; if (sp.behind) { dx = -dx; dy = -dy; }
+        const a = Math.atan2(dy, dx), R = Math.min(W, H) * 0.42 - 22;
+        ctx.fillStyle = 'rgba(232,200,138,.75)'; ctx.font = '600 11px Rajdhani, sans-serif';
+        ctx.fillText('SATURN', W / 2 + Math.cos(a) * R - 18, H / 2 + Math.sin(a) * R + 4);
+      } else {
+        ctx.strokeStyle = 'rgba(232,200,138,.55)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 22, -0.4, 0.4); ctx.stroke();
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 22, Math.PI - 0.4, Math.PI + 0.4); ctx.stroke();
+        ctx.fillStyle = 'rgba(232,200,138,.8)'; ctx.font = '600 11px Rajdhani, sans-serif';
+        ctx.fillText(lbl, sp.x + 28, sp.y + 4);
+      }
+    }
     // damage vignette
     flight.game.renderer.grade.uniforms.hit.value = Math.max(0, 0.6 - (p.time - p.lastHit) * 1.5) * (p.hull < p.maxHull ? 1 : 0.4);
   }

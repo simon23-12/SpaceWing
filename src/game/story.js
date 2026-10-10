@@ -26,6 +26,15 @@ export const PEOPLE = {
   vesper: { name: 'Prof. Lior Vesper', role: 'Aufzeichnung · 2241', color: '#d7b8ff', ini: 'LV' },
   rook:   { name: 'Silas Rook', role: 'Schakale von Phoebe', color: '#ff5a4a', ini: 'SR' },
   saffi:  { name: 'Saffi Lindqvist', role: 'Sängerin · Roche-Grenze', color: '#ff8ad8', ini: 'SL' },
+  gast_kesh:  { name: 'Ol’ Kesh', role: 'Ringschürfer im Ruhestand · Ringgilde', color: '#9fd18f', ini: 'OK' },
+  gast_rana:  { name: 'Rana Okonjo-Weiß', role: 'Reporterin · Saturn-Kurier', color: '#c8a0ff', ini: 'RO' },
+  gast_tomas: { name: 'Tomas Reyes', role: 'Dockarbeiter · Hangar 7', color: '#d8b07a', ini: 'TR' },
+  gast_ilse:  { name: 'Ilse Marangoni', role: 'Kurierpilotin', color: '#7fe0d8', ini: 'IM' },
+  crew_a: { name: 'Deckwart Halvorsen', role: 'Stationsdienst · Deck 4', color: '#9fc4ff', ini: 'DH' },
+  crew_b: { name: 'Sorrel Ndiaye', role: 'Lebenserhaltung · Deck 4', color: '#9fc4ff', ini: 'SN' },
+  crew_c: { name: 'Ama Quist', role: 'Eisfrachterin aus Enceladus', color: '#bfe6ff', ini: 'AQ' },
+  crew_d: { name: 'Yara Benedek', role: 'Mechanikerin · Hangar 7', color: '#ffd36a', ini: 'YB' },
+  crew_e: { name: 'Jun Takeda', role: 'Liga-Zollbeamter (außer Dienst)', color: '#9fb4ff', ini: 'JT' },
   self:   { name: 'Du', role: '', color: '#7fd4ff', ini: '··' },
   comp:   { name: 'Bordcomputer', role: '', color: '#9fd6ff', ini: '>_' },
 };
@@ -33,6 +42,27 @@ export const PEOPLE = {
 const say = (who, text, extra = {}) => ({ who, text, ...extra });
 
 // ============================================================================ NPC conversations in the station
+
+/**
+ * Small dialogue tree: an opening line with topics, every topic returns to the menu.
+ * topics: [{ q: question, a: [text | [who, text]], act?, if? }]
+ */
+function tree(who, intro, topics, bye = 'Bis dann.') {
+  topics = topics.filter(t => t.if === undefined || t.if);
+  const choices = topics.map((t, i) => ({ t: t.q, go: 't' + i })).concat([{ t: bye, end: true }]);
+  const steps = [say(who, intro, { choices })];
+  topics.forEach((t, i) => {
+    t.a.forEach((line, k) => {
+      const [w, text] = Array.isArray(line) ? line : [who, line];
+      const last = k === t.a.length - 1;
+      steps.push(say(w, text, { label: k === 0 ? 't' + i : undefined, ...(last ? { go: 'menu', act: t.act } : {}) }));
+    });
+  });
+  steps.push(say(who, ['Sonst noch was?', 'Noch eine Frage?', 'Was noch?'][topics.length % 3], { label: 'menu', choices }));
+  return steps;
+}
+
+const jumpHint = 'Für einen anderen Mond brauchst du ein Sprungtriebwerk. Klasse I reicht für Enceladus und Mimas, Titan braucht II, Iapetus III. Lenka baut dir eins ein.';
 
 export function npcDialogue(game, npc) {
   const g = game.state;
@@ -63,7 +93,12 @@ export function npcDialogue(game, npc) {
       say(MAGS, 'Ja. Ich arbeite für das Archiv, schon seit Teos Tod. Ich hätte es dir früher sagen sollen.'),
       say(MAGS, 'Varga kann jede Fraktion vorhersagen, jede Flotte und jeden Markt. Dich kann sie nicht vorhersagen. Du bist kein Datenpunkt, ' + name + '. Du bist ein Mensch mit einem rostigen Jäger.'),
     ];
-    return [say(MAGS, ['Die Spacewing zieht nach links. Hat sie schon immer.', 'Trink nicht, was Kix „Spezial“ nennt.', 'Teo hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'][g.day % 3])];
+    return tree(MAGS, ['Setz dich, ' + name + '. Die Spacewing zieht immer noch nach links, oder?', 'Na, Pilot. Was macht der Rost?', 'Trink nicht, was Kix „Spezial“ nennt. Was gibt’s?'][g.day % 3], [
+      { q: 'Erzähl mir von der Spacewing.', a: ['Hawker-Lindqvist SW-2. Ein Keil mit zwei Triebwerken, so groß wie Frachtcontainer. Kein Flügel, keine Romantik. Im Vakuum braucht man keine Flügel, nur Schub und Nerven.', 'Teo hat sie vierzig Jahre geflogen. Die Kanonen schwenken, wenn du sie lässt. Und sie zieht nach links.'] },
+      { q: 'Wie komme ich zu den anderen Monden?', a: [jumpHint, 'Und nicht jeder Mond lässt dich rein. Titan zum Beispiel will erst wissen, auf welcher Seite du stehst.'] },
+      { q: 'Wer war Teo?', a: ['Mein Bruder. Kurierflieger, Idiot, der beste Pilot im Ring. Ist vor sechs Jahren bei Mimas verschwunden.', 'Er hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'] },
+      { q: 'Worum geht es in diesem Handelskrieg eigentlich?', a: ['Wasser, Methan, Helium. Enceladus hat das Wasser, Titan das Methan, die Ringe das Erz. Die Liga will an allem Zoll verdienen, das Konsortium will alles besitzen.', 'Und wir dazwischen fliegen das Zeug hin und her und werden beschossen. So ist das hier draußen.'] },
+    ], 'Bis später, Mags.');
   }
   if (npc === KIX) {
     const lines = [
@@ -76,13 +111,73 @@ export function npcDialogue(game, npc) {
     ];
     if (g.flags.m3done && !g.flags['accepted:funkstille']) return [
       say(KIX, name + '. Gut, dass du da bist. Mags ist seit zwei Tagen weg.'),
-      say(KIX, 'Ihr Transponder hat sich zuletzt aus dem B-Ring gemeldet, Abbaufeld der Ringgilde. Dann nichts mehr.'),
+      say(KIX, 'Ihr Transponder hat sich zuletzt vom Ringrand bei Mimas gemeldet, aus dem Abbaufeld der Ringgilde. Dann nichts mehr.'),
       say(KIX, 'Sie hat ihre Rechnung offen gelassen. Mags lässt nie eine Rechnung offen.', { choices: [{ t: 'Ich fliege hin.', act: (gm) => acceptStory(gm, 'funkstille'), end: true }, { t: 'Gib mir eine Minute.', end: true }] }),
     ];
-    return lines[g.day % lines.length];
+    return tree(KIX, lines[g.day % lines.length][0].text, [
+      { q: 'Einen Whisky. (12 Cr)', a: ['Synthetisch, zwölf Jahre in einem Tank gereift, der früher Hydraulikflüssigkeit hatte. Wohl bekommt’s.'], act: (gm) => { if (gm.state.credits >= 12) { gm.state.credits -= 12; gm.ui.refreshTopbar(); gm.ui.notify('−12 Cr'); } else gm.ui.notify('Kix: „Kein Geld, kein Whisky.“'); } },
+      { q: 'Was gibt’s Neues?', a: [g.flags.zoll ? 'Die Liga hat den Saturnzoll erhoben. Helium-3 kostet ein Viertel mehr, und im Ringgang wird geflucht.' : 'Gerüchte, dass die Liga einen Zoll auf alles erheben will, was den Saturn verlässt. Die Händler trinken schon vorsorglich.', 'Und auf Titan baut das Konsortium Kriegsschiffe und nennt sie Geleitschutz.'] },
+      { q: 'Wer spielt da?', a: ['„Roche-Grenze“. Saffi Lindqvist, Bass und Rhodes. Sie spielen in Kraken-Hafen auf Titan, und wir kriegen sie als Hologramm. 2,3 Sekunden Lichtverzögerung, man hört es am Applaus.'] },
+      { q: 'Wo finde ich Arbeit?', a: ['Femi Oduya an der Söldnerbörse, Kommandodeck. Fracht, Kopfgeld, Eskorte. Am Anfang alles hier im Rhea-Orbit, für die anderen Monde brauchst du ein Sprungtriebwerk.'] },
+    ], 'Danke, Kix.');
   }
-  if (npc === ODUYA) return [say(ODUYA, 'Söldnerbörse Cassini. Aufträge am Terminal, Beschwerden bei der Stationsmeisterin, Trinkgeld bei mir.', { act: (gm) => gm.ui.openBoerse() })];
-  if (npc === 'haendler') return [say('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', { act: (gm) => gm.ui.openWerft() })];
+  if (npc === ODUYA) return tree(ODUYA, 'Söldnerbörse Cassini. Aufträge am Terminal, Beschwerden bei der Stationsmeisterin, Trinkgeld bei mir.', [
+    { q: 'Zeig mir die Aufträge.', a: ['Bitte sehr. Frisch vom Netz.'], act: (gm) => gm.ui.openBoerse() },
+    { q: 'Wer zahlt am besten?', a: ['Das Konsortium zahlt gut und vergisst nichts. Das Kollektiv zahlt wenig und vergisst nie, wer geholfen hat. Die Ringgilde zahlt in bar und in Schnaps.', 'Kopfgelder auf Schakale zahlt die Börse selbst. Die sind ehrlich verdient.'] },
+    { q: 'Was hat es mit dem Zoll auf sich?', a: ['Die Liga der Inneren Welten sagt, der Saturn soll seinen Anteil an der Ordnung des Systems zahlen. Das Konsortium sagt, die Liga soll sich um ihre eigenen Planeten kümmern.', 'Ich sage: Solange beide streiten, gibt es Arbeit.'] },
+    { q: 'Wie werde ich bekannter?', a: ['Verdien Geld. Ab zwanzigtausend Kredits nennt man dich hier Frachtpilot, dann öffnet sogar das Herschel-Depot auf Mimas seine Tore.'] },
+  ], 'Danke, Femi.');
+  if (npc === 'haendler') return tree('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', [
+    { q: 'Zur Werft.', a: ['Leg los. Und fass die Spacewing nicht an der linken Gondel an, die ist heiß.'], act: (gm) => gm.ui.openWerft() },
+    { q: 'Was kann ein Sprungtriebwerk?', a: [jumpHint.replace('Lenka baut dir eins ein.', 'Ich baue es dir ein.'), 'Ohne Sprung brauchst du für den Weg nach Titan zwei Wochen Fusionsbrand. Mit Sprung einen Herzschlag und einen Kater.'] },
+    { q: 'Lohnt sich ein Apartment?', a: ['Wenn du auf zwei Stationen eins besitzt, reist du per Transit-Kapsel hin und her, ohne zu fliegen. Dein Schiff kommt mit dem Frachtdienst nach.', 'Kabine 4-117 kannst du hier am Terminal in deiner Kabine kaufen. Dann ist auch Schluss mit der Miete.'] },
+    { q: 'Welches Schiff als Nächstes?', a: ['Die Kestrel ist ein echter Jäger. Die Mule fährt Fracht, viel Fracht. Wer Geld hat, nimmt die Corsair und wird in Ruhe gelassen.'] },
+  ], 'Bis später, Lenka.');
+  if (npc === JUNO) return tree(JUNO, 'Du bist also der Pilot, von dem Mags erzählt. Juno Vesper, Archiv von Iapetus.', [
+    { q: 'Was ist die Vesper-Prognose?', a: ['Mein Großvater hat eine Mathematik entwickelt, die das Verhalten großer Gesellschaften vorhersagt. Nicht einzelner Menschen, nur von Millionen.', 'Die Prognose sagt dem Saturn dreißig Jahre Chaos voraus. Varga hat eine Kopie. Und sie will daraus eine Krone machen.'] },
+    { q: 'Warum Iapetus?', a: ['Weil niemand dorthin fliegt. Eine Seite schwarz, eine weiß, ein Gebirge genau am Äquator. Ideal, um ein Archiv zu verstecken.'] },
+  ], 'Auf bald, Juno.');
+  // ------------------------------------------------------------------ people on the deck
+  if (npc === 'gast_kesh') return tree(npc, 'Hm? Ach, der neue Pilot. Setz dich, mir tun die Knie weh, wenn ich hochgucke.', [
+    { q: 'Wer bist du?', a: ['Kesh. Ol’ Kesh, sagen sie. Fünfzig Jahre Erz geschürft am Ringrand, bevor die Gilde mich in Rente geschickt hat. Jetzt schürfe ich hier nach Whisky.'] },
+    { q: 'Wie ist es bei Mimas?', a: ['Der Todesstern. Ein Krater, so groß, dass der ganze Mond fast dabei zerbrochen wäre. Im Krater liegt das Herschel-Depot. Keine Fragen, keine Papiere.', 'Und dahinter der Ringrand, die Cassini-Teilung. Da haben wir Erz geschürft. Wunderschön und tödlich.'] },
+    { q: 'Was hältst du vom Handelskrieg?', a: ['Die Gilde fliegt für keinen. Weder für die Liga noch für das Konsortium. Aber wenn einer anfängt, die Ringe zu besitzen, dann fliege ich wieder, Knie hin oder her.'] },
+  ], 'Pass auf dich auf, Kesh.');
+  if (npc === 'gast_rana') return tree(npc, 'Rana Okonjo-Weiß, Saturn-Kurier. Wenn du was gesehen hast, ich zahle für Geschichten.', [
+    { q: 'Was schreibst du gerade?', a: [g.flags.zoll ? 'Über den Zoll. Wer ihn bezahlt, wer ihn eintreibt und wer ihn heimlich umgeht.' : 'Über die Liga. Sie schickt Korvetten in den Rhea-Orbit und nennt es Höflichkeitsbesuch.', 'Und über Titan. Das Konsortium kauft auffällig viele Kanonen für eine Firma, die angeblich Methan verkauft.'] },
+    { q: 'Was weißt du über Titan?', a: ['Kraken-Hafen hängt über dem größten Methanmeer. Goldfassaden, Dunst so orange wie ein Sonnenuntergang, und eine Konsulin, die nie lächelt. Aurelia Varga.', 'Man sagt, Varga kennt die Zukunft. Ich halte das für Werbung.'] },
+    { q: 'Hast du einen Tipp für mich?', a: ['Kopfgelder auf Schakale. Die Rotten werden besser bewaffnet, als sie es sich leisten können. Wer die Waffen liefert, ist meine nächste Geschichte.'] },
+  ], 'Viel Glück mit der Geschichte.');
+  if (npc === 'gast_tomas') return tree(npc, 'Feierabend. Endlich. Was willst du?', [
+    { q: 'Wie ist die Arbeit im Hangar?', a: ['Laut, kalt, und alle zwei Stunden kommt ein Frachter, dessen Pilot glaubt, Andocken sei optional. Hangar 7 ist der beste. Der mit der Spacewing.'] },
+    { q: 'Was kosten die Waren gerade?', a: ['Wasser kommt billig von Enceladus, Methan billig von Titan. Wer zwischen beiden fliegt, verdient. ' + (g.flags.zoll ? 'Nur Helium-3 ist teuer, seit der Zoll gilt.' : 'Noch.')] },
+    { q: 'Wie lebt man auf der Station?', a: ['Der Ring dreht sich, deshalb stehen wir. Deck 4 hat den Ringgang, die Bar und die Kabinen. Oben die Kuppel, da sieht man den Saturn, wenn man den Lift nimmt.'] },
+  ], 'Schönen Feierabend.');
+  if (npc === 'gast_ilse') return tree(npc, 'Kurierpilotin. Ich fliege, was in einen Laderaum passt und schnell sein muss. Du auch?', [
+    { q: 'Wie fühlt sich ein Hyperraumsprung an?', a: ['Erst lädt das Triebwerk, drei Sekunden, die sich anfühlen wie dreißig. Dann wird alles weiß, die Sterne ziehen sich zu Strichen.', 'Und dann bist du da, und der Saturn hängt an einer anderen Stelle im Himmel. Den immer im Blick behalten. Er ist der einzige Fixpunkt hier draußen.'] },
+    { q: 'Welcher Mond ist der schönste?', a: ['Enceladus. Weiß wie frischer Schnee, und die Geysire leuchten im Gegenlicht. Titan ist eindrucksvoller, aber man sieht vor lauter Dunst nichts.', 'Iapetus ist unheimlich. Halb schwarz, halb weiß. Da fliege ich nur, wenn ich muss.'] },
+    { q: 'Hast du Ärger mit Piraten?', a: ['Die Schakale von Phoebe. Früher Lumpen mit Schrottkanonen, heute fliegen sie mit Waffen, die neu riechen.'] },
+  ], 'Guten Flug, Ilse.');
+  if (npc === 'crew_a') return tree(npc, 'Deckwart Halvorsen. Verlaufen? Passiert jedem auf Deck 4.', [
+    { q: 'Wo finde ich was?', a: ['Ringgang: Bar am Westende, Kabinen auf der Südseite, deine ist 4-117. Kommandodeck über die zwei großen Türen. Vom Kommandodeck nach Osten: Hangar 7 und der Lift zur Aussichtskuppel.'] },
+    { q: 'Was ist oben in der Kuppel?', a: ['Glas, Pflanzen und der beste Blick auf den Saturn im ganzen System. Lift in der Lobby rufen, draufstellen, E drücken.'] },
+  ], 'Danke.');
+  if (npc === 'crew_b') return tree(npc, 'Pause. Sorrel, Lebenserhaltung. Die Luft, die du atmest, ist von mir. Bitte.', [
+    { q: 'Wie funktioniert die Station?', a: ['Der Ring dreht sich, das gibt uns etwa ein Drittel g. Das Wasser kommt von Enceladus, der Strom aus dem Fusionskern in der Spindel. Und wenn irgendwas ausfällt, ruft man mich.'] },
+    { q: 'Was passiert, wenn der Zoll kommt?', a: ['Dann wird das Wasser teurer, und die Leute duschen weniger. Und dann kommt der Ärger. Glaub mir, Lebenserhaltung ist Politik.'] },
+  ], 'Danke, Sorrel.');
+  if (npc === 'crew_c') return tree(npc, 'Ama Quist, Eisfrachterin. Ich bin nur auf der Durchreise nach Enceladus.', [
+    { q: 'Wie ist es auf Enceladus?', a: ['Kalt. Die „Quelle“ liegt über den Tigerstreifen am Südpol, da bohren wir das Eis. Das Kollektiv gehört allen, die dort arbeiten. Kein Konsortium, keine Liga.'] },
+    { q: 'Und der Handelskrieg?', a: ['Wenn Titan oder die Liga unsere Quelle blockieren, verdurstet der halbe Saturn. Das wissen alle. Genau deshalb haben wir Angst.'] },
+  ], 'Gute Reise.');
+  if (npc === 'crew_d') return tree(npc, 'Yara, Mechanikerin. Ist das dein Keil da draußen? Hübsche Gondeln.', [
+    { q: 'Was würdest du an der Spacewing verbessern?', a: ['Erst das Sprungtriebwerk, sonst bleibst du ewig bei Rhea. Dann Schilde. Die SW-2 hat einen Rumpf wie ein Panzer, aber Schilde wie ein Regenschirm.'] },
+    { q: 'Warum sieht sie aus wie ein Keil?', a: ['Weil im All Flügel nichts bringen. Alles, was zählt, sind die zwei großen Triebwerke hinten und die schwenkbaren Kanonen an den Seiten. Der Rumpf hält nur alles zusammen.'] },
+  ], 'Danke, Yara.');
+  if (npc === 'crew_e') return tree(npc, 'Jun Takeda. Ja, Liga. Nein, ich bin nicht im Dienst. Und nein, ich weiß nichts über die Korvetten.', [
+    { q: 'Was will die Liga hier draußen?', a: ['Ordnung. So sagen sie es jedenfalls. Die Inneren Welten brauchen Helium-3 für ihre Reaktoren. Der Saturn hat es. Den Rest kannst du dir denken.'] },
+    { q: 'Bist du für den Zoll?', a: ['Ich bin für meinen Feierabend. Aber unter uns: Ein Zoll ohne Rückhalt ist nur eine Einladung für Schmuggler.'] },
+  ], 'Schönen Abend noch.');
   return [say(npc, '…')];
 }
 
@@ -122,7 +217,7 @@ export const STORY = {
         await c.talk([
           ['Mags (Turm)', 'Gut, du sitzt. Ich bin oben im Turm. Bring uns raus und gib dem alten Mädchen etwas Schub.', 'ringgilde'],
           ['Mags (Turm)', 'W und S für den Schub, die Maus lenkt. Shift ist der Nachbrenner. Den brauchst du heute hoffentlich nicht.', 'ringgilde'],
-          ['Mags (Turm)', 'Öffne die Systemkarte mit M und setz Kurs auf Enceladus. Den Rest macht der Fusionsantrieb.', 'ringgilde'],
+          ['Mags (Turm)', 'Öffne die Systemkarte mit M und spring nach Enceladus. Die Rostig hat ein altes Sprungtriebwerk, Klasse I. Den Sprit zahle ich.', 'ringgilde'],
         ]);
         c.objective('Systemkarte öffnen [M] und Kurs auf Enceladus setzen');
       } else if (f.zoneId === 'enceladus' && stage === 0) {
@@ -334,7 +429,7 @@ export const STORY = {
   funkstille: {
     title: 'Funkstille', giver: KIX, zone: 'rings',
     available: (g) => g.flags.m3done,
-    brief: 'Mags ist verschwunden. Ihr Transponder meldete sich zuletzt aus dem B-Ring-Abbaufeld der Ringgilde. Finde die Sankt Rostig.',
+    brief: 'Mags ist verschwunden. Ihr Transponder meldete sich zuletzt vom Ringrand im Mimas-System, dem Abbaufeld der Ringgilde. Finde die Sankt Rostig.',
     async flight(c, game) {
       const g = game.state, f = c.flight;
       if (g.flags.m4rescued) { c.objective('Zurück zur Hochstation Cassini (Rhea)'); return; }
@@ -612,7 +707,7 @@ export function finaleChoice(game) {
     say(MAGS, 'Dann flieg in die Cassini-Teilung. Die Ringgilde und das Kollektiv treffen dich dort.', { label: 'f', go: 'go' }),
     say(JUNO, 'Brandt erwartet dich in der Cassini-Teilung. Ich hoffe, du weißt, was du tust.', { label: 'z', go: 'go' }),
     say(MAGS, '… Ich hätte nicht gedacht, dass du so jemand bist. Geh. Varga zahlt beim Andocken auf Titan.', { label: 'k', act: (gm) => { acceptStory(gm, 'kassini'); }, end: true }),
-    say('comp', 'Neues Ziel: B-Ring, Cassini-Teilung (Systemkarte).', { label: 'go', act: (gm) => acceptStory(gm, 'kassini') }),
+    say('comp', 'Neues Ziel: Mimas-System, Ringrand an der Cassini-Teilung (Systemkarte).', { label: 'go', act: (gm) => acceptStory(gm, 'kassini') }),
   ];
 }
 

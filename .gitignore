@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.blend1
 blender/cache/
+__pycache__/
+*.pyc

@@ -37,7 +37,15 @@ button { font-family: var(--f-head); }
 .btn.small { font-size: 14px; padding: 8px 12px; letter-spacing: .1em; }
 .btn.warm { border-color: rgba(255,207,122,.6); background: linear-gradient(90deg, rgba(255,207,122,.22), rgba(255,207,122,.04)); }
 .btn:disabled { opacity: .35; cursor: not-allowed; padding-left: 18px; }
-.title .foot { position: absolute; bottom: 22px; left: 9vw; color: var(--dim); font-size: 13px; letter-spacing: .08em; }
+.title .credit { position: absolute; bottom: 20px; right: 26px; color: rgba(220,232,240,.72); font-family: var(--f-head); font-size: 15px; letter-spacing: .32em; text-transform: uppercase; z-index: 2; }
+.title h1, .title h2, .title .menu { position: relative; z-index: 2; }
+.title h2 { letter-spacing: .9em !important; font-size: clamp(20px, 2.6vw, 38px) !important; margin-top: 4px !important; color: #e8c88a !important; text-shadow: 0 0 30px rgba(232,200,138,.35); }
+.title .bgimg { animation: titledrift 40s ease-in-out infinite alternate; }
+@keyframes titledrift { from { transform: scale(1.0); } to { transform: scale(1.06) translate(-1%, 0.5%); } }
+.transit { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 50%, #0c1830 0%, #02040a 70%); z-index: 50; }
+.transit .tl { position: absolute; left: 0; right: 0; bottom: 14vh; text-align: center; z-index: 2; }
+.transit .lbl { font-family: var(--f-head); font-size: clamp(22px, 3vw, 40px); letter-spacing: .4em; color: #e8f4ff; text-shadow: 0 0 24px rgba(127,212,255,.6); }
+.transit .sub { color: var(--dim); letter-spacing: .14em; margin-top: 8px; }
 .title input { background: rgba(0,0,0,.5); border: 1px solid var(--line2); color: #fff; font-family: var(--f-head); font-size: 22px; padding: 10px 14px; letter-spacing: .12em; outline: none; width: 100%; }
 .loading { position: fixed; inset: 0; background: #000 center/cover; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 9vh; z-index: 40; }
 .loading .box { width: min(520px, 80vw); text-align: center; background: rgba(0,0,0,.55); padding: 18px 22px; border: 1px solid var(--line); }

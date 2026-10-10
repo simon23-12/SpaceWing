@@ -98,6 +98,66 @@
  ],
  "markers": [
   {
+   "kind": "patron",
+   "id": "seat12",
+   "pos": [
+    1.5,
+    0,
+    -2.95
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "seated": true
+  },
+  {
+   "kind": "patron",
+   "id": "seat30",
+   "pos": [
+    2.536,
+    0,
+    -0.025
+   ],
+   "dir": [
+    -0.866,
+    0.0,
+    0.5
+   ],
+   "seated": true
+  },
+  {
+   "kind": "patron",
+   "id": "seat41",
+   "pos": [
+    -2.736,
+    0,
+    2.975
+   ],
+   "dir": [
+    0.866,
+    0.0,
+    0.5
+   ],
+   "seated": true
+  },
+  {
+   "kind": "patron",
+   "id": "seat52",
+   "pos": [
+    1.2,
+    0,
+    4.65
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "seated": true
+  },
+  {
    "kind": "npc",
    "id": "mags",
    "pos": [
@@ -127,6 +187,36 @@
    ]
   },
   {
+   "kind": "patron",
+   "id": "counter0",
+   "pos": [
+    3.75,
+    0,
+    2.6
+   ],
+   "dir": [
+    1.0,
+    0.0,
+    -0.0
+   ],
+   "seated": false
+  },
+  {
+   "kind": "patron",
+   "id": "counter1",
+   "pos": [
+    3.8,
+    0,
+    -1.3
+   ],
+   "dir": [
+    0.985,
+    0.0,
+    0.174
+   ],
+   "seated": false
+  },
+  {
    "kind": "band",
    "id": "band",
    "pos": [
@@ -139,21 +229,6 @@
     0.0,
     0.707
    ]
-  },
-  {
-   "kind": "door",
-   "id": "bruecke",
-   "pos": [
-    -5.0,
-    0,
-    4.9
-   ],
-   "dir": [
-    0.0,
-    0.0,
-    1.0
-   ],
-   "label": "Zum Kommandodeck"
   },
   {
    "kind": "spawn",
@@ -190,5 +265,6 @@
   0,
   -1
  ],
- "lightScale": 2.0
+ "lightScale": 2.0,
+ "signsFixed": true
 }

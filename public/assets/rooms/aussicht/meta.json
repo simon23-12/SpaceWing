@@ -71,21 +71,6 @@
  ],
  "markers": [
   {
-   "kind": "door",
-   "id": "bruecke",
-   "pos": [
-    0,
-    0,
-    6.4
-   ],
-   "dir": [
-    0.0,
-    0.0,
-    1.0
-   ],
-   "label": "Lift zum Kommandodeck"
-  },
-  {
    "kind": "spawn",
    "id": "default",
    "pos": [
