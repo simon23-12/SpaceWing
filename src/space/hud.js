@@ -13,7 +13,8 @@ function el(tag, cls, parent, html) {
 }
 
 export class HUD {
-  constructor() {
+  constructor(gunner = false) {
+    this.gunner = gunner;
     this.root = el('div', 'hud', document.getElementById('ui'));
     this.canvas = el('canvas', 'hud-canvas', this.root);
     this.ctx = this.canvas.getContext('2d');
@@ -35,10 +36,10 @@ export class HUD {
     this.radar = el('canvas', 'hud-radar', this.root);
     this.radar.width = this.radar.height = 220;
     this.rctx = this.radar.getContext('2d');
-    this.help = el('div', 'hud-help', this.root,
-      'Maus: Steuern · W/S: Schub · A/D: Rollen · Q/E: Seitwärts · Shift: Boost · LMB/Leertaste: Laser · RMB/F: Rakete · T: Ziel · C: Kamera · L: Andocken · M: Systemkarte · H: Hilfe');
-    this.help.style.opacity = 1;
-    setTimeout(() => this.help.style.opacity = 0, 9000);
+    this.help = el('div', 'hud-help', this.root, gunner
+      ? 'Maus: Turm drehen · LMB/Leertaste: Feuer · T: Ziel durchschalten · Y: Ziel voraus · H: Hilfe'
+      : 'Maus: Steuern · W/S: Schub · A/D: Rollen · Q/E: Seitwärts · Shift: Boost · LMB/Leertaste: Laser · RMB/F: Rakete · T: Ziel · C: Kamera · L: Andocken · M: Systemkarte · H: Hilfe');
+    this.help.style.opacity = 0;
     this.q = { sv: this.left.querySelector('.sv'), hv: this.left.querySelector('.hv'), ev: this.left.querySelector('.ev'),
       shield: this.left.querySelector('.shield'), hull: this.left.querySelector('.hull'), energy: this.left.querySelector('.energy'),
       msl: this.left.querySelector('.msl'), fa: this.left.querySelector('.fa'), spd: this.right.querySelector('.spd'),
@@ -96,7 +97,7 @@ export class HUD {
     q.fa.textContent = p.flightAssist ? 'FLUGHILFE AN' : 'FLUGHILFE AUS';
     q.spd.textContent = Math.round(p.speed());
     q.thr.style.width = (100 * p.throttle) + '%';
-    q.cam.textContent = flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER';
+    q.cam.textContent = this.gunner ? 'GESCHÜTZTURM' : flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER';
 
     this.draw(flight);
     this.drawRadar(flight);
@@ -130,7 +131,7 @@ export class HUD {
     ctx.clearRect(0, 0, W, H);
     const p = flight.player;
     // crosshair: where the guns converge (~600 m ahead)
-    const aim = this.project(cam, p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 600));
+    const aim = this.gunner ? { x: W / 2, y: H / 2 } : this.project(cam, p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 600));
     ctx.strokeStyle = 'rgba(160,230,255,0.85)'; ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(aim.x, aim.y, 14, 0.3, Math.PI - 0.3); ctx.moveTo(aim.x + 14 * Math.cos(Math.PI + 0.3), aim.y + 14 * Math.sin(Math.PI + 0.3));

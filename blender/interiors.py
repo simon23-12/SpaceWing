@@ -635,47 +635,151 @@ def bar():
 
 @room
 def kabine():
+    """Kabine 4-117: small but lived-in quarters with a panorama window to space (Saturn swings past as the ring turns)."""
     floor = mat_floor('floor_cab', '#2c2e31', 3.0)
-    wallm = mat_wall('wall_cab', '#8c8f93', '#73777c', scale=2.0, dirt=0.6)
+    wallm = mat_wall('wall_cab', '#8c8f93', '#73777c', scale=2.0, dirt=0.5)
     trim = mat_metal('trim_cab', '#6a6d72', 0.4, metal=0.8, scale=4)
+    dark = mat_rubber('dark_cab', '#1c1d20')
+    wood = mat_wood('wood_cab', '#6a4428')
     fabric = mat_simple('blanket', '#3d4a5c', 0.9)
+    fabric2 = mat_simple('blanket2', '#8a4a2c', 0.85)
     pillow = mat_simple('pillow', '#c8c4b8', 0.9)
+    olive = mat_simple('duffel', '#4a5236', 0.8)
+    leather = mat_simple('jacket', '#5a3a26', 0.6)
+    rug = mat_simple('rug_cab', '#6a3a30', 0.95)
+    ceramic = mat_simple('mug', '#d8d2c4', 0.3)
+    pot = mat_simple('pot_cab', '#3a3c40', 0.5)
+    leaf = mat_simple('leaf_cab', '#3f6a2e', 0.6)
+    poster = mat_simple('poster_cab', '#1a1430', 0.7)
     led = light_mat('led_cab', '#ffe0b8', 10)
+    led_cool = light_mat('led_cab_cool', '#bfe4ff', 6)
     glass = mat_glass('glass_cab')
     S, Gl, Gs, X = [], [], [], []
-    W, D, H = 3.2, 4.6, 2.5   # x [-1.6,1.6], y [-2.3, 2.3]
-    INFO['interior'] = ('box', -1.6, 1.6, -2.3, 2.3, 0.0, H)
-    S.append(box('floor', floor, (W, D, 0.1), (0, 0, -0.05)))
-    S.append(box('ceil', wallm, (W, D, 0.1), (0, 0, H + 0.05)))
-    S += wall('wN', wallm, (-1.6, 2.3), (1.6, 2.3), H, openings=[(1.6, 0.6, 1.2, 1.8)])
-    Gs.append(cyl('glass_porthole', glass, 0.32, 0.04, (0, 2.3, 1.5), rot=(R(90), 0, 0), n=32))
-    S.append(lathe('porthole_ring', [(-0.12, 0.33), (0.12, 0.33), (0.12, 0.42), (-0.12, 0.42)], trim, n=32))
-    S[-1].location = (0, 2.3, 1.5)
-    S += wall('wS', wallm, (1.6, -2.3), (-1.6, -2.3), H, openings=[(1.6, 1.0, 0, 2.1)])
-    S += wall('wE', wallm, (1.6, 2.3), (1.6, -2.3), H)
-    S += wall('wW', wallm, (-1.6, -2.3), (-1.6, 2.3), H)
-    # bunk along west wall
-    S.append(box('bunk', trim, (1.0, 2.1, 0.45), (-1.05, 1.0, 0.25), bevel=0.02))
-    S.append(box('mattress', fabric, (0.95, 2.0, 0.16), (-1.05, 1.0, 0.55), bevel=0.05))
-    S.append(box('pillow', pillow, (0.6, 0.35, 0.12), (-1.05, 1.8, 0.68), bevel=0.05))
-    S.append(box('bunk_hood', trim, (1.05, 2.1, 0.06), (-1.05, 1.0, 1.9)))
-    S.append(box('bunk_led', led, (0.03, 1.9, 0.03), (-0.56, 1.0, 1.86)))
-    # locker + desk with terminal
-    S.append(box('locker', trim, (0.6, 0.7, 2.1), (1.25, 1.8, 1.05), bevel=0.02))
-    S.append(box('desk', trim, (0.6, 1.1, 0.06), (1.25, 0.4, 0.78)))
+    W, H = 5.0, 2.6
+    X0, X1, Y0, Y1 = -2.5, 2.5, -2.3, 3.7   # door in the south wall (y0), window in the north wall (y1)
+    INFO['interior'] = ('box', X0, X1, Y0, Y1, 0.0, H)
+    cy = (Y0 + Y1) / 2
+    S.append(box('floor', floor, (W, Y1 - Y0, 0.1), (0, cy, -0.05)))
+    S.append(box('ceil', wallm, (W, Y1 - Y0, 0.1), (0, cy, H + 0.05)))
+    # ---- panorama window
+    S += wall('wN', wallm, (X0, Y1), (X1, Y1), H, openings=[(2.5, 4.2, 0.55, 2.3)])
+    Gs.append(box('glass_window', glass, (4.2, 0.03, 1.75), (0, Y1 + 0.02, 1.425)))
+    for x in (-1.4, 1.4):
+        S.append(box(f'mullion{x}', trim, (0.07, 0.22, 1.75), (x, Y1 - 0.02, 1.425)))
+    S.append(box('sill', trim, (4.5, 0.5, 0.07), (0, Y1 - 0.2, 0.52), bevel=0.01))
+    S.append(box('header', trim, (4.5, 0.26, 0.12), (0, Y1 - 0.1, 2.36)))
+    for x in (-2.18, 2.18):
+        S.append(box(f'jamb{x}', trim, (0.12, 0.3, 1.9), (x, Y1 - 0.08, 1.43)))
+    S.append(box('cove_led', led_cool, (4.0, 0.04, 0.02), (0, Y1 - 0.24, 2.29)))
+    # window bench with cushions
+    S.append(box('bench', trim, (3.0, 0.6, 0.42), (0.35, Y1 - 0.55, 0.21), bevel=0.02))
+    S.append(box('bench_cushion', fabric, (2.9, 0.56, 0.1), (0.35, Y1 - 0.55, 0.47), bevel=0.04))
+    S.append(box('bench_pillow0', fabric2, (0.42, 0.14, 0.36), (1.45, Y1 - 0.38, 0.68), rot=(R(-12), 0, R(8)), bevel=0.05))
+    S.append(box('bench_pillow1', pillow, (0.38, 0.13, 0.32), (1.0, Y1 - 0.36, 0.66), rot=(R(-14), 0, R(-6)), bevel=0.05))
+    S.append(box('bench_glow', led, (2.8, 0.02, 0.02), (0.35, Y1 - 0.86, 0.04)))
+    # plants: one on the sill, one big in the corner
+    S.append(cyl('sillpot', pot, 0.1, 0.16, (-1.75, Y1 - 0.2, 0.64), rot=(0, 0, 0), n=16, r2=0.08))
+    S.append(plant('sill_plant', leaf, (-1.75, Y1 - 0.2, 0.7), n=12, length=0.32, seed=4))
+    S.append(cyl('floorpot', pot, 0.22, 0.45, (-2.1, Y1 - 0.45, 0.225), rot=(0, 0, 0), n=20, r2=0.17))
+    S.append(plant('floor_plant', leaf, (-2.1, Y1 - 0.45, 0.42), n=16, length=0.75, seed=9))
+    # ---- south wall with the door, west/east walls
+    S += wall('wS', wallm, (X1, Y0), (X0, Y0), H, openings=[(2.5, 1.0, 0, 2.1)])
+    S += wall('wE', wallm, (X1, Y1), (X1, Y0), H)
+    S += wall('wW', wallm, (X0, Y0), (X0, Y1), H)
+    S.append(box('door_frame_l', trim, (0.08, 0.14, 2.15), (-0.54, Y0 + 0.1, 1.07)))
+    S.append(box('door_frame_r', trim, (0.08, 0.14, 2.15), (0.54, Y0 + 0.1, 1.07)))
+    S.append(box('door_frame_t', trim, (1.16, 0.14, 0.08), (0, Y0 + 0.1, 2.14)))
+    # ---- bunk along the west wall
+    by0, by1 = 0.25, 2.45
+    bc = (by0 + by1) / 2
+    S.append(box('bunk', trim, (1.05, by1 - by0, 0.4), (-1.95, bc, 0.22), bevel=0.02))
+    S.append(box('bunk_glow', led, (0.02, by1 - by0 - 0.2, 0.02), (-1.42, bc, 0.03)))
+    S.append(box('mattress', pillow, (1.0, by1 - by0 - 0.06, 0.16), (-1.95, bc, 0.5), bevel=0.05))
+    S.append(box('blanket', fabric, (1.04, 1.35, 0.06), (-1.94, bc - 0.38, 0.6), bevel=0.03))
+    S.append(box('blanket_fold', fabric2, (0.9, 0.34, 0.09), (-1.92, by0 + 0.3, 0.66), rot=(0, 0, R(4)), bevel=0.04))
+    S.append(box('pillow', pillow, (0.62, 0.36, 0.13), (-1.95, by1 - 0.28, 0.65), rot=(R(-8), 0, R(-3)), bevel=0.06))
+    S.append(box('headboard', wood, (1.1, 0.06, 0.7), (-1.95, by1 + 0.02, 0.85), bevel=0.01))
+    S.append(box('bed_shelf', wood, (0.26, by1 - by0, 0.04), (-2.36, bc, 1.45)))
+    import random
+    rnd = random.Random(17)
+    yb = by0 + 0.15
+    for i in range(11):
+        th = rnd.uniform(0.03, 0.06); hh = rnd.uniform(0.17, 0.25)
+        col = rnd.choice(['#7a2a24', '#2a4a6a', '#c8b07a', '#3a5a3a', '#d8d0c0', '#5a3a6a'])
+        S.append(box(f'book{i}', mat_simple(f'book{i}', col, 0.7), (0.17, th, hh), (-2.38, yb, 1.47 + hh / 2), rot=(R(rnd.choice([0, 0, 0, 8])), 0, 0)))
+        yb += th + 0.004
+    S.append(box('speaker', dark, (0.16, 0.22, 0.14), (-2.36, yb + 0.25, 1.54), bevel=0.02))
+    S.append(box('model_ship', trim, (0.12, 0.3, 0.05), (-2.37, by1 - 0.4, 1.5)))
+    S.append(box('reading_lamp', trim, (0.1, 0.12, 0.1), (-2.38, by1 - 0.15, 1.75), bevel=0.02))
+    S.append(sphere('reading_bulb', led, 0.035, (-2.3, by1 - 0.15, 1.72)))
+    S.append(cyl('duffel', olive, 0.2, 0.72, (-1.55, -0.25, 0.2), rot=(0, R(90), R(20)), n=18))
+    S.append(box('duffel_strap', dark, (0.05, 0.42, 0.02), (-1.55, -0.25, 0.4), rot=(0, 0, R(20))))
+    # galley niche: counter, water dispenser, kettle
+    S.append(box('galley', trim, (0.6, 0.75, 0.9), (-2.18, -0.95, 0.45), bevel=0.02))
+    S.append(box('galley_top', wood, (0.62, 0.78, 0.04), (-2.18, -0.95, 0.92)))
+    S.append(box('dispenser', trim, (0.3, 0.3, 0.45), (-2.3, -1.12, 1.17), bevel=0.02))
+    S.append(box('dispenser_glow', led_cool, (0.01, 0.12, 0.05), (-2.14, -1.12, 1.3)))
+    S.append(cyl('kettle', ceramic, 0.07, 0.16, (-2.15, -0.72, 1.02), rot=(0, 0, 0), n=16))
+    S.append(cyl('cup0', ceramic, 0.04, 0.09, (-2.0, -0.88, 0.985), rot=(0, 0, 0), n=12))
+    # jacket on a hook and boots by the door
+    S.append(cyl('hook', trim, 0.015, 0.1, (-2.43, -1.75, 1.75), rot=(0, R(90), 0), n=8))
+    S.append(box('jacket', leather, (0.12, 0.5, 0.75), (-2.38, -1.75, 1.36), rot=(R(3), R(4), 0), bevel=0.05))
+    S.append(box('jacket_collar', leather, (0.14, 0.34, 0.1), (-2.37, -1.75, 1.72), bevel=0.04))
+    for k, x in enumerate((-1.95, -1.75)):
+        S.append(box(f'boot{k}', dark, (0.12, 0.3, 0.12), (x, -1.95, 0.06), rot=(0, 0, R(8 * k)), bevel=0.03))
+        S.append(box(f'boot_shaft{k}', dark, (0.11, 0.12, 0.24), (x, -1.86, 0.2), rot=(0, 0, R(8 * k)), bevel=0.03))
+    # ---- desk and terminal along the east wall
+    S.append(box('desk', wood, (0.72, 1.5, 0.05), (2.12, 1.4, 0.76), bevel=0.01))
+    S.append(box('desk_side', trim, (0.68, 0.05, 0.74), (2.12, 0.67, 0.37)))
+    S.append(box('desk_drawers', trim, (0.6, 0.45, 0.6), (2.15, 1.9, 0.38), bevel=0.01))
     bpy.ops.mesh.primitive_plane_add(size=1.0)
     scr = bpy.context.active_object; scr.name = 'screen_kabine'
-    scr.scale = (0.6, 0.38, 1); scr.rotation_euler = (R(80), 0, R(-90)); scr.location = (1.5, 0.4, 1.15)
+    scr.scale = (0.78, 0.46, 1); scr.rotation_euler = (R(84), 0, R(90)); scr.location = (2.4, 1.4, 1.2)
     scr.data.materials.append(light_mat('screen_lit_cab', '#3a7fb0', 3))
     X.append(scr)
-    S.append(box('photo', mat_simple('photo', '#d0c0a0', 0.6), (0.01, 0.2, 0.15), (1.55, -0.3, 1.5)))
-    S.append(box('ceil_led', led, (0.6, 1.4, 0.02), (0, 0, H - 0.02)))
-    point_light('cl', (0, 0.3, H - 0.3), 25, '#ffe0c0', 0.3)
-    point_light('bl', (-1.0, 1.0, 1.7), 6, '#ffd0a0', 0.1)
-    Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (1.1, 0.04, 0.04), (0, -2.2, 2.2)))
-    marker('terminal', 'kabine_terminal', (0.9, 0.4, 0), R(0), label='Terminal (Speichern · Logbuch)')
-    marker('terminal', 'bett', (-0.6, 1.0, 0), R(180), label='Schlafen (neuer Tag)')
-    marker('spawn', 'default', (0, -1.5, 0), R(90))
+    S.append(box('screen_bezel', dark, (0.04, 0.84, 0.52), (2.44, 1.4, 1.2), rot=(R(-6), 0, 0)))
+    S.append(box('keyboard', dark, (0.18, 0.45, 0.015), (2.05, 1.4, 0.79), rot=(0, 0, 0), bevel=0.005))
+    S.append(cyl('mug', ceramic, 0.045, 0.1, (1.95, 0.85, 0.835), rot=(0, 0, 0), n=14))
+    S.append(box('datapad', dark, (0.16, 0.24, 0.012), (1.98, 1.85, 0.79), rot=(0, 0, R(18))))
+    S.append(box('photo_frame', trim, (0.03, 0.16, 0.12), (2.33, 0.85, 0.85), rot=(0, R(-12), 0)))
+    S.append(cyl('lamp_base', trim, 0.07, 0.02, (2.3, 2.0, 0.79), rot=(0, 0, 0), n=14))
+    S.append(cyl('lamp_arm', trim, 0.012, 0.42, (2.3, 2.0, 1.0), rot=(R(-12), 0, 0), n=8))
+    S.append(sphere('lamp_head', led, 0.05, (2.3, 1.95, 1.2), scale=(1, 1, 0.7)))
+    S += chair('desk_chair', fabric, trim, (1.6, 1.3, 0), rot=R(-90))
+    S.append(box('photo_wall', mat_simple('photo', '#d0c0a0', 0.6), (0.01, 0.3, 0.22), (2.43, 1.0, 1.75)))
+    S.append(box('chart_wall', mat_simple('chart', '#a8b8c0', 0.7), (0.01, 0.42, 0.3), (2.43, 1.75, 1.78)))
+    # locker by the door
+    S.append(box('locker', trim, (0.62, 0.9, 2.2), (2.17, -1.5, 1.1), bevel=0.02))
+    S.append(box('locker_seam', dark, (0.01, 0.02, 2.1), (1.855, -1.5, 1.1)))
+    for y in (-1.6, -1.4):
+        S.append(box(f'locker_handle{y}', trim, (0.03, 0.02, 0.22), (1.84, y, 1.1)))
+    S.append(box('locker_tag', mat_simple('tag', '#d8c890', 0.6), (0.01, 0.2, 0.08), (1.85, -1.5, 1.7)))
+    # poster next to the door (holo print)
+    S.append(box('poster', poster, (0.62, 0.01, 0.86), (1.55, Y0 + 0.14, 1.45)))
+    Gl.append(text_mesh('poster_t1', 'ROCHE-GRENZE', mat_emit('glow_neon_pink', '#ff4ac8', 10), 0.075, (1.55, Y0 + 0.155, 1.62), rot=(R(90), 0, R(180))))
+    Gl.append(text_mesh('poster_t2', 'LIVE · KRAKEN-HAFEN', mat_emit('glow_poster_c', '#7fdcff', 6), 0.04, (1.55, Y0 + 0.155, 1.5), rot=(R(90), 0, R(180))))
+    S.append(sphere('poster_saturn', mat_simple('poster_sat', '#d8b070', 0.5), 0.12, (1.55, Y0 + 0.16, 1.25), scale=(1, 0.1, 1)))
+    S.append(box('poster_ring', mat_simple('poster_ring', '#c8a060', 0.5), (0.4, 0.012, 0.025), (1.55, Y0 + 0.165, 1.25), rot=(0, R(-14), 0)))
+    S.append(box('rug', rug, (1.5, 2.1, 0.012), (0.15, 0.7, 0.006)))
+    # ceiling: light panel, conduits, vent
+    S.append(box('ceil_led', led, (0.7, 1.6, 0.02), (0, 0.7, H - 0.02)))
+    for k, x in enumerate((2.3, 2.38)):
+        S.append(cyl(f'conduit{k}', trim, 0.025, Y1 - Y0 - 0.2, (x, cy, H - 0.12 - k * 0.05), n=8))
+    S.append(box('vent', dark, (0.5, 0.5, 0.02), (-1.2, -1.2, H - 0.01)))
+    for k in range(5):
+        S.append(box(f'vent_slat{k}', trim, (0.46, 0.02, 0.03), (-1.2, -1.4 + k * 0.1, H - 0.03)))
+    S.append(box('panel_door', dark, (0.18, 0.02, 0.26), (0.85, Y0 + 0.14, 1.25)))
+    Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (1.1, 0.04, 0.04), (0, Y0 + 0.1, 2.24)))
+    Gl.append(box('panel_led', mat_emit('glow_lock_green', '#3aff6a', 6), (0.04, 0.012, 0.04), (0.85, Y0 + 0.155, 1.3)))
+    # lights: ceiling, bed and desk lamps, and the cold light through the window
+    point_light('cl', (0, 0.7, H - 0.3), 26, '#ffe0c0', 0.3)
+    point_light('bl', (-2.2, by1 - 0.2, 1.65), 7, '#ffd0a0', 0.05)
+    point_light('dl', (2.25, 1.9, 1.12), 6, '#ffd8a8', 0.05)
+    area_light('win_space', (0, Y1 + 0.6, 1.5), (R(-90), 0, 0), 4.0, 45, '#a8c0ff', size_y=1.6)
+    area_light('win_saturn', (1.2, Y1 + 0.8, 2.2), (R(-110), 0, R(-20)), 2.0, 18, '#ffd8a0')
+    marker('terminal', 'kabine_terminal', (1.6, 1.4, 0), R(0), label='Terminal (Speichern · Logbuch)')
+    marker('terminal', 'bett', (-1.2, 1.3, 0), R(180), label='Schlafen (neuer Tag)')
+    marker('spawn', 'default', (0, -1.4, 0), R(90))
     INFO['window_dir'] = b2t((0, 1, 0))
     return S, Gl, Gs, X
 
@@ -1102,5 +1206,5 @@ if __name__ != 'interiors':  # executed via the bridge (not imported)
             res['preview'] = swlib.save_render(os.path.join(outdir, 'preview.jpg'), fmt='JPEG')
         else:
             setup_world_space(strength=0.35, saturn=False)
-            res['glb'] = bake_room(name, S, Gl, Gs, X, outdir, size={'kabine': 2048, 'bar': 3072, 'aussicht': 3072, 'deck': 4096}.get(name, 4096), samples=samples)
+            res['glb'] = bake_room(name, S, Gl, Gs, X, outdir, size={'kabine': 3072, 'bar': 3072, 'aussicht': 3072, 'deck': 4096}.get(name, 4096), samples=samples)
     result = res

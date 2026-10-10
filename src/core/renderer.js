@@ -90,7 +90,7 @@ export class Renderer {
     u.tint.value = m ? m.tint : [1, 1, 1];
     u.tintAmt.value = m ? m.amt : 0;
     this.gl.toneMappingExposure = m ? m.exposure : 1.0;
-    u.flash.value = 0;
+    u.flash.value = 0; u.hit.value = 0;
   }
 
   render(dt) {

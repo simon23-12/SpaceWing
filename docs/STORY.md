@@ -61,7 +61,7 @@ Eine Prognose sagt Massen vorher, keine Einzelnen. Das ist ihre größte Stärke
 
 **Der Spieler** – Rufzeichen frei wählbar (Standard: *Wren*). Ehemaliger Frachtpilot bei Hallström Logistik, die am Saturnzoll pleitegegangen ist. Ohne Schiff, ohne Kredits, mit drei Nächten Kabinenmiete. Ein Niemand, und genau darum geht es.
 
-**Magdalena „Mags“ Okafor** (61) – Eisfrachterpilotin aus der Ringgilde, flucht in drei Sprachen. Fliegt die *Sankt Rostig*, einen 40 Jahre alten Mule‑Frachter. Ihr verstorbener Mann **Teo** flog eine *Hawker‑Lindqvist SW‑2 „Spacewing“*, die seit acht Jahren in ihrer Hangarbucht verrostet. Mags ist ein *Faden*, eine Feldagentin des Archivs. Sie hat den Spieler nicht zufällig angesprochen.
+**Magdalena „Mags“ Okafor** (61) – Eisfrachterpilotin aus der Ringgilde, flucht in drei Sprachen. Fliegt den *Eisvogel*, einen eisweißen Frachter mit Kugelturm und zwei Eistanks, ihr ganzer Stolz. Ihr verstorbener Mann **Teo** flog eine *Hawker‑Lindqvist SW‑2 „Spacewing“*, die seit acht Jahren in ihrer Hangarbucht verrostet. Mags ist ein *Faden*, eine Feldagentin des Archivs. Sie hat den Spieler nicht zufällig angesprochen.
 
 **KX‑9 „Kix“** – Barkeeper der Bar *Cassini‑Spalt*. Ein umgebauter Bergbauroboter mit vier Armen, trockenem Humor und einem Gedächtnis für jede offene Rechnung. Weiß alles, sagt wenig.
 
@@ -82,10 +82,13 @@ Eine Prognose sagt Massen vorher, keine Einzelnen. Das ist ihre größte Stärke
 ## 3. Handlung
 
 ### Prolog – „Drei Nächte Miete“
-Der Spieler wacht in einer Sargkabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Ihre eigenen zittern am Steuer, am Geschütz nicht.
+Der Spieler wacht in einer Sargkabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Fliegen kann sie noch, aber am Abzug zittern ihr die Hände.
 
 ### Mission 1 – „Eisfracht“
-Der Spieler fliegt die *Sankt Rostig* von Rhea zum Geysirfeld von Enceladus. Mags sitzt am Turm. Eiscontainer aufnehmen, dann Rückflug. Die Schakale greifen an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
+Mags fliegt ihren *Eisvogel* per Hyperraumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
+
+### Mission 1b – „Flugstunde“
+Tutorial in der Spacewing: Mags fliegt im Eisvogel nebenher und erklärt Lenken, Schub, Rollen, Kamera, Nachbrenner, Laser auf Zieldrohnen, Raketen und das Andocken.
 
 ### Akt I – „Brotlos“
 Die Söldnerbörse vermittelt Frachtaufträge, Kurierflüge und kleine Kopfgelder. Der Spieler verdient Kredits, rüstet die Spacewing auf und lernt das System kennen. Die Preise reagieren auf die Politik.
@@ -95,7 +98,7 @@ Die Söldnerbörse vermittelt Frachtaufträge, Kurierflüge und kleine Kopfgelde
 ### Akt II – „Handelskrieg“
 **Mission 3 – „Goldene Lanzen“:** Kurierflug mit einem versiegelten Datenkern nach Kraken‑Hafen. Morrows Lanzen begleiten den Spieler „zum Schutz“. Varga bietet das Doppelte, wenn der Spieler ihr berichtet, wohin Mags fliegt.
 
-**Mission 4 – „Funkstille“:** Mags verschwindet. Ihr Transponder meldet sich zuletzt aus dem B‑Ring. Die *Sankt Rostig* treibt beschädigt zwischen Eisbrocken. Die angreifenden Schakale tragen Konsortiums‑Lanzenkanonen.
+**Mission 4 – „Funkstille“:** Mags verschwindet. Ihr Transponder meldet sich zuletzt aus dem B‑Ring. Der *Eisvogel* treibt beschädigt zwischen Eisbrocken. Die angreifenden Schakale tragen Konsortiums‑Lanzenkanonen.
 
 **Mission 5 – „Das Gewölbe“:** Mags, verletzt, und Juno Vesper müssen nach Iapetus. Im Gewölbe öffnet sich die erste Aufzeichnung. Lior Vesper beschreibt den Saturnzoll, als hätte er ihn gestern erlebt, und dann eine Zukunft, die nicht eintritt. *„Wenn ihr diese Aufzeichnung seht und das Konsortium Enceladus noch nicht blockiert hat, dann kennt jemand meine Zahlen.“*
 

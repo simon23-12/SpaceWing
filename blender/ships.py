@@ -396,7 +396,107 @@ def korvette():
     return P, E, dict(dist=150, center=(0, 0, 0))
 
 
-SHIPS.update({'sankt_rostig': sankt_rostig, 'mule': mule, 'lanze': lanze, 'kestrel': kestrel, 'corsair': corsair, 'korvette': korvette})
+def eisvogel():
+    """'Eisvogel' - Mags Okafor's ice hauler and gunship (~22 m). Ice-white enamel with a navy belly and the orange
+    stripe of the Ringgilde, two frosted ice tanks on the flanks, a dorsal ball turret with a glass bubble (the gunner's
+    seat), hot radiator fins and three engines. Well kept: Mags loves this ship."""
+    paint = mat_paint('hull_eis', '#dfe5e8', color2='#24465e', wear=0.3, rust=0.04, dirt=0.35, metal=0.3, rough=0.32,
+                      scale=0.8, stripe=('y', 6.4, 0.55), stripe_color='#e0702a')
+    tankm = mat_paint('tank_eis', '#cfe4ee', color2='#7fa9bf', wear=0.25, rust=0.0, dirt=0.3, metal=0.35, rough=0.28,
+                      scale=1.2, panel=0.5)
+    metal = mat_metal('metal_eis', '#6c7076', 0.36, metal=0.85, grime=0.35)
+    dark = mat_rubber('dark_eis', '#17191c')
+    glow = mat_emit('glow_engine_eis', '#9fd8ff', 11)
+    heat = mat_emit('glow_heat_eis', '#ff6a2a', 3)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_eis', '#0a141c')
+    P = []
+    hull = loft('hull', [
+        dict(y=12.0, w=0.16, h=0.12, z=0.05),
+        dict(y=11.1, w=1.4, h=0.8, z=0.08, e=3.0),
+        dict(y=8.6, w=3.0, h=1.9, z=0.2, e=3.6, flat=0.85),
+        dict(y=5.0, w=3.8, h=2.4, z=0.2, e=4.2, flat=0.85),
+        dict(y=0.0, w=4.0, h=2.6, z=0.1, e=4.6, flat=0.8),
+        dict(y=-5.0, w=4.4, h=2.6, z=0.1, e=4.6, flat=0.8),
+        dict(y=-8.0, w=4.0, h=2.2, z=0.1, e=4.2),
+        dict(y=-8.8, w=3.0, h=1.5, z=0.1, e=3.4),
+    ], paint, n=48, sharp=32)
+    P.append(hull)
+    # sharp chines along the flanks give the long hull its edge
+    ch = wing('chine', paint, root_y=4.2, root_chord=9.0, tip_chord=6.4, span=0.55, sweep=-0.6, thick=0.05, x0=1.75, z0=0.35)
+    P.append(ch)
+    P.append(loft('spine', [dict(y=-0.7, w=0.3, h=0.2, z=1.3), dict(y=-1.6, w=0.9, h=0.6, z=1.45, e=3), dict(y=-6.5, w=1.1, h=0.75, z=1.45, e=3),
+                            dict(y=-8.4, w=0.6, h=0.3, z=1.3)], metal, n=24))
+    # cockpit: wraparound canopy with frame
+    P.append(loft('canopy_hood', [dict(y=10.0, w=0.4, h=0.2, z=0.75), dict(y=9.2, w=1.8, h=0.9, z=0.95, e=3.0),
+                                  dict(y=7.0, w=2.2, h=1.2, z=1.05, e=3.4), dict(y=5.6, w=1.6, h=0.8, z=1.0, e=3.0)], paint, n=32))
+    P.append(sphere('canopy', glass, 1.0, (0, 8.25, 1.38), scale=(0.95, 1.55, 0.5)))
+    P.append(box('canopy_spine', metal, (0.07, 2.9, 0.06), (0, 8.15, 1.88), rot=(R(-2), 0, 0)))
+    for y in (7.3, 9.0):
+        P.append(box(f'canopy_rib{y}', metal, (1.7, 0.07, 0.06), (0, y, 1.8 - abs(y - 8.2) * 0.18)))
+    # dorsal ball turret: the gunner sits in the glass bubble
+    P.append(cyl('turret_ring', metal, 1.0, 0.36, (0, 0.5, 1.42), rot=(0, 0, 0), n=40))
+    P.append(sphere('turret_ball', paint, 0.88, (0, 0.5, 1.9), scale=(1, 1, 0.78)))
+    P.append(sphere('turret_bubble', glass, 0.56, (0, 1.05, 2.02), scale=(0.95, 0.75, 0.72)))
+    for sx in (-1, 1):
+        P.append(box(f'turret_cheek{sx}', metal, (0.32, 1.0, 0.42), (0.62 * sx, 1.0, 1.9), bevel=0.05))
+        P.append(cyl(f'turret_barrel{sx}', dark, 0.075, 2.8, (0.62 * sx, 2.7, 1.9)))
+        P.append(cyl(f'turret_muzzle{sx}', metal, 0.11, 0.3, (0.62 * sx, 4.1, 1.9)))
+    # frosted ice tanks on the flanks
+    for sx in (-1, 1):
+        t = cyl(f'tank{sx}', tankm, 1.0, 8.6, (2.75 * sx, 1.75, -0.55), n=40)
+        P.append(t)
+        for y, nm in ((6.05, 'f'), (-2.55, 'b')):
+            P.append(sphere(f'tank_cap{nm}{sx}', tankm, 1.0, (2.75 * sx, y, -0.55), scale=(1, 0.42, 1), seg=40, rings=16))
+        for k, y in enumerate((4.6, 1.75, -1.1)):
+            P.append(lathe(f'tank_band{k}{sx}', [(y + 0.16, 1.05), (y - 0.16, 1.05)], metal, n=40, axis_pos=(2.75 * sx, 0, -0.55)))
+        for y in (4.0, -0.6):
+            P.append(box(f'pylon{y}{sx}', metal, (1.3, 1.2, 0.36), (1.95 * sx, y, -0.45), bevel=0.05))
+        P.append(cyl(f'tank_valve{sx}', metal, 0.16, 0.5, (2.75 * sx, 6.6, -0.55)))
+    # engines: two nacelles on the shoulders + the main drive
+    exh = []
+    eng, _ = engine_pod('eng', 2.25, 0.8, -3.0, -9.2, 1.02, paint, metal, glow, n=36)
+    P += eng
+    for k, y in enumerate((-4.6, -7.0)):
+        r = lathe(f'eng_band{k}', [(y + 0.14, 1.06), (y - 0.14, 1.06)], metal, n=36, axis_pos=(2.25, 0, 0.8))
+        P.append(r); mirror_x_world(r)
+    P.append(lathe('main_noz', [(-8.7, 1.05), (-9.6, 1.2), (-10.3, 1.34)], dark, n=36, axis_pos=(0, 0, 0.1)))
+    P.append(cyl('main_glow', glow, 0.95, 0.05, (0, -8.85, 0.1), n=36))
+    exh += [empty('exhaust_0', (-2.25, -10.1, 0.8)), empty('exhaust_1', (2.25, -10.1, 0.8)), empty('exhaust_2', (0, -10.5, 0.1))]
+    # hot radiator fins (angled up) with glowing edges, a ventral fin
+    for sx in (1,):
+        f = wing('radiator', metal, root_y=-3.6, root_chord=4.2, tip_chord=1.5, span=3.3, sweep=-2.2, dihedral=1.4,
+                 thick=0.09, x0=1.5, z0=1.15)
+        P.append(f)
+        hb = wing('radiator_glow', heat, root_y=-3.62, root_chord=4.24, tip_chord=1.54, span=3.32, sweep=-2.2, dihedral=1.4,
+                  thick=0.03, x0=1.49, z0=1.15)
+        hb.scale = (1.0, 1.0, 1.0)
+        P.append(hb)
+    vf = wing('vfin', paint, root_y=-5.4, root_chord=3.2, tip_chord=1.1, span=1.5, sweep=-1.6, thick=0.14, x0=0.0, z0=0.0, mirror=False)
+    vf.rotation_euler = (0, R(90), 0); vf.location = (0, 0, -1.0); swship.apply_all(vf)
+    P.append(vf)
+    # chin cannons
+    for sx in (-1, 1):
+        P.append(box(f'chin_mount{sx}', metal, (0.45, 1.6, 0.42), (0.95 * sx, 8.6, -0.72), bevel=0.05))
+        P.append(cyl(f'chin_gun{sx}', dark, 0.09, 2.4, (0.95 * sx, 10.4, -0.72)))
+        P.append(cyl(f'chin_muzzle{sx}', metal, 0.12, 0.26, (0.95 * sx, 11.6, -0.72)))
+    # comms: dish behind the turret, mast, sensor blister
+    P.append(cyl('dish_mast', metal, 0.05, 0.9, (-1.0, -2.6, 1.6), rot=(0, 0, 0)))
+    P.append(sphere('dish', metal, 0.55, (-1.0, -2.6, 2.1), scale=(1, 1, 0.28)))
+    P.append(cyl('antenna', metal, 0.02, 1.6, (0.9, -4.8, 1.75), rot=(R(-35), 0, 0)))
+    P.append(sphere('sensor', dark, 0.32, (0, 10.6, -0.35), scale=(1, 1.4, 0.6)))
+    P.append(box('belly_hatch', metal, (1.8, 2.4, 0.12), (0, -1.5, -1.22), bevel=0.03))
+    grb = mat_metal('greeble_eis', '#8d9196', 0.45, metal=0.6)
+    P += greebles(hull, grb, count=46, size=(0.16, 0.5), height=(0.02, 0.07), seed=7,
+                  region=lambda h: h.z > 0.9 and not (abs(h.x) < 1.3 and (5.2 < h.y < 10.5 or -0.8 < h.y < 1.8)))
+    P += greebles(hull, grb, count=18, size=(0.2, 0.6), height=(0.03, 0.08), seed=8, region=lambda h: h.z < -0.8)
+    P += nav_lights((-3.75, 1.75, -0.55), (3.75, 1.75, -0.55), (0, -8.9, 1.2), gr, gg, gw)
+    E = exh + [empty('gun_0', (-0.95, 11.9, -0.72)), empty('gun_1', (0.95, 11.9, -0.72)),
+               empty('turret', (0, 0.6, 2.35)), empty('cockpit', (0, 8.4, 1.45))]
+    return P, E, dict(dist=46, center=(0, 0.5, 0))
+
+
+SHIPS.update({'sankt_rostig': sankt_rostig, 'mule': mule, 'lanze': lanze, 'kestrel': kestrel, 'corsair': corsair, 'korvette': korvette, 'eisvogel': eisvogel})
 
 if __name__ != 'ships':  # executed via the bridge (not imported)
     ship_id = BL_ARGS[0]

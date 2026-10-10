@@ -46,7 +46,16 @@ export class Game {
     input.endFrame();
   }
 
+  /** F12: real fullscreen (the browser's own F12 shortcut is suppressed while the game has focus). */
+  toggleFullscreen() {
+    const d = document;
+    if (d.fullscreenElement) { d.exitFullscreen?.(); return; }
+    const p = d.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    p?.then(() => { if (this.mode?.isRoom || this.mode?.isFlight) input.lock(this.renderer.gl.domElement); }).catch(() => this.ui.notify('Vollbild wurde vom Browser abgelehnt.'));
+  }
+
   onKey(e) {
+    if (e.code === 'F12') { e.preventDefault(); if (!e.repeat) this.toggleFullscreen(); return; }
     if (e.code === 'Escape') {
       if (this.ui.dlg) return;
       if (this.ui.closeTop()) return;
@@ -164,10 +173,9 @@ export class Game {
   async intro() {
     const g = this.state;
     await this.ui.dialog([
-      { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117, die kleinste Kabine auf dem Ring.' },
+      { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, gemietet, aber mit Fenster zum Saturn.' },
       { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Bezahlte Miete: noch drei Nächte. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.` },
       { who: 'comp', text: 'Empfehlung: Arbeit finden. Die Bar „Cassini-Spalt“ liegt am Ende des Ringgangs, links aus deiner Tür. Barkeeper wissen alles.' },
-      { who: 'comp', text: 'Steuerung: Klicken zum Umsehen, WASD zum Gehen, Shift zum Laufen, E zum Benutzen und Sprechen. Tab öffnet den Deckplan.' },
     ]);
   }
 
@@ -291,7 +299,6 @@ export class Game {
     f.on('docked', (id) => this.onDocked(f, id));
     f.on('playerDead', () => this.onPlayerDead(f));
     await this.fadeIn(0.8);
-    this.ui.notify('Klicken, um die Maussteuerung zu aktivieren · H: Hilfe');
     const lockOnClick = () => { if (this.mode === f && !this.ui.modalOpen) input.lock(this.renderer.gl.domElement); };
     this.renderer.gl.domElement.addEventListener('mousedown', lockOnClick);
     f._unlock = () => this.renderer.gl.domElement.removeEventListener('mousedown', lockOnClick);
@@ -383,7 +390,7 @@ export class Game {
     logEntry(g, `Abgeschossen. Bergung und Notreparatur: −${fmt(fee)} Cr`);
     this.mode = { kind: 'cutscene', render3D: false };
     await this.ui.dialog([
-      { who: temp ? 'mags' : 'comp', text: temp ? 'Rettungskapsel geborgen. Die Rostig ist zäher als sie aussieht, wir haben sie zurückgeschleppt. Noch mal, und diesmal mit Gefühl.' : `Rettungskapsel von einem Bergungsschlepper aufgenommen. Bergung und Notreparatur kosten ${fmt(fee)} Kredits. Willkommen zurück auf Cassini.` },
+      { who: temp ? 'mags' : 'comp', text: temp ? 'Rettungskapsel geborgen. Der Eisvogel hat mehr abbekommen, als mir lieb ist. Wir versuchen es noch mal, und diesmal triffst du.' : `Rettungskapsel von einem Bergungsschlepper aufgenommen. Bergung und Notreparatur kosten ${fmt(fee)} Kredits. Willkommen zurück auf Cassini.` },
     ]);
     this.save();
     await this.enterStation('cassini');

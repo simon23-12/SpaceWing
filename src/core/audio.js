@@ -155,7 +155,7 @@ export class Audio {
 
   setupHum() {
     const C = this.ctx;
-    this.humG = C.createGain(); this.humG.gain.value = 0.05; this.humG.connect(this.music);
+    this.humG = C.createGain(); this.humG.gain.value = 0.022; this.humG.connect(this.music);
     const o1 = C.createOscillator(); o1.frequency.value = 55; const o2 = C.createOscillator(); o2.frequency.value = 110.3;
     const n = this.noiseSource(true); const f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 220;
     o1.connect(this.humG); o2.connect(this.humG); n.connect(f).connect(this.humG);
@@ -188,11 +188,12 @@ export class Audio {
     const s = this.seq;
     if (!s || !this.ctx) return;
     const C = this.ctx;
-    const bpm = s.mode === 'jazz' ? 132 : s.mode === 'space' ? 66 : 60;
+    const bpm = s.mode === 'jazz' ? 132 : s.mode === 'space' ? 66 : s.mode === 'station' ? 76 : 60;
     const spb = 60 / bpm;
     while (s.next < C.currentTime + 0.25) {
       if (s.mode === 'jazz') this.jazzBeat(s, s.next, spb);
       else if (s.mode === 'space' || s.mode === 'menu') this.ambientBeat(s, s.next, spb);
+      else if (s.mode === 'station') this.stationBeat(s, s.next, spb);
       s.next += spb; s.beat++;
       if (s.beat % 4 === 0) s.bar++;
     }
@@ -211,6 +212,37 @@ export class Audio {
       this.pluck(NOTE(chord[0] - 12), t, 0.12 * s.combat, 0.25);
       if (s.beat % 2 === 0) this.kick(t, 0.25 * s.combat);
       this.hat(t + spb / 2, 0.05 * s.combat);
+    }
+  }
+  // station: an unhurried lounge groove for the corridors and the cabin ("Deck 4", original)
+  stationBeat(s, t, spb) {
+    const form = [
+      { bass: 45, ch: [57, 60, 64, 67, 71] },   // Am9
+      { bass: 41, ch: [57, 60, 64, 71] },       // Fmaj7#11
+      { bass: 48, ch: [55, 59, 62, 64] },       // Cmaj9
+      { bass: 43, ch: [55, 60, 62, 64] },       // G6sus
+    ];
+    const c = form[Math.floor(s.bar / 2) % form.length];
+    const b = s.beat % 8;
+    const sw = spb * 0.58;
+    if (b === 0) for (const n of c.ch) this.rhodes(NOTE(n), t + Math.random() * 0.02, spb * 3.2, 0.03, this.music);
+    if (b === 3 && Math.random() < 0.7) for (const n of c.ch.slice(1)) this.rhodes(NOTE(n), t + sw, spb * 1.6, 0.022, this.music);
+    if (b === 6 && Math.random() < 0.4) for (const n of c.ch.slice(2)) this.rhodes(NOTE(n + 12), t, spb, 0.016, this.music);
+    // bass: root, fifth, a passing note into the next chord
+    const next = form[(Math.floor(s.bar / 2) + 1) % form.length];
+    if (b === 0) this.bass(NOTE(c.bass), t, spb * 1.8, this.music);
+    else if (b === 3) this.bass(NOTE(c.bass + 7), t + sw, spb * 0.9, this.music);
+    else if (b === 5 && Math.random() < 0.6) this.bass(NOTE(c.bass + 12), t, spb * 0.8, this.music);
+    else if (b === 7) this.bass(NOTE(next.bass + (Math.random() < 0.5 ? 2 : -1)), t + sw, spb * 0.5, this.music);
+    // soft kit: kick on 1 and the "and" of 2, brushed hats
+    if (s.beat % 4 === 0) this.kick(t, 0.13);
+    if (s.beat % 4 === 2 && Math.random() < 0.5) this.kick(t + sw, 0.07);
+    this.hat(t + sw, 0.018, null, 0.06, 7000);
+    if (s.beat % 2 === 1) this.hat(t, 0.025, null, 0.16, 2600);
+    // sparse bell melody, A minor pentatonic
+    if (Math.random() < 0.22) {
+      const mel = [69, 72, 74, 76, 79, 81];
+      this.bell(NOTE(mel[Math.floor(Math.random() * mel.length)]), t + (Math.random() < 0.5 ? sw : 0), 0.022);
     }
   }
   pad(freq, t, dur, vol) {

@@ -26,6 +26,12 @@ export const SHIP_CLASSES = {
     energy: 120, regen: 16, laserDmg: 12, laserRate: 4, turret: true, length: 42, engine: '#ffb070', jump: 1,
     desc: 'Mags Okafors Eisfrachter. Mehr Rost als Rumpf, aber er hat noch nie eine Ladung verloren.',
   },
+  eisvogel: {
+    name: '„Eisvogel“', maker: 'Hawker-Lindqvist HL-7 (Umbau)', role: 'Eisfrachter mit Geschützturm', price: 0, npcOnly: true,
+    hull: 1500, shield: 600, speed: 210, boost: 360, accel: 48, turn: 0.95, cargo: 36, guns: 2, missiles: 0,
+    energy: 180, regen: 30, laserDmg: 18, laserRate: 6, turret: true, length: 22.4, engine: '#9fd8ff', jump: 1,
+    desc: 'Mags Okafors ganzer Stolz: eisweißer Frachter mit zwei Eistanks, drei Triebwerken und einem Kugelturm auf dem Rücken.',
+  },
   mule: {
     name: 'Mule MT-3', maker: 'Brandt & Söhne, Ganymed', role: 'Frachter', price: 95000,
     hull: 1200, shield: 420, speed: 165, boost: 250, accel: 32, turn: 0.6, cargo: 60, guns: 1, missiles: 2,

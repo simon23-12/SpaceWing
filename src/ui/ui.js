@@ -60,7 +60,7 @@ export class UI {
       <div class="credit">Von Simon</div>
     </div>`);
     // speed streaks drifting through the picture, slowly, towards the station
-    const streaks = new Streaks(el, { count: 150, speed: 1.5, vx: 0.66, vy: 0.55, alpha: 0.85, color: [205, 228, 255], z: 0 });
+    const streaks = new Streaks(el, { count: 55, speed: 1.5, vx: 0.66, vy: 0.55, alpha: 0.85, color: [205, 228, 255], z: 0 });
     el._cleanup = () => streaks.dispose();
     el.querySelector('[data-a="new"]').onclick = () => {
       this.sfx();
@@ -622,7 +622,7 @@ export class UI {
       body.innerHTML = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">IM ALL</h4><table class="grid">
         ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table></div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">AUF DER STATION</h4><table class="grid">
-        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table><p class="dim" style="margin-top:14px">Maus-Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
         <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren</label>
         <p class="dim" style="margin-top:10px">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div></div>`;

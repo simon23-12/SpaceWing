@@ -1,6 +1,6 @@
 # SpaceWing Saturn
 
-Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite auf der Hochstation Cassini im Rhea-Orbit, fliegst deine erste Tour als Aushilfe auf einem rostigen Eisfrachter und bekommst danach einen alten Kurierjäger geschenkt: die SW-2 „Spacewing“. Von da an verdienst du Kredits mit Frachtaufträgen, Kopfgeldern und Eskorten, rüstest dein Schiff auf und gerätst in einen Handelskrieg zwischen den Saturnmonden, in dem es um eine Zukunftsprognose im Stil von Asimovs *Foundation* geht.
+Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite auf der Hochstation Cassini im Rhea-Orbit, sitzt auf deiner ersten Tour im Kugelturm von Mags Okafors Eisfrachter „Eisvogel“ und bekommst danach eine alte Rostlaube geschenkt: den Kurierjäger SW-2 „Spacewing“. In einer Flugstunde mit Mags lernst du, ihn zu fliegen. Von da an verdienst du Kredits mit Frachtaufträgen, Kopfgeldern und Eskorten, rüstest dein Schiff auf und gerätst in einen Handelskrieg zwischen den Saturnmonden, in dem es um eine Zukunftsprognose im Stil von Asimovs *Foundation* geht.
 
 **Spielen:** https://simon23-12.github.io/SpaceWing/
 
@@ -49,9 +49,13 @@ python3 tools/bl.py blender/ships.py spacewing
 
 ## Steuerung
 
+**Im Kugelturm (Mission 1):** Maus zielen · Linksklick/Leertaste feuern · T Ziel
+
 **Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T Ziel · C Kamera · L andocken · M Systemkarte · Esc Pause
 
 **Auf der Station:** WASD gehen · Shift laufen · Maus umsehen · E benutzen/sprechen · Tab Deckplan
+
+**Überall:** F12 Vollbild
 
 ## Asset-Lizenzen
 

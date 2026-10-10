@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const _v = new THREE.Vector3(), _l = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _l = new THREE.Vector3(), _q = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0);
 
 /** Turn the ship's nose toward a world point. Returns angle (rad) between nose and target. */
 export function steerTo(ship, point, rollToUp = true, gain = 2.2) {
@@ -97,6 +97,19 @@ export function updateAI(ship, flight, dt) {
       if (d < (ai.arrive || 120)) { if (ai.onArrive) ai.onArrive(ship); ai.mode = ai.then || 'idle'; }
       break;
     }
+    case 'orbit': {
+      // circle a point (gunner missions: the pilot keeps the ship moving so the turret has a field of fire)
+      const c = ai.center, r = ai.radius || 800;
+      const axis = ai.axis || _up;
+      const rel = _v.copy(ship.pos).sub(c);
+      rel.addScaledVector(axis, -rel.dot(axis));
+      const d = rel.length() || 1;
+      const tan = _l.copy(axis).cross(rel).normalize();
+      const tgt = c.clone().addScaledVector(rel, r / d).addScaledVector(tan, r * 0.7).addScaledVector(axis, Math.sin(ai.t * 0.35) * r * 0.18);
+      steerTo(ship, tgt);
+      inp.throttle = ai.throttle ?? 0.55;
+      break;
+    }
     case 'patrol': {
       if (!ai.point || ship.pos.distanceTo(ai.point) < 200 || ai.t > 25) {
         ai.t = 0;
@@ -121,5 +134,5 @@ export function updateAI(ship, flight, dt) {
   }
   if (inp.fire) flight.fireGuns(ship);
   // turrets on AI capital ships
-  if (ship.stats.turret || ship.cls === 'korvette') flight.turretFire(ship, dt, ai.turretSkill ?? 0.5);
+  if (!ship.isPlayer && (ship.stats.turret || ship.cls === 'korvette')) flight.turretFire(ship, dt, ai.turretSkill ?? 0.5);
 }

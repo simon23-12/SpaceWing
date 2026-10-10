@@ -71,8 +71,8 @@ export function npcDialogue(game, npc) {
     if (g.story === 'prolog' || (g.story === 'eisfracht' && !g.flags['accepted:eisfracht'])) {
       return [
         say(MAGS, 'Du bist von Hallström, oder? Die Firma, die pleitegegangen ist. Setz dich.'),
-        say(MAGS, 'Ich bin Mags. Ich fliege Eis von Enceladus hierher, seit vierzig Jahren. Und seit einem Jahr zittern mir am Steuer die Hände.'),
-        say(MAGS, 'Am Geschütz merkt man das nicht. Ich brauche jemanden, der fliegt, während ich schieße. Eine Tour. Zwölfhundert Kredits.', {
+        say(MAGS, 'Ich bin Mags. Ich fliege Eis von Enceladus hierher, seit vierzig Jahren. Fliegen kann ich noch. Aber seit einem Jahr zittern mir am Abzug die Hände.'),
+        say(MAGS, 'Ich brauche jemanden im Turm, der trifft, während ich fliege. Eine Tour nach Enceladus und zurück. Zwölfhundert Kredits.', {
           choices: [
             { t: 'Zwölfhundert? Ich bin dabei.', go: 'yes' },
             { t: 'Warum ich? Hier sitzen hundert Piloten.', go: 'why' },
@@ -80,11 +80,12 @@ export function npcDialogue(game, npc) {
           ] }),
         say(MAGS, 'Weil du nüchtern bist und hungrig aussiehst. Das sind die besten.', { label: 'why' }),
         say(MAGS, 'Und weil die anderen hundert mir Geld schulden.', { choices: [{ t: 'Na gut. Wann geht’s los?', go: 'yes' }, { t: 'Später.', end: true }] }),
-        say(MAGS, 'Jetzt. Meine „Sankt Rostig“ steht in Hangar 7. Sie sieht schlimmer aus, als sie fliegt.', { label: 'yes', act: (gm) => acceptStory(gm, 'eisfracht') }),
-        say(MAGS, 'Geh zum Hangar und steig ein. Ich warte im Turm. Und, ' + name + ': Fass nichts Rotes an.'),
+        say(MAGS, 'Jetzt. Mein „Eisvogel“ steht in Hangar 7. Das schönste Schiff im Ring, und wehe, du sagst was anderes.', { label: 'yes', act: (gm) => acceptStory(gm, 'eisfracht') }),
+        say(MAGS, 'Geh zum Hangar und steig ein, der Turm ist hinten oben. Ich sitze schon im Cockpit. Und, ' + name + ': Fass nichts Rotes an.'),
       ];
     }
-    if (g.story === 'eisfracht' && g.flags['accepted:eisfracht']) return [say(MAGS, 'Was stehst du noch hier rum? Hangar 7. Die Rostlaube wartet.')];
+    if (g.story === 'eisfracht' && g.flags['accepted:eisfracht']) return [say(MAGS, 'Was stehst du noch hier rum? Hangar 7. Der Eisvogel wartet.')];
+    if (g.story === 'flugschule' && !g.flags['done:flugschule']) return [say(MAGS, 'Die Spacewing steht startklar in Hangar 7. Steig ein, ich fliege neben dir und zeig dir alles.')];
     if (g.flags.m4rescued && !g.flags.m5done) return [
       say(MAGS, 'Mein Bein ist Schrott, mein Schiff ist Schrott. Aber mein Kopf funktioniert.'),
       say(MAGS, 'Juno muss nach Iapetus. Du fliegst. Ich komme mit, weil ich Juno nicht allein lasse. Frag nicht. Noch nicht.'),
@@ -96,7 +97,7 @@ export function npcDialogue(game, npc) {
     return tree(MAGS, ['Setz dich, ' + name + '. Die Spacewing zieht immer noch nach links, oder?', 'Na, Pilot. Was macht der Rost?', 'Trink nicht, was Kix „Spezial“ nennt. Was gibt’s?'][g.day % 3], [
       { q: 'Erzähl mir von der Spacewing.', a: ['Hawker-Lindqvist SW-2. Ein Keil mit zwei Triebwerken, so groß wie Frachtcontainer. Kein Flügel, keine Romantik. Im Vakuum braucht man keine Flügel, nur Schub und Nerven.', 'Teo hat sie vierzig Jahre geflogen. Die Kanonen schwenken, wenn du sie lässt. Und sie zieht nach links.'] },
       { q: 'Wie komme ich zu den anderen Monden?', a: [jumpHint, 'Und nicht jeder Mond lässt dich rein. Titan zum Beispiel will erst wissen, auf welcher Seite du stehst.'] },
-      { q: 'Wer war Teo?', a: ['Mein Bruder. Kurierflieger, Idiot, der beste Pilot im Ring. Ist vor sechs Jahren bei Mimas verschwunden.', 'Er hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'] },
+      { q: 'Wer war Teo?', a: ['Mein Mann. Kurierflieger, Idiot, der beste Pilot im Ring. Ist vor acht Jahren bei Mimas verschwunden.', 'Er hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'] },
       { q: 'Worum geht es in diesem Handelskrieg eigentlich?', a: ['Wasser, Methan, Helium. Enceladus hat das Wasser, Titan das Methan, die Ringe das Erz. Die Liga will an allem Zoll verdienen, das Konsortium will alles besitzen.', 'Und wir dazwischen fliegen das Zeug hin und her und werden beschossen. So ist das hier draußen.'] },
     ], 'Bis später, Mags.');
   }
@@ -203,103 +204,197 @@ function completeStory(game, id, reward, next, text) {
 export const STORY = {
   prolog: { title: 'Drei Nächte Miete', brief: 'Sprich in der Bar mit dem Barkeeper.' },
 
-  // ------------------------------------------------------------------------ M1
+  // ------------------------------------------------------------------------ M1 (gunner: Mags flies, the player shoots)
   eisfracht: {
     title: 'Eisfracht', giver: MAGS, anyZone: true,
-    brief: 'Fliege Mags Okafors Frachter „Sankt Rostig“ nach Enceladus, nimm Eiscontainer auf und bring sie heil nach Rhea zurück. Mags bedient das Geschütz.',
-    ship: { cls: 'sankt_rostig', upgrades: {}, paint: null, cargo: {}, uid: 'TEMP-ROSTIG', name: '„Sankt Rostig“' },
+    brief: 'Flieg mit Mags Okafor auf ihrem Frachter „Eisvogel“ nach Enceladus und zurück. Mags fliegt, du sitzt im Kugelturm und hältst Piraten auf Abstand.',
+    ship: { cls: 'eisvogel', upgrades: {}, paint: null, cargo: {}, uid: 'TEMP-EISVOGEL', name: '„Eisvogel“', gunner: true },
     async flight(c, game) {
-      const g = game.state, f = c.flight;
-      f.player.turretAuto = true;
+      const g = game.state, f = c.flight, p = f.player;
       const stage = g.flags.m1stage || 0;
+      const jump = (zone) => f.travelTo(zone, () => game.arrive(f, zone), { jump: true });
+      const M = (t) => ['Mags', t, 'ringgilde'];
       if (f.zoneId === 'rhea' && stage === 0) {
-        await c.wait(2.5);
+        const d = f.station.dock;
+        p.ai = { mode: 'goto', point: d.pos.clone().addScaledVector(d.dir, 1900).add(new THREE.Vector3(0, 250, 0)), throttle: 0.55, arrive: 150 };
+        c.objective('Im Kugelturm mitfliegen');
+        await c.wait(2);
         await c.talk([
-          ['Mags (Turm)', 'Gut, du sitzt. Ich bin oben im Turm. Bring uns raus und gib dem alten Mädchen etwas Schub.', 'ringgilde'],
-          ['Mags (Turm)', 'W und S für den Schub, die Maus lenkt. Shift ist der Nachbrenner. Den brauchst du heute hoffentlich nicht.', 'ringgilde'],
-          ['Mags (Turm)', 'Öffne die Systemkarte mit M und spring nach Enceladus. Die Rostig hat ein altes Sprungtriebwerk, Klasse I. Den Sprit zahle ich.', 'ringgilde'],
+          M('Sitzt du? Gut. Willkommen im Turm. Ich fliege, du schießt. Die Maus dreht den Turm, links klicken feuert.'),
+          M('Probier ruhig ein paar Schüsse. Hier draußen ist nichts außer Eis, Funkverkehr und dem alten Saturn.'),
+          M('Gleich springen wir nach Enceladus. Beim ersten Sprung wird jedem schlecht. Nicht in meinen Turm kotzen.'),
         ]);
-        c.objective('Systemkarte öffnen [M] und Kurs auf Enceladus setzen');
+        await c.until(() => p.ai.mode !== 'goto');
+        c.objective('Hyperraumsprung nach Enceladus');
+        jump('enceladus');
       } else if (f.zoneId === 'enceladus' && stage === 0) {
-        await c.wait(3);
         const st = f.station;
         const beacon = st.dock.pos.clone().addScaledVector(st.dock.dir, 700).add(new THREE.Vector3(0, -150, 0));
         f.addWaypoint('ice', beacon, 'Ladebake');
-        f.missionBlocksDock = 'Erst die Eiscontainer an der Ladebake aufnehmen';
+        p.ai = { mode: 'goto', point: beacon, throttle: 0.7, arrive: 140, then: 'idle' };
+        await c.wait(3);
         await c.talk([
-          ['Quelle Flugleitung', 'Sankt Rostig, willkommen in der Quelle. Eure Ladung steht an Bake drei. Wie immer gut gekühlt.', 'kollektiv'],
-          ['Mags (Turm)', 'Siehst du die Geysire? Hundert Kilometer hohe Wasserfontänen. Davon lebt das ganze System. Flieg zur Bake, langsam.', 'ringgilde'],
+          ['Quelle Flugleitung', 'Eisvogel, willkommen in der Quelle. Eure Ladung steht an Bake drei. Wie immer gut gekühlt.', 'kollektiv'],
+          M('Siehst du die Geysire? Hundert Kilometer hohe Wasserfontänen. Davon lebt das ganze System.'),
         ]);
-        c.objective('Zur Ladebake fliegen und unter 40 m/s anhalten');
-        let hold = 0;
-        await c.until(dt => { if (c.near(beacon, 180) && f.player.speed() < 40) hold += dt; else hold = 0; return hold > 1; });
+        c.objective('Mags fliegt zur Ladebake');
+        await c.until(() => p.ai.mode !== 'goto');
+        p.ai = { mode: 'idle', throttle: 0 };
         c.objective('Container werden verladen …');
         f.hud.showToast('ANDOCKKLAMMERN GREIFEN', 2.5);
-        hold = 0;
-        await c.until(dt => { if (c.near(beacon, 260)) hold += dt; return hold > 6; });
+        await c.wait(6);
         f.removeWaypoint('ice');
-        f.player.record.cargo = { wasser: 36 };
-        f.player.cargoLabel = '36 t Wasser-Eis';
-        f.hud.showToast('36 t WASSER-EIS GELADEN', 2.5);
+        p.record.cargo = { wasser: 36 };
+        p.cargoLabel = '36 t Wasser-Eis';
+        f.hud.showToast('36 T WASSER-EIS GELADEN', 2.5);
         g.flags.m1stage = 1;
-        await c.wait(2);
-        await c.talk([['Mags (Turm)', 'Schön. Jetzt nach Hause, bevor …', 'ringgilde']]);
-        const wave = await c.pirates(3, f.player.pos.clone().add(new THREE.Vector3(1, 0.3, 0.6).normalize().multiplyScalar(3000)), { dist: 300, skill: 0.45, upgrades: { lasers: 2 } });
+        await c.wait(1.5);
+        await c.talk([M('Schön. Jetzt nach Hause, bevor …')]);
+        const wave = await c.pirates(3, p.pos.clone().add(new THREE.Vector3(1, 0.3, 0.6).normalize().multiplyScalar(3000)), { dist: 300, skill: 0.45, upgrades: { lasers: 2 } });
+        p.ai = { mode: 'orbit', center: beacon.clone(), radius: 650, throttle: 0.5 };
         await c.talk([
           ['Schakal Alpha', 'Na, wen haben wir denn da. Die alte Okafor mit einem Bauch voller Eis.', 'schakale'],
-          ['Mags (Turm)', '… bevor genau das passiert. Drei Wespen. Dreh dich, damit ich freies Schussfeld habe. Und schieß selbst mit, Leertaste oder linke Maustaste!', 'ringgilde'],
+          M('… bevor genau das passiert. Drei Wespen! Ich halte uns in Bewegung, du hältst sie uns vom Leib.'),
+          M('T schaltet die Ziele durch. Der kleine Kreis zeigt dir, wohin du vorhalten musst.'),
         ]);
         c.objective('Die Schakale abwehren');
-        f.missionBlocksDock = 'Erst die Angreifer abwehren';
         let line = 0;
         await c.until(() => {
           const left = c.alive(wave).length;
-          if (left === 2 && line === 0) { line++; c.say('Mags (Turm)', 'Einer weniger! Die Waffen dieser Wespen sind neu. Zu neu für Schakale.', 'ringgilde'); }
-          if (left === 1 && line === 1) { line++; c.say('Mags (Turm)', 'Noch einer. Nimm ihn mit T ins Ziel, dann siehst du den Vorhaltepunkt.', 'ringgilde'); }
+          if (left === 2 && line === 0) { line++; c.say('Mags', 'Einer weniger! Die Waffen dieser Wespen sind neu. Zu neu für Schakale.', 'ringgilde'); }
+          if (left === 1 && line === 1) { line++; c.say('Mags', 'Noch einer! Halt drauf, ich dreh uns quer.', 'ringgilde'); }
           return left === 0;
         });
         g.flags.m1stage = 2;
-        f.missionBlocksDock = 'Mags will nach Rhea – Systemkarte [M]';
+        p.ai = { mode: 'idle', throttle: 0.2 };
         await c.talk([
-          ['Mags (Turm)', 'Ha! Nicht schlecht für jemanden, der vor einer Woche noch Kisten für Hallström gefahren hat.', 'ringgilde'],
-          ['Mags (Turm)', 'Merk dir das Wappen auf den Wracks. Ein Schakal mit Konsortiums-Kanonen. Jemand bezahlt die.', 'ringgilde'],
-          ['Mags (Turm)', 'Kurs Rhea. Systemkarte, M.', 'ringgilde'],
+          M('Ha! Nicht schlecht für jemanden, der vor einer Woche noch Kisten für Hallström gefahren hat.'),
+          M('Merk dir das Wappen auf den Wracks. Ein Schakal mit Konsortiums-Kanonen. Jemand bezahlt die.'),
+          M('Kurs Rhea. Festhalten.'),
         ]);
-        c.objective('Zurück nach Rhea (Systemkarte [M])');
-      } else if (f.zoneId === 'enceladus' && stage === 2) {
-        f.missionBlocksDock = 'Mags will nach Rhea – Systemkarte [M]';
-        c.objective('Zurück nach Rhea (Systemkarte [M])');
-      } else if (f.zoneId === 'rhea' && stage === 2) {
+        c.objective('Hyperraumsprung nach Rhea');
+        jump('rhea');
+      } else if (f.zoneId !== 'rhea' && stage >= 1) {
         await c.wait(2);
-        c.say('Mags (Turm)', 'Da ist sie, unsere Cassini. Ab nach Hause, Andocken mit L.', 'ringgilde');
-        c.objective('An der Hochstation Cassini andocken [L]');
-      } else if (stage === 1) {
-        c.objective('Zurück nach Rhea (Systemkarte [M])');
+        c.say('Mags', 'Ab nach Hause.', 'ringgilde');
+        c.objective('Hyperraumsprung nach Rhea');
+        await c.wait(3);
+        jump('rhea');
+      } else if (f.zoneId === 'rhea' && stage >= 1) {
+        const d = f.station.dock;
+        p.ai = { mode: 'goto', point: d.pos.clone().addScaledVector(d.dir, 900), throttle: 0.6, arrive: 200 };
+        await c.wait(2);
+        c.say('Mags', 'Da ist sie, unsere Cassini. Ich bring uns rein.', 'ringgilde');
+        c.objective('Mags dockt an der Hochstation Cassini an');
+        await c.until(() => p.ai.mode !== 'goto' || c.near(d.pos, 1200));
+        g.flags.m1stage = 2;
+        f.requestDock();
       } else {
-        c.objective('Kurs auf Enceladus (Systemkarte [M])');
+        await c.wait(2);
+        jump('enceladus');
       }
     },
     onDock(game, station) {
       const g = game.state;
       if (station !== 'cassini' || (g.flags.m1stage || 0) < 2) return null;
       return [
-        say(MAGS, 'So. Sechsunddreißig Tonnen Eis, null Kratzer. Na gut, ein paar neue Kratzer.', { scene: 'hangar' }),
+        say(MAGS, 'So. Sechsunddreißig Tonnen Eis, null Kratzer am Eisvogel. Du schießt besser, als du aussiehst.', { scene: 'hangar' }),
         say(MAGS, 'Hier sind deine zwölfhundert. Und noch etwas.'),
-        say(MAGS, 'Die SW-2 da hinten unter der Plane. Eine Hawker-Lindqvist „Spacewing“. Sie hat Teo gehört, meinem Mann. Er ist vor acht Jahren gestorben.'),
+        say(MAGS, 'Die SW-2 da hinten in der Ecke. Eine Hawker-Lindqvist „Spacewing“. Sie hat Teo gehört, meinem Mann. Er ist vor acht Jahren bei Mimas verschwunden.'),
         say(MAGS, 'Seitdem steht sie hier rum und rostet, und ich zahle Hangarmiete für einen Geist. Sie gehört dir.', {
           choices: [{ t: 'Das kann ich nicht annehmen.', go: 'no' }, { t: 'Danke, Mags. Ich pass auf sie auf.', go: 'yes' }] }),
-        say(MAGS, 'Doch, kannst du. Sie will fliegen und ich kann es nicht mehr. Ende der Diskussion.', { label: 'no', go: 'yes2' }),
+        say(MAGS, 'Doch, kannst du. Sie will fliegen und ich habe meinen Eisvogel. Ende der Diskussion.', { label: 'no', go: 'yes2' }),
         say(MAGS, 'Ich weiß.', { label: 'yes' }),
-        say(MAGS, 'Sie fliegt. Meistens. Lenka in der Werft kann sie aufmöbeln, wenn du Kredits hast. Kredits gibt’s an der Söldnerbörse.', { label: 'yes2',
+        say(MAGS, 'Sie ist eine Rostlaube, aber sie fliegt. Bevor du damit Aufträge annimmst, drehen wir eine Runde, und ich bringe dir bei, wie man sie fliegt.', { label: 'yes2',
           act: (gm) => {
-            completeStory(gm, 'eisfracht', 1200, 'zoll', 'Erste Tour mit Mags. Die Spacewing gehört jetzt dir.');
+            completeStory(gm, 'eisfracht', 1200, 'flugschule', 'Erste Tour mit Mags. Die Spacewing gehört jetzt dir.');
             const s = addShip(gm.state, 'spacewing', 'Spacewing');
             s.hull = 0.72;
             gm.state.activeShip = s.uid;
             gm.state.flags.m1done = true;
             gm.state.rep.ringgilde += 5;
+            acceptStory(gm, 'flugschule');
           } }),
-        say(MAGS, 'Und, ' + g.callsign + ': Wenn dir jemand Konsortiums-Geld anbietet, frag dich, wofür.'),
+        say(MAGS, 'Steig in Hangar 7 ein, wenn du so weit bist. Ich fliege mit dem Eisvogel neben dir.'),
+      ];
+    },
+  },
+
+  // ------------------------------------------------------------------------ M1b: flight school in the Spacewing
+  flugschule: {
+    title: 'Flugstunde', giver: MAGS, zone: 'rhea',
+    brief: 'Mags bringt dir bei, wie man die Spacewing fliegt: lenken, Schub, rollen, Nachbrenner, Waffen, Raketen und Andocken. Start in Hangar 7.',
+    async flight(c, game) {
+      const g = game.state, f = c.flight, p = f.player;
+      if (g.flags['done:flugschule'] || f.opts.spawn !== 'undock') return;
+      const M = (t) => ['Mags', t, 'ringgilde'];
+      const st = f.station;
+      const mags = await f.spawn({ cls: 'eisvogel', faction: 'ringgilde', name: 'Mags · „Eisvogel“', pos: p.pos.clone().add(new THREE.Vector3(60, 30, 40)), quat: p.quat.clone(),
+        tags: ['ally'], invulnerable: true, ai: { mode: 'escort', leader: p, offset: new THREE.Vector3(70, 25, 60), aggressive: false } });
+      const ahead = (dist, side = 0, up = 0) => p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), dist).addScaledVector(p.right(new THREE.Vector3()), side).addScaledVector(p.up(new THREE.Vector3()), up);
+      const ring = async (pos, label) => {
+        f.addWaypoint('ring', pos, label);
+        await c.until(() => c.near(pos, 120));
+        f.removeWaypoint('ring');
+        game.audio?.blip?.();
+      };
+      await c.wait(2.5);
+      await c.talk([M('So, Pilot. Die Spacewing gehorcht der Maus. Der kleine Punkt in der Mitte ist dein Steuerknüppel. Je weiter weg, desto schneller drehst du.')]);
+      c.objective('Mit der Maus lenken: zur Markierung fliegen');
+      await ring(ahead(1100, 500, 260), 'Markierung');
+      await c.talk([M('Gut. W gibt Schub, S nimmt ihn weg. Mit 1 bis 4 setzt du feste Stufen, X stoppt sofort.')]);
+      c.objective('Auf über 180 m/s beschleunigen [W]');
+      await c.until(() => p.speed() > 180);
+      c.objective('Abbremsen auf unter 30 m/s [S] oder [X]');
+      await c.until(() => p.speed() < 30);
+      await c.talk([M('A und D rollen das Schiff um die Längsachse. Q und E schieben dich seitwärts. Damit weichst du aus, ohne die Nase vom Ziel zu nehmen.')]);
+      c.objective('Einmal um die eigene Achse rollen [A] / [D]');
+      let roll = 0;
+      await c.until(dt => { roll += Math.abs(p.angVel.z) * dt; return roll > Math.PI * 1.8; });
+      await c.talk([M('C wechselt zwischen Außenkamera und Cockpit. Probier beides, nimm, was dir liegt.')]);
+      c.objective('Kamera wechseln [C]');
+      const cam0 = f.camMode;
+      await c.until(() => f.camMode !== cam0);
+      await c.talk([M('Shift ist der Nachbrenner. Schnell, aber er frisst Energie, und ohne Energie schießt du nicht.')]);
+      c.objective('Nachbrenner 3 Sekunden halten [Shift]');
+      let boost = 0;
+      await c.until(dt => { if (p.input.boost && p.energy > 5) boost += dt; return boost > 3; });
+      c.objective('Zur nächsten Markierung fliegen');
+      await ring(ahead(1400, -600, -200), 'Markierung');
+      // gunnery: three target drones that do not shoot back
+      const center = ahead(900);
+      const drones = await c.spawnWave([0, 1, 2].map(i => ({ cls: 'wespe', faction: 'neutral', name: `Zieldrohne ${i + 1}`, paint: '#e8e8e8',
+        pos: center.clone().add(new THREE.Vector3((i - 1) * 140, (i % 2) * 60, 0)), tags: ['noFriendlyFire', 'objective'],
+        ai: { mode: 'patrol', center: center.clone(), radius: 260, aggressive: false } })));
+      drones.forEach(d => { d.stats = { ...d.stats, speed: 70, boost: 90 }; d.shield = 0; d.maxShield = 1; d.hull = d.maxHull = 90; });
+      await c.talk([
+        M('Ich habe drei Zieldrohnen ausgesetzt. Die schießen nicht zurück, also keine Ausreden.'),
+        M('T schaltet die Ziele durch. Der kleine Kreis vor dem Ziel ist der Vorhaltepunkt. Linksklick oder Leertaste feuert.'),
+      ]);
+      c.objective('Die drei Zieldrohnen abschießen [T] · [Linksklick]');
+      await c.until(() => c.alive(drones).length === 0);
+      const last = await f.spawn({ cls: 'wespe', faction: 'neutral', name: 'Zieldrohne „Hartnäckig“', paint: '#e8e8e8', pos: ahead(1300, 200, 100), tags: ['noFriendlyFire', 'objective'],
+        ai: { mode: 'patrol', center: ahead(1300), radius: 400, aggressive: false } });
+      last.stats = { ...last.stats, speed: 120 }; last.shield = 0; last.maxShield = 1; last.hull = last.maxHull = 130;
+      p.target = last;
+      await c.talk([M('Die da ist zäher. Halt sie im Visier, bis der Kreis rot wird, dann Rechtsklick oder F. Rakete raus.')]);
+      c.objective('Die zähe Drohne mit einer Rakete treffen [Rechtsklick] / [F]');
+      await c.until(() => !last.alive);
+      await c.talk([
+        M('Sauber. M öffnet die Systemkarte. Da siehst du die Monde. Für die anderen brauchst du ein Sprungtriebwerk von Lenka.'),
+        M('Und jetzt nach Hause. Flieg auf unter drei Kilometer an die Andockbucht und drück L. Den Rest macht der Leitstrahl.'),
+      ]);
+      g.flags.m1bflown = true;
+      c.objective('An der Hochstation Cassini andocken [L]');
+      mags.ai = { mode: 'goto', point: st.dock.pos.clone().addScaledVector(st.dock.dir, 600).add(new THREE.Vector3(150, 80, 0)), throttle: 0.6, arrive: 100 };
+    },
+    onDock(game, station) {
+      const g = game.state;
+      if (station !== 'cassini' || !g.flags.m1bflown) return null;
+      return [
+        say(MAGS, 'Na also. Du fliegst wie jemand, der es ernst meint. Teo hätte gelacht und dir sofort den Steuerknüppel geklaut.', { scene: 'hangar' }),
+        say(MAGS, 'Für den Sprit gebe ich dir dreihundert dazu. Ab jetzt verdienst du dein Geld selbst: Söldnerbörse auf dem Kommandodeck, bei Femi.', {
+          act: (gm) => completeStory(gm, 'flugschule', 300, 'zoll', 'Flugstunde mit Mags. Die Spacewing gehorcht.') }),
       ];
     },
   },
@@ -429,22 +524,22 @@ export const STORY = {
   funkstille: {
     title: 'Funkstille', giver: KIX, zone: 'rings',
     available: (g) => g.flags.m3done,
-    brief: 'Mags ist verschwunden. Ihr Transponder meldete sich zuletzt vom Ringrand im Mimas-System, dem Abbaufeld der Ringgilde. Finde die Sankt Rostig.',
+    brief: 'Mags ist verschwunden. Ihr Transponder meldete sich zuletzt vom Ringrand im Mimas-System, dem Abbaufeld der Ringgilde. Finde den Eisvogel.',
     async flight(c, game) {
       const g = game.state, f = c.flight;
       if (g.flags.m4rescued) { c.objective('Zurück zur Hochstation Cassini (Rhea)'); return; }
       await c.wait(3);
       const wreckPos = f.player.pos.clone().add(new THREE.Vector3(0.6, -0.05, -1).normalize().multiplyScalar(4200));
-      const wreck = await f.spawn({ cls: 'sankt_rostig', faction: 'neutral', name: 'Sankt Rostig (treibend)', pos: wreckPos, invulnerable: true, tags: ['objective', 'noFriendlyFire'], ai: { mode: 'idle', throttle: 0 } });
+      const wreck = await f.spawn({ cls: 'eisvogel', faction: 'neutral', name: 'Eisvogel (treibend)', pos: wreckPos, invulnerable: true, tags: ['objective', 'noFriendlyFire'], ai: { mode: 'idle', throttle: 0 } });
       wreck.angVel.set(0.02, 0.05, 0.01);
       wreck.ai = null;
       wreck.input.throttle = 0;
       await c.talk([
         ['Bordcomputer', 'Schwaches Transpondersignal empfangen: SANKT ROSTIG. Keine Triebwerksaktivität.', 'neutral'],
-        ['Ringgilde Patrouille', 'Pilot, wir haben die Rostig auch gesehen. Wir kommen nicht nah ran, da draußen jagen Schakale. Viel Glück.', 'ringgilde'],
+        ['Ringgilde Patrouille', 'Pilot, wir haben den Eisvogel auch gesehen. Wir kommen nicht nah ran, da draußen jagen Schakale. Viel Glück.', 'ringgilde'],
       ]);
-      c.objective('Die Sankt Rostig finden');
-      f.addWaypoint('wreck', wreckPos, 'Sankt Rostig');
+      c.objective('Den Eisvogel finden');
+      f.addWaypoint('wreck', wreckPos, 'Eisvogel');
       await c.until(() => c.near(wreck.pos, 1600));
       const wave = await c.pirates(5, wreck.pos.clone().add(new THREE.Vector3(0, 300, 0)), { dist: 1400, skill: 0.55, upgrades: { lasers: 4, shield: 2 } });
       await c.talk([
@@ -454,14 +549,14 @@ export const STORY = {
       c.objective('Die Schakale ausschalten');
       await c.until(() => c.alive(wave).length === 0);
       await c.talk([['Mags (schwach)', 'Gut gemacht. Jetzt komm ganz nah ran, auf unter 200 Meter, und halt still. Meine Rettungskapsel klemmt.', 'ringgilde']]);
-      c.objective('An der Sankt Rostig unter 200 m halten');
+      c.objective('Am Eisvogel unter 200 m halten');
       let hold = 0;
       await c.until(dt => { if (c.near(wreck.pos, 200 + wreck.hitRadius)) hold += dt; else hold = Math.max(0, hold - dt); if (hold > 0) f.objective(`Andockklammer … ${Math.min(100, Math.round(hold / 6 * 100))} %`); return hold > 6; });
       f.removeWaypoint('wreck');
       f.hud.showToast('MAGS AN BORD', 2.5);
       g.flags.m4rescued = true;
       await c.talk([
-        ['Mags', 'Danke. Mein Bein ist hin, und die Rostig auch. Aber ich habe etwas gefunden: Frachtpapiere der Schakal-Wespen. Bezahlt von einer Briefkastenfirma auf Titan.', 'ringgilde'],
+        ['Mags', 'Danke. Mein Bein ist hin, und mein Eisvogel auch. Aber ich habe etwas gefunden: Frachtpapiere der Schakal-Wespen. Bezahlt von einer Briefkastenfirma auf Titan.', 'ringgilde'],
         ['Mags', 'Bring mich nach Hause. Da wartet jemand, den du kennenlernen musst.', 'ringgilde'],
       ]);
       c.objective('Mags zur Hochstation Cassini bringen (Rhea)');

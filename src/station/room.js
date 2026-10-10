@@ -134,6 +134,13 @@ export class RoomMode {
     const toSat = new THREE.Vector3(-anchor[0], -anchor[1], -anchor[2]).normalize();
     const look = toSat.clone().applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0.32));
     this.spaceQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), look);
+    // the cabin window faces the other way: give it its own view with Saturn slowly drifting past (the ring turns)
+    const kab = this.parts.kabine;
+    if (kab?.meta.window_dir) {
+      this.kabWin = new THREE.Vector3(...kab.meta.window_dir).applyAxisAngle(new THREE.Vector3(0, 1, 0), deckMeta.layout.kabine?.rotY || 0).normalize();
+      this.kabLook = toSat.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.22).add(new THREE.Vector3(0, -0.08, 0)).normalize();
+      this.spaceQK = new THREE.Quaternion();
+    }
     // doors and lift
     for (const d of deckMeta.doors || []) this.doors.push(new DeckDoor(d, this.scene));
     if (deckMeta.lift) this.lift = new Lift(deckMeta.lift, this.scene, this.doors.filter(d => d.kind === 'lift'), this.game.audio);
@@ -270,21 +277,43 @@ export class RoomMode {
     const pad = this.parts.hangar?.meta.pad;
     if (pad) {
       const ship = this.game.launchShipRecord();
-      if (ship) {
-        jobs.push(ShipModel.load(ship.cls, { paint: ship.paint, engineColor: '#7fb6ff' }).then(model => {
-          const p = this.parts.hangar.toWorld(pad);
-          const box = new THREE.Box3().setFromObject(model.root);
-          model.root.position.copy(p).add(new THREE.Vector3(0, -box.min.y + 0.4, 0));
-          model.root.rotation.y = Math.PI / 2 + this.deckMeta.layout.hangar.rotY;
-          if (model.length > 30) model.root.position.x -= 4;
-          this.parts.hangar.root.attach(model.root);
-          this.shipModel = model;
-        }));
-      }
+      const hRot = this.deckMeta.layout.hangar.rotY;
+      if (ship) jobs.push(this.parkShip(ship.cls, ship.paint, this.parts.hangar.toWorld(pad), -Math.PI / 2 + hRot).then(m => { this.shipModel = m; }));
+      // Teo's old Spacewing waits in a corner until Mags gives it away
+      const g = this.game.state;
+      if (!g.flags.m1done && ship?.cls !== 'spacewing') jobs.push(this.parkShip('spacewing', null, this.parts.hangar.toWorld([-13, 0, 4]), hRot + 0.15));
     }
     await Promise.all(jobs);
     const sees = SEES[this.roomId] || PARTS;
     for (const n of this.npcs) { n.obj.visible = sees.includes(n.room); if (n.extra) n.extra.visible = n.obj.visible; }
+  }
+
+  /** A parked ship model in the hangar, with a box collider so nobody walks into it. */
+  async parkShip(cls, paint, pos, rotY) {
+    const model = await ShipModel.load(cls, { paint, engineColor: '#7fb6ff' }).catch(() => null);
+    if (!model) return null;
+    const box = new THREE.Box3().setFromObject(model.root);
+    model.root.position.copy(pos).add(new THREE.Vector3(0, -box.min.y + 0.3, 0));
+    model.root.rotation.y = rotY;
+    for (const pl of model.plumes) pl.visible = false;
+    for (const gl of model.glows) if (gl.engine) gl.mesh.material.color.copy(gl.base).multiplyScalar(0.06);
+    this.parts.hangar.root.attach(model.root);
+    model.root.updateMatrixWorld(true);
+    (this.shipBoxes ||= []).push({ box, inv: model.root.matrixWorld.clone().invert(), m: model.root.matrixWorld.clone() });
+    return model;
+  }
+
+  /** Push a standing capsule out of the parked ships' boxes (in the ship's own frame, horizontally). */
+  pushOutShips(np, r) {
+    for (const s of this.shipBoxes || []) {
+      const l = np.clone().applyMatrix4(s.inv), b = s.box;
+      if (l.y > b.max.y || l.y + this.height < b.min.y) continue;
+      const dx0 = l.x - (b.min.x - r), dx1 = (b.max.x + r) - l.x, dz0 = l.z - (b.min.z - r), dz1 = (b.max.z + r) - l.z;
+      if (dx0 <= 0 || dx1 <= 0 || dz0 <= 0 || dz1 <= 0) continue;
+      const m = Math.min(dx0, dx1, dz0, dz1);
+      if (m === dx0) l.x -= dx0; else if (m === dx1) l.x += dx1; else if (m === dz0) l.z -= dz0; else l.z += dz1;
+      np.copy(l.applyMatrix4(s.m));
+    }
   }
 
   async addKix(m) {
@@ -387,7 +416,7 @@ export class RoomMode {
   ui() {
     const root = document.getElementById('ui');
     this.uiEl = document.createElement('div');
-    this.uiEl.innerHTML = `<div class="crosshair"></div><div class="roomlabel"></div><div class="roomprompt hidden"></div><div class="clicktoplay">KLICKEN ZUM UMSEHEN · WASD GEHEN · E BENUTZEN · TAB DECKPLAN</div>`;
+    this.uiEl.innerHTML = `<div class="crosshair"></div><div class="roomlabel"></div><div class="roomprompt hidden"></div><div class="clicktoplay" style="background:none"></div>`;
     this.uiEl.style.cssText = 'position:fixed;inset:0;pointer-events:none';
     root.appendChild(this.uiEl);
     this.labelEl = this.uiEl.querySelector('.roomlabel');
@@ -407,7 +436,12 @@ export class RoomMode {
     if (!modal && input.locked) this.move(dt); else { this.vel.x = 0; this.vel.z = 0; this.move(dt, true); }
     this.camera.position.set(this.pos.x, this.pos.y + this.height - 0.12 + Math.sin(this.time * 9) * this.bob * 0.025, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
-    this.sky.camera.quaternion.copy(this.spaceQ).multiply(this.camera.quaternion);
+    let sq = this.spaceQ;
+    if (this.roomId === 'kabine' && this.spaceQK) {
+      const drift = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(this.time * Math.PI * 2 / 150) * 0.28);
+      sq = this.spaceQK.setFromUnitVectors(this.kabWin, this.kabLook).multiply(drift);
+    }
+    this.sky.camera.quaternion.copy(sq).multiply(this.camera.quaternion);
     this.sky.camera.fov = this.camera.fov; this.sky.camera.aspect = this.camera.aspect; this.sky.camera.updateProjectionMatrix();
     this.sky.update(dt);
     this.updateRoom();
@@ -510,6 +544,7 @@ export class RoomMode {
     const np = new THREE.Vector3(seg.start.x, seg.start.y - r, seg.start.z);
     // closed doors and the lift are dynamic colliders
     for (const d of this.doors) d.pushOut(np, r, this.height);
+    this.pushOutShips(np, r);
     const liftGround = this.lift ? this.lift.carry(np, r) : false;
     const delta = np.clone().sub(this.pos);
     this.onGround = liftGround || delta.y > Math.abs(dt * this.vel.y * 0.25);
@@ -572,7 +607,7 @@ export class RoomMode {
     if (m.kind === 'npc') return names[m.id] || 'Sprechen';
     if (m.kind === 'person') return 'Ansprechen';
     if (m.kind === 'lift') return m.label;
-    if (m.kind === 'ship') return this.game.launchShipRecord() ? `Einsteigen: ${this.game.launchShipRecord().name} · Start` : 'Kein Schiff';
+    if (m.kind === 'ship') { const r = this.game.launchShipRecord(); return r ? `Einsteigen: ${r.name}${r.gunner ? ' · in den Kugelturm' : ' · Start'}` : 'Kein Schiff'; }
     if (m.kind === 'band') return '„Roche-Grenze“ (Hologramm, live aus Kraken-Hafen)';
     return m.label || 'Benutzen';
   }

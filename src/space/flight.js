@@ -40,6 +40,10 @@ export class FlightMode {
     this.radarRange = 5000;
     this.state = 'flying';
     this.paused = false;
+    // gunner missions: someone else flies, the player only works the dorsal turret
+    this.gunner = !!opts.playerRecord?.gunner;
+    this.aim = { yaw: 0, pitch: 0.12 };
+    if (this.gunner) this.stick = null;
   }
 
   on(ev, fn) { (this.listeners[ev] ||= []).push(fn); }
@@ -80,7 +84,7 @@ export class FlightMode {
     this.addShip(this.player);
     this.placePlayer(this.opts.spawn);
 
-    this.hud = new HUD();
+    this.hud = new HUD(this.gunner);
     this.hud.setZone(this.zone.name);
     this.moon = MOONS[moonOfZone(this.zoneId)];
     this.game.renderer.setMood(this.moon?.mood);
@@ -348,6 +352,36 @@ export class FlightMode {
     } else this.lock = null;
   }
 
+  /** Gunner seat: the mouse turns the turret (free yaw, limited pitch), LMB/Space fires both barrels. */
+  controlGunner(dt) {
+    const p = this.player, a = this.aim, S = this.game.settings || {};
+    const sens = 0.0022 * (S.mouseSens || 1);
+    a.yaw -= input.mouse.dx * sens;
+    a.pitch -= input.mouse.dy * sens * (S.invertY ? -1 : 1);
+    a.pitch = THREE.MathUtils.clamp(a.pitch, -0.22, 1.35);
+    a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
+    if (input.button(0) || input.down('Space')) this.fireTurret(p);
+    if (input.hit('KeyT')) this.cycleTarget(true);
+    if (input.hit('KeyY')) this.targetAhead();
+    if (input.hit('KeyH')) this.hud.toggleHelp();
+  }
+
+  fireTurret(p) {
+    if (p.fireCd > 0) return;
+    p.fireCd = 1 / p.stats.laserRate;
+    const cam = this.camera;
+    const dir = cam.getWorldDirection(new THREE.Vector3());
+    const right = _w.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    for (const side of [-1, 1]) {
+      const from = cam.position.clone().addScaledVector(dir, 2.2).addScaledVector(right, side * 0.55).addScaledVector(up, -0.35);
+      const d = dir.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(0.004)).normalize();
+      this.bolts.fire(from, d, BOLT_SPEED, p.vel, p, p.stats.laserDmg, '#ff9a3a');
+    }
+    this.shake = Math.min(0.25, (this.shake || 0) + 0.04);
+    this.game.audio?.laser(1, true);
+  }
+
   cycleTarget(hostileFirst) {
     const p = this.player;
     const list = this.ships.filter(s => s !== p && s.alive && s.pos.distanceTo(p.pos) < 12000)
@@ -359,7 +393,7 @@ export class FlightMode {
   }
 
   targetAhead() {
-    const p = this.player, f = p.forward(new THREE.Vector3());
+    const p = this.player, f = this.gunner ? this.camera.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
     let best = null, ba = 0.5;
     for (const s of this.ships) {
       if (s === p || !s.alive) continue;
@@ -463,7 +497,7 @@ export class FlightMode {
     const e = k * k * (3 - 2 * k);
     this.anchorOverride = [0, 1, 2].map(i => tr.from[i] + (tr.to[i] - tr.from[i]) * e);
     this.warp = 0.6 + Math.sin(k * Math.PI) * 0.6;
-    this.streaks.set({ alpha: Math.min(1, (tr.t - 3.2) * 2), speed: 1 + Math.sin(k * Math.PI) * 8 });
+    this.streaks?.set({ alpha: Math.min(1, (tr.t - 3.2) * 2), speed: 1 + Math.sin(k * Math.PI) * 8 });
     if (k >= 1 && !tr.done) {
       tr.done = true;
       this.game.fadeOut(0.25).then(() => { this.streaks?.dispose(); this.streaks = null; tr.onArrive && tr.onArrive(); });
@@ -516,7 +550,10 @@ export class FlightMode {
     if (this.paused || !this.player) return;
     this.time += dt;
     const p = this.player;
-    if (this.state === 'flying' && p.alive) this.controlPlayer(dt);
+    if (this.state === 'flying' && p.alive) {
+      if (this.gunner) { if (p.ai) updateAI(p, this, dt); this.controlGunner(dt); }
+      else this.controlPlayer(dt);
+    }
     if (this.state === 'docking') this.runAutopilot(dt);
     if (this.state === 'travel') this.updateTravel(dt);
     for (const s of this.ships) if (s.alive && !s.isPlayer) updateAI(s, this, dt);
@@ -537,7 +574,7 @@ export class FlightMode {
     this.dust.update(this.camera, p.vel.clone().multiplyScalar(this.warp ? 1 + this.warp * 40 : 1), 1 + (this.warp || 0) * 3);
     this.hud.update(dt, this);
     // docking prompt
-    if (this.state === 'flying') {
+    if (this.state === 'flying' && !this.gunner) {
       const justLeft = this.opts.spawn === 'undock' && this.time < 12;
       const prompt = this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
       this.hud.prompt(prompt);
@@ -555,6 +592,7 @@ export class FlightMode {
     const targetFov = (this.camMode === 'cockpit' ? 72 : 66) + boostFov + (this.warp || 0) * 25;
     cam.fov += (targetFov - cam.fov) * Math.min(1, dt * 3);
     cam.updateProjectionMatrix();
+    if (this.gunner) return this.updateGunnerCamera(dt, snap);
     const vis = this.camMode !== 'cockpit';
     p.model.root.visible = vis;
     if (this.cockpit) this.cockpit.visible = this.camMode === 'cockpit';
@@ -577,6 +615,24 @@ export class FlightMode {
       cam.rotateX(-0.08);
       if (this.shake > 0) { cam.position.add(new THREE.Vector3().randomDirection().multiplyScalar(this.shake)); this.shake *= Math.exp(-dt * 6); }
     }
+  }
+
+  /** Camera in the turret bubble: follows the hull softly, the aim is relative to the ship. */
+  updateGunnerCamera(dt, snap) {
+    const p = this.player, cam = this.camera;
+    p.model.root.visible = true;
+    if (this.cockpit) this.cockpit.visible = false;
+    this.hud.root.classList.remove('cockpit');
+    const k = snap ? 1 : 1 - Math.exp(-dt * 8);
+    this.camQ.slerp(p.quat, k);
+    const t = p.model.root.getObjectByName('turret');
+    const base = t ? t.getWorldPosition(new THREE.Vector3()) : p.pos.clone().addScaledVector(p.up(new THREE.Vector3()), p.radius * 0.3);
+    cam.position.copy(base).addScaledVector(_v.set(0, 1, 0).applyQuaternion(this.camQ), 0.5);
+    cam.quaternion.copy(this.camQ).multiply(_q.setFromEuler(new THREE.Euler(this.aim.pitch, this.aim.yaw, 0, 'YXZ')));
+    if (this.shake > 0) { cam.position.add(new THREE.Vector3().randomDirection().multiplyScalar(this.shake * 0.08)); this.shake *= Math.exp(-dt * 6); }
+    if (cam.near !== 0.1) { cam.near = 0.1; }
+    cam.fov += ((p.input.boost ? 76 : 70) + (this.warp || 0) * 25 - cam.fov) * Math.min(1, dt * 3);
+    cam.updateProjectionMatrix();
   }
 
   boltHit(a, b, bolt) {
