@@ -8,6 +8,7 @@ import { zoneAnchor } from '../space/universe.js';
 import { ShipModel } from '../space/shipModel.js';
 import { NPC } from './npc.js';
 import { DeckDoor, Lift } from './deck.js';
+import { BARKS, PEOPLE } from '../game/story.js';
 
 /*
  * Hochstation Cassini, Deck 4: one continuous, walkable level. Every room (Blender-baked GLB + lightmap)
@@ -424,12 +425,13 @@ export class RoomMode {
   ui() {
     const root = document.getElementById('ui');
     this.uiEl = document.createElement('div');
-    this.uiEl.innerHTML = `<div class="crosshair"></div><div class="roomlabel"></div><div class="roomprompt hidden"></div><div class="clicktoplay" style="background:none"></div>`;
+    this.uiEl.innerHTML = `<div class="crosshair"></div><div class="roomlabel"></div><div class="roomprompt hidden"></div><div class="clicktoplay" style="background:none"></div><div class="roomsub"></div>`;
     this.uiEl.style.cssText = 'position:fixed;inset:0;pointer-events:none';
     root.appendChild(this.uiEl);
     this.labelEl = this.uiEl.querySelector('.roomlabel');
     this.labelEl.textContent = this.areaName();
     this.promptEl = this.uiEl.querySelector('.roomprompt');
+    this.subEl = this.uiEl.querySelector('.roomsub');
     this.ctp = this.uiEl.querySelector('.clicktoplay');
     this.ctp.style.pointerEvents = 'auto';
     this.ctp.onclick = () => { input.lock(this.game.renderer.gl.domElement); };
@@ -484,7 +486,7 @@ export class RoomMode {
     if (this.screens) for (const s of this.screens) { s.t += dt; if (s.t > 2) { s.t = 0; this.drawScreen(s); } }
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
     this.game.audio?.setListener(this.camera.position, fwd, new THREE.Vector3(0, 1, 0));
-    if (!modal) this.interact();
+    if (!modal) { this.interact(); this.barks(dt); }
   }
 
   /** Crew walking a marker path; stops and looks at the player when close. */
@@ -600,6 +602,34 @@ export class RoomMode {
       else this.game.onInteract(this, m);
     }
     if (input.hit('Tab')) this.game.toOverview();
+  }
+
+  /** People say something when you stop right in front of them and look at them. */
+  barks(dt) {
+    this.barkCd = (this.barkCd || 0) - dt;
+    if (this.subT > 0 && (this.subT -= dt) <= 0) this.subEl.classList.remove('on');
+    if (this.barkCd > 0) return;
+    const eye = this.camera.position, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    for (const n of this.npcs) {
+      const lines = BARKS[n.id];
+      if (!lines || n.holo || n.talking || !n.obj.visible || (n.barkAt && this.time - n.barkAt < 45)) continue;
+      const head = n.obj.position.clone(); head.y += n.marker?.seated ? 1.0 : 1.5;
+      const to = head.clone().sub(eye), d = Math.hypot(to.x, to.z);
+      if (d > 2.4 || to.normalize().dot(fwd) < 0.82) continue;
+      n.barkAt = this.time; this.barkCd = 6;
+      let i = Math.floor(Math.random() * lines.length);
+      if (lines.length > 1 && i === n.lastBark) i = (i + 1) % lines.length;
+      n.lastBark = i;
+      const text = lines[i], A = this.game.audio, name = this.game.state?.callsign;
+      const vl = A?.voiceLength?.(text, name) || 0;
+      if (vl) A.speak(text, { name });
+      const who = PEOPLE[n.id]?.name || '';
+      this.subEl.innerHTML = `<b style="color:${PEOPLE[n.id]?.color || '#9fd6ff'}">${who}</b> ${text}`;
+      this.subEl.classList.add('on');
+      this.subT = Math.max(2.8, vl + 0.8);
+      if (n.npc && !n.walk) { n.npc.setTalking(true); setTimeout(() => { if (!n.talking) n.npc.setTalking(false); }, this.subT * 1000); }
+      return;
+    }
   }
 
   /** NPC switches to its talking clip during a conversation. */

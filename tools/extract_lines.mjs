@@ -114,6 +114,10 @@ for (const file of FILES) {
         for (const e of a[0].elements) if (e.type === 'ArrayExpression') add(speakerOf(e.elements[0], anc), e.elements[1], true);
       }
     },
+    VariableDeclarator(n) {
+      if (n.id?.name !== 'BARKS' || n.init?.type !== 'ObjectExpression') return;
+      for (const prop of n.init.properties) for (const e of prop.value.elements || []) add(prop.key.name || prop.key.value, e, false);
+    },
     ObjectExpression(n, _s, anc) {
       const who = n.properties.find(p => p.key?.name === 'who'), text = n.properties.find(p => p.key?.name === 'text');
       if (who && text) add(speakerOf(who.value, anc), text.value, false);

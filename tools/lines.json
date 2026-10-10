@@ -16,6 +16,211 @@
  },
  {
   "speaker": "mags",
+  "text": "Na, Pilot. Setz dich, wenn du was willst.",
+  "radio": false
+ },
+ {
+  "speaker": "mags",
+  "text": "Steh nicht so rum, du machst mich nervös.",
+  "radio": false
+ },
+ {
+  "speaker": "mags",
+  "text": "Der Whisky hier ist schlecht. Ich trink ihn trotzdem.",
+  "radio": false
+ },
+ {
+  "speaker": "kix",
+  "text": "Willkommen im Cassini-Spalt. Vier Arme, null Mitleid.",
+  "radio": false
+ },
+ {
+  "speaker": "kix",
+  "text": "Noch einen? Ich zähle nicht mit. Doch, tue ich.",
+  "radio": false
+ },
+ {
+  "speaker": "kix",
+  "text": "Bestellungen an der Theke, Beschwerden an die Wand.",
+  "radio": false
+ },
+ {
+  "speaker": "oduya",
+  "text": "Neue Aufträge sind im Netz. Komm, schau sie dir an.",
+  "radio": false
+ },
+ {
+  "speaker": "oduya",
+  "text": "Fracht nach Inktomi wird immer gesucht.",
+  "radio": false
+ },
+ {
+  "speaker": "oduya",
+  "text": "Na, Pilot? Hunger auf Arbeit?",
+  "radio": false
+ },
+ {
+  "speaker": "haendler",
+  "text": "Schiffe, Teile, Fracht. Was darf es sein?",
+  "radio": false
+ },
+ {
+  "speaker": "haendler",
+  "text": "Ehrliche Preise. Mehr oder weniger.",
+  "radio": false
+ },
+ {
+  "speaker": "haendler",
+  "text": "Fass nichts an, was du nicht kaufen willst.",
+  "radio": false
+ },
+ {
+  "speaker": "juno",
+  "text": "Die Zahlen lügen nicht. Menschen schon.",
+  "radio": false
+ },
+ {
+  "speaker": "juno",
+  "text": "Hast du kurz Zeit?",
+  "radio": false
+ },
+ {
+  "speaker": "gast_kesh",
+  "text": "Hm? Ach, du bist es.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_kesh",
+  "text": "Meine Knie sagen, dass Sturm aufzieht. Im Weltraum.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_kesh",
+  "text": "Setz dich, Junge. Oder Mädel. Egal.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_rana",
+  "text": "Saturn-Kurier. Hast du was gesehen da draußen?",
+  "radio": false
+ },
+ {
+  "speaker": "gast_rana",
+  "text": "Jede Geschichte hat ihren Preis.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_rana",
+  "text": "Na, Pilot? Was Neues?",
+  "radio": false
+ },
+ {
+  "speaker": "gast_tomas",
+  "text": "Feierabend. Lass mich in Ruhe trinken.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_tomas",
+  "text": "Hangar sieben ist der beste. Merk dir das.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_tomas",
+  "text": "Was guckst du so?",
+  "radio": false
+ },
+ {
+  "speaker": "gast_ilse",
+  "text": "Kurierpilotin. Immer in Eile.",
+  "radio": false
+ },
+ {
+  "speaker": "gast_ilse",
+  "text": "Schöner Tag für einen Sprung, oder?",
+  "radio": false
+ },
+ {
+  "speaker": "gast_ilse",
+  "text": "Hey, Kollege.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_a",
+  "text": "Verlaufen? Passiert jedem auf Deck vier.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_a",
+  "text": "Bitte nicht im Gang rennen.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_a",
+  "text": "Alles in Ordnung, Pilot?",
+  "radio": false
+ },
+ {
+  "speaker": "crew_b",
+  "text": "Atmen nicht vergessen. Die Luft ist von mir.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_b",
+  "text": "Pause. Zehn Minuten. Dann wieder Filter.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_b",
+  "text": "Hallo.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_c",
+  "text": "Bald geht es zurück nach Enceladus.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_c",
+  "text": "Kalt hier, oder? Bei uns ist es kälter.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_c",
+  "text": "Hallo, Pilot.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_d",
+  "text": "Willkommen in meiner Werkstatt. Was soll ich schrauben?",
+  "radio": false
+ },
+ {
+  "speaker": "crew_d",
+  "text": "Pass auf, der Boden ist ölig.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_d",
+  "text": "Na? Lust auf ein paar Mods?",
+  "radio": false
+ },
+ {
+  "speaker": "crew_e",
+  "text": "Ich bin nicht im Dienst.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_e",
+  "text": "Abend.",
+  "radio": false
+ },
+ {
+  "speaker": "crew_e",
+  "text": "Liga? Heute nicht.",
+  "radio": false
+ },
+ {
+  "speaker": "mags",
   "text": "Du bist von Hallström, oder? Die Firma, die pleitegegangen ist. Setz dich.",
   "radio": false
  },

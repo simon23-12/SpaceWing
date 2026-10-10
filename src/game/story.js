@@ -64,6 +64,24 @@ function tree(who, intro, topics, bye = 'Bis dann.') {
 
 const jumpHint = 'Für einen anderen Mond brauchst du ein Sprungtriebwerk. Klasse I reicht für Enceladus und Mimas, Titan braucht II, Iapetus III. Lenka baut dir eins ein.';
 
+/** Short lines people say when you stop right in front of them (voiced, no dialogue box). */
+export const BARKS = {
+  mags: ['Na, Pilot. Setz dich, wenn du was willst.', 'Steh nicht so rum, du machst mich nervös.', 'Der Whisky hier ist schlecht. Ich trink ihn trotzdem.'],
+  kix: ['Willkommen im Cassini-Spalt. Vier Arme, null Mitleid.', 'Noch einen? Ich zähle nicht mit. Doch, tue ich.', 'Bestellungen an der Theke, Beschwerden an die Wand.'],
+  oduya: ['Neue Aufträge sind im Netz. Komm, schau sie dir an.', 'Fracht nach Inktomi wird immer gesucht.', 'Na, Pilot? Hunger auf Arbeit?'],
+  haendler: ['Schiffe, Teile, Fracht. Was darf es sein?', 'Ehrliche Preise. Mehr oder weniger.', 'Fass nichts an, was du nicht kaufen willst.'],
+  juno: ['Die Zahlen lügen nicht. Menschen schon.', 'Hast du kurz Zeit?'],
+  gast_kesh: ['Hm? Ach, du bist es.', 'Meine Knie sagen, dass Sturm aufzieht. Im Weltraum.', 'Setz dich, Junge. Oder Mädel. Egal.'],
+  gast_rana: ['Saturn-Kurier. Hast du was gesehen da draußen?', 'Jede Geschichte hat ihren Preis.', 'Na, Pilot? Was Neues?'],
+  gast_tomas: ['Feierabend. Lass mich in Ruhe trinken.', 'Hangar sieben ist der beste. Merk dir das.', 'Was guckst du so?'],
+  gast_ilse: ['Kurierpilotin. Immer in Eile.', 'Schöner Tag für einen Sprung, oder?', 'Hey, Kollege.'],
+  crew_a: ['Verlaufen? Passiert jedem auf Deck vier.', 'Bitte nicht im Gang rennen.', 'Alles in Ordnung, Pilot?'],
+  crew_b: ['Atmen nicht vergessen. Die Luft ist von mir.', 'Pause. Zehn Minuten. Dann wieder Filter.', 'Hallo.'],
+  crew_c: ['Bald geht es zurück nach Enceladus.', 'Kalt hier, oder? Bei uns ist es kälter.', 'Hallo, Pilot.'],
+  crew_d: ['Willkommen in meiner Werkstatt. Was soll ich schrauben?', 'Pass auf, der Boden ist ölig.', 'Na? Lust auf ein paar Mods?'],
+  crew_e: ['Ich bin nicht im Dienst.', 'Abend.', 'Liga? Heute nicht.'],
+};
+
 export function npcDialogue(game, npc) {
   const g = game.state;
   const name = g.callsign;

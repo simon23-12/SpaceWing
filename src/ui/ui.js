@@ -6,6 +6,7 @@ import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
 import { Streaks } from './streaks.js';
+import { ShipPreview } from './shipPreview.js';
 
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -303,7 +304,7 @@ export class UI {
   // ------------------------------------------------------------------ shipyard
   /** Yara's workshop in Hangar 7: upgrades ("mods"), repairs and paint. */
   openWerkstatt() {
-    return this.panel('Werkstatt', 'Hangar 7 · Yara Benedek · Mods, Reparatur, Lackierung', (body, rebuild) => this.shipUpgrades(body, rebuild));
+    return this.panel('Werkstatt', 'Hangar 7 · Yara Benedek · Mods, Reparatur, Lackierung', (body, rebuild) => this.shipUpgrades(body, rebuild), { wide: true, onClose: () => this.disposePreview() });
   }
 
   openWerft(initialTab) {
@@ -312,13 +313,36 @@ export class UI {
     const home = station === 'cassini';
     let tab = initialTab || (home ? 'kauf' : 'werft');
     return this.panel(home ? 'Werft & Markt' : 'Werft & Markt', `${STATIONS[station].name}${home ? ' · Lenka Brandvold' : ''}`, (body, rebuild, close, w) => {
+      if (tab !== 'werft') this.disposePreview();
       const old = w.querySelector('.tabs'); if (old) old.remove();
       this.tabs(body, [...(home ? [] : [['werft', 'Mein Schiff']]), ['kauf', 'Schiffe kaufen'], ['hangar', 'Hangar'], ['markt', 'Markt']], tab, (k) => { tab = k; rebuild(); });
       if (tab === 'markt') return this.marketBody(body, rebuild, station);
       if (tab === 'kauf') return this.shipShop(body, rebuild);
       if (tab === 'hangar') return this.hangarList(body, rebuild);
       this.shipUpgrades(body, rebuild);
-    });
+    }, { wide: true, onClose: () => this.disposePreview() });
+  }
+
+  disposePreview() { this.pv?.dispose(); this.pv = null; this.pvWrap = null; }
+
+  /** Before/after numbers for a mod, shown next to the 3D preview. */
+  modDiff(ship, k) {
+    const lv = ship.upgrades[k] || 0;
+    if (lv >= maxLevel(k)) return `<b>${UPGRADES[k].name}</b><div class="good">Voll ausgebaut</div>`;
+    const a = shipStats(ship), b = shipStats({ ...ship, upgrades: { ...ship.upgrades, [k]: lv + 1 } });
+    const rows = {
+      engine: [['Tempo', 'speed', ' m/s'], ['Nachbrenner', 'boost', ' m/s'], ['Wendigkeit', 'turn', '', 2]],
+      shield: [['Schild', 'shield', '']], armor: [['Rumpf', 'hull', '']],
+      lasers: [['Laser-DPS', (s) => s.laserDmg * s.laserRate, '']], missiles: [['Raketen', 'missiles', ''], ['Erfassung', 'lockTime', ' s', 2]],
+      cargo: [['Fracht', 'cargo', ' t']], reactor: [['Energie/s', 'regen', '', 1]], salvage: [['Bergungsnetz', 'salvage', ' t']],
+      jump: [['Sprungklasse', (s) => JUMP_CLASS[s.jump], '']],
+    }[k] || [];
+    const val = (s, f) => typeof f === 'function' ? f(s) : s[f];
+    const show = (v, dig) => typeof v === 'number' ? (dig ? v.toFixed(dig) : Math.round(v)) : v;
+    const p = upgradePrice(ship.cls, k, lv);
+    return `<b>${UPGRADES[k].name} · Stufe ${lv + 1}</b><div class="dim" style="font-size:12px;margin:2px 0 6px">${UPGRADES[k].desc}</div>` +
+      rows.map(([l, f, u, dig]) => `<div class="svrow"><span>${l}</span><span>${show(val(a, f), dig)}${u}</span><span class="arrow">→</span><span class="good">${show(val(b, f), dig)}${u}</span></div>`).join('') +
+      `<div style="margin-top:6px" class="${this.g.credits >= p ? 'warm' : 'bad'}">${fmt(p)} Cr${this.g.credits >= p ? '' : ' · es fehlen ' + fmt(p - this.g.credits) + ' Cr'}</div>`;
   }
 
   shipUpgrades(body, rebuild) {
@@ -327,7 +351,7 @@ export class UI {
     const cls = SHIP_CLASSES[ship.cls], st = shipStats(ship);
     const repairCost = Math.round((1 - ship.hull) * st.hull * 6);
     let html = `<div class="split"><div>
-      <img src="${assets.url(`assets/ships/${ship.cls}/preview.jpg`)}" style="width:100%;border:1px solid var(--line)">
+      <div class="svslot"></div>
       <h4 style="font-family:var(--f-head);font-size:22px;letter-spacing:.1em;margin:10px 0 2px">${esc(ship.name)}</h4>
       <div class="dim">${esc(cls.maker)} · ${esc(cls.role)}</div><p style="line-height:1.5">${esc(cls.desc || '')}</p>
       <div class="statgrid">
@@ -344,7 +368,7 @@ export class UI {
     for (const [k, u] of Object.entries(UPGRADES)) {
       const lv = ship.upgrades[k] || 0;
       const p = lv < maxLevel(k) ? upgradePrice(ship.cls, k, lv) : null;
-      html += `<tr${k === 'jump' ? ' style="background:rgba(255,207,122,.06)"' : ''}><td><b>${u.name}</b>${k === 'jump' ? ` <span class="warm">Klasse ${JUMP_CLASS[lv]}</span>` : ''}<div class="dim" style="font-size:12px">${u.desc}</div></td>
+      html += `<tr data-pv="${k}" class="pvrow${this.pvKey === k ? ' sel' : ''}"${k === 'jump' ? ' style="background:rgba(255,207,122,.06)"' : ''}><td><b>${u.name}</b>${k === 'jump' ? ` <span class="warm">Klasse ${JUMP_CLASS[lv]}</span>` : ''}<div class="dim" style="font-size:12px">${u.desc}</div></td>
         <td><div class="pips">${Array.from({ length: maxLevel(k) }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></td>
         <td class="num">${p != null ? `<button class="btn small" data-up="${k}" ${g.credits < p ? 'disabled' : ''}>${fmt(p)} Cr</button>` : '<span class="good">MAX</span>'}</td></tr>`;
     }
@@ -352,6 +376,24 @@ export class UI {
     for (const p of PAINTS) html += `<div data-paint="${p.id || ''}" title="${p.name}" class="${(ship.paint || null) === p.hex ? 'on' : ''}" style="background:${p.hex || 'linear-gradient(135deg,#a8602f,#8b8f8c)'}"></div>`;
     html += `</div><div style="margin-top:14px"><label class="dim">Name: </label><input data-name value="${esc(ship.name)}" maxlength="22" style="background:#000;border:1px solid var(--line);color:#fff;padding:6px;font-family:var(--f-head);font-size:16px"></div></div></div>`;
     body.innerHTML = html;
+    // live 3D preview: kept across rebuilds (one WebGL context per open panel)
+    if (!this.pvWrap || this.pvShip !== ship.uid) {
+      this.disposePreview();
+      this.pvWrap = document.createElement('div'); this.pvWrap.className = 'shipview';
+      this.pvWrap.innerHTML = '<canvas></canvas><div class="svinfo dim">Mod anklicken für eine Vorschau</div>';
+      this.pv = new ShipPreview(this.pvWrap.querySelector('canvas'), ship); this.pvShip = ship.uid; this.pvKey = null;
+    }
+    body.querySelector('.svslot').replaceWith(this.pvWrap);
+    requestAnimationFrame(() => this.pv?.resize());
+    const info = this.pvWrap.querySelector('.svinfo');
+    if (this.pvKey) info.innerHTML = this.modDiff(ship, this.pvKey);
+    body.querySelectorAll('[data-pv]').forEach(tr => tr.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const k = tr.dataset.pv; this.pvKey = k;
+      body.querySelectorAll('.pvrow').forEach(r => r.classList.toggle('sel', r === tr));
+      info.classList.remove('dim'); info.innerHTML = this.modDiff(ship, k);
+      this.pv.showUpgrade(k, (ship.upgrades[k] || 0) + 1); this.sfx('blip');
+    }));
     body.querySelector('[data-repair]')?.addEventListener('click', () => {
       if (g.credits < repairCost) { this.sfx('error'); this.notify('Nicht genug Kredits'); return; }
       g.credits -= repairCost; ship.hull = 1; this.sfx('coins'); rebuild();
@@ -359,7 +401,13 @@ export class UI {
     body.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
       const k = b.dataset.up, lv = ship.upgrades[k] || 0, p = upgradePrice(ship.cls, k, lv);
       if (g.credits < p) { this.sfx('error'); return; }
-      g.credits -= p; ship.upgrades[k] = lv + 1; logEntry(g, `${UPGRADES[k].name} Stufe ${lv + 1} eingebaut`); this.sfx('coins'); this.game.save(); rebuild();
+      g.credits -= p; ship.upgrades[k] = lv + 1; logEntry(g, `${UPGRADES[k].name} Stufe ${lv + 1} eingebaut`); this.sfx('coins'); this.game.save();
+      this.pvKey = k; this.pv?.showUpgrade(k, lv + 1); rebuild();
+    });
+    body.querySelectorAll('[data-paint]').forEach(d => {
+      const p = PAINTS.find(x => (x.id || '') === d.dataset.paint);
+      d.addEventListener('mouseenter', () => this.pv?.setPaint(p.hex));
+      d.addEventListener('mouseleave', () => this.pv?.setPaint(ship.paint || null));
     });
     body.querySelectorAll('[data-paint]').forEach(d => d.onclick = () => {
       const p = PAINTS.find(x => (x.id || '') === d.dataset.paint);
