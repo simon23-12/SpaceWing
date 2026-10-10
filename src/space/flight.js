@@ -13,7 +13,7 @@ import { FACTIONS, MOONS, moonOfZone } from '../game/data.js';
 import { cargoFree } from '../game/state.js';
 import { Streaks } from '../ui/streaks.js';
 
-const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _ec = new THREE.Color();
 const BOLT_SPEED = 900;
 
 export class FlightMode {
@@ -276,7 +276,7 @@ export class FlightMode {
     const lp = this.leadFor(ship, tgt);
     const dir = lp.sub(from).normalize().add(new THREE.Vector3().randomDirection().multiplyScalar(0.03 * (1.2 - skill))).normalize();
     this.bolts.fire(from, dir, BOLT_SPEED, ship.vel, ship, ship.stats.laserDmg * 0.8, ship.isPlayer ? '#ff9a3a' : '#5ab0ff', 2.0, 10, 0.45);
-    this.game.audio?.laser(Math.max(0.1, 1 - ship.pos.distanceTo(this.camera.position) / 1500) * 0.6, false);
+    this.game.audio?.laser(Math.max(0.1, 1 - ship.pos.distanceTo(this.camera.position) / 1500) * 0.6, false, 'turret');
   }
 
   fireMissile(ship, target) {
@@ -381,7 +381,7 @@ export class FlightMode {
       this.bolts.fire(from, d, BOLT_SPEED, p.vel, p, p.stats.laserDmg, '#ff9a3a');
     }
     this.shake = Math.min(0.25, (this.shake || 0) + 0.04);
-    this.game.audio?.laser(1, true);
+    this.game.audio?.laser(0.9, true, 'turret');
   }
 
   cycleTarget(hostileFirst) {
@@ -560,6 +560,7 @@ export class FlightMode {
     if (this.state === 'travel') this.updateTravel(dt);
     for (const s of this.ships) if (s.alive && !s.isPlayer) updateAI(s, this, dt);
     for (const s of this.ships) if (s.alive) s.integrate(dt);
+    this.exhaustEmbers(dt);
     this.collisions(dt);
     this.bolts.update(dt, this.camera, (a, b, bolt) => this.boltHit(a, b, bolt));
     this.updateMissiles(dt);
@@ -683,6 +684,30 @@ export class FlightMode {
     if (killer && killer.isPlayer) this.game.state.kills++;
     this.emit('destroyed', s, killer);
     if (this.player.target === s) this.player.target = null;
+  }
+
+  /** Hot plasma flecks shed by engines at high thrust and on afterburner (only for ships near the camera). */
+  exhaustEmbers(dt) {
+    this.emberT = (this.emberT || 0) + dt;
+    if (this.emberT < 0.033) return;
+    const step = this.emberT; this.emberT = 0;
+    for (const s of this.ships) {
+      if (!s.alive || !s.model.exhausts.length || (!s.input.boost && s.throttle < 0.7)) continue;
+      if (s.pos.distanceToSquared(this.camera.position) > 900 * 900) continue;
+      const boost = s.input.boost && s.energy > 5;
+      s._emberCol ||= new THREE.Color(s.stats.engine || '#7fb6ff');
+      const col = _ec.copy(s._emberCol).multiplyScalar(boost ? 2.6 : 1.5);
+      const back = s.forward(_w).multiplyScalar(-1);
+      const n = Math.ceil((boost ? 4 : 2) * step / 0.033);
+      for (const ex of s.model.exhausts) {
+        const wp = ex.getWorldPosition(_v);
+        for (let k = 0; k < n; k++) {
+          const vel = s.vel.clone().multiplyScalar(0.85).addScaledVector(back, 14 + Math.random() * 22).add(new THREE.Vector3().randomDirection().multiplyScalar(2.5));
+          const sz = Math.max(0.08, s.radius * 0.016) * (boost ? 1.5 : 1) * (0.6 + Math.random() * 0.8);
+          this.trails.emit(wp.clone().addScaledVector(back, Math.random() * 3), vel, col, sz, 0.15 + Math.random() * (boost ? 0.35 : 0.2), sz * 1.5);
+        }
+      }
+    }
   }
 
   // ------------------------------------------------------------------ salvage: wreck pieces you can scoop up and sell

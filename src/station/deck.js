@@ -16,8 +16,8 @@ function hazardTexture() {
 let HAZ = null;
 
 export class DeckDoor {
-  constructor(d, scene) {
-    this.id = d.id; this.kind = d.kind; this.level = d.level;
+  constructor(d, scene, audio) {
+    this.id = d.id; this.kind = d.kind; this.level = d.level; this.audio = audio; this.wanted = false;
     this.pos = new THREE.Vector3(...d.pos);
     this.normal = new THREE.Vector3(...d.normal).normalize();
     this.tan = new THREE.Vector3().crossVectors(UP, this.normal).normalize();
@@ -67,6 +67,7 @@ export class DeckDoor {
     }
     if (this.kind === 'lift' && lift && !lift.at(this.level)) want = false;
     const target = want ? 1 : 0;
+    if (want !== this.wanted) { this.wanted = want; this.audio?.door?.(want, this.pos, this.kind === 'heavy'); }
     const sp = this.kind === 'heavy' ? 1.4 : 2.6;
     this.open += Math.sign(target - this.open) * Math.min(Math.abs(target - this.open), sp * dt);
     this.layout();

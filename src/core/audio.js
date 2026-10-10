@@ -18,6 +18,10 @@ const MOON_PROGS = {
 };
 const NOTE = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
+// Recorded soundtrack (all CC0, OpenGameArt; see README). The procedural score fills the rest (station lounge, bar jazz).
+const TRACK_VOL = { menu: 0.55, dome: 0.5, battle1: 0.5, battle2: 0.5 };
+const trackFor = (mode, moon) => mode === 'menu' ? 'menu' : mode === 'dome' ? 'dome' : mode === 'space' ? `space_${moon || 'rhea'}` : null;
+
 export class Audio {
   constructor() {
     this.ctx = null;
@@ -50,6 +54,7 @@ export class Audio {
     this.voiceOut = C.createGain(); this.voiceOut.gain.value = 1.15; this.voiceOut.connect(this.master);
     this.voiceAn = C.createAnalyser(); this.voiceAn.fftSize = 512; this.voiceOut.connect(this.voiceAn); this.voiceBuf = new Float32Array(512);
     this.loadVoices();
+    this.loadSfx();
   }
 
   // ---------------------------------------------------------------- voice-over
@@ -116,7 +121,7 @@ export class Audio {
       hg.gain.setValueAtTime(0, t - 0.1); hg.gain.linearRampToValueAtTime(0.035, t - 0.02); hg.gain.setValueAtTime(0.035, end);
       hg.gain.linearRampToValueAtTime(0.16, end + 0.02); hg.gain.exponentialRampToValueAtTime(0.0005, end + 0.2);
       hiss.start(t - 0.1); hiss.stop(end + 0.25);
-      this.click(t - 0.1);
+      this.radioClick(t - 0.1);
       v.hiss = hiss;
     } else src.connect(this.voiceOut);
     src.start(t);
@@ -124,7 +129,7 @@ export class Audio {
     src.onended = () => { if (this.voice === v) this.voice = null; };
     return buf.duration;
   }
-  click(t) {
+  radioClick(t) {
     const C = this.ctx, o = C.createOscillator(); o.type = 'square'; o.frequency.value = 1900;
     const g = C.createGain(); this.env(g, t, 0.002, 0.05, 0.03);
     o.connect(g).connect(this.voiceOut); o.start(t); o.stop(t + 0.05);
@@ -149,9 +154,49 @@ export class Audio {
     g.gain.exponentialRampToValueAtTime(Math.max(sustain, 0.0001), t + a + d);
   }
 
+  // ---------------------------------------------------------------- sampled SFX (Kenney Sci-Fi Sounds, CC0)
+  async loadSfx() {
+    this.sfxBuf = {};
+    const names = [...[0, 1, 2, 3, 4].flatMap(i => [`laser_p${i}`, `laser_ai${i}`, `boom${i}`, `hull${i}`, `shield${i}`]), 'turret0', 'turret1', 'turret2',
+      'bigboom0', 'bigboom1', 'engine_loop', 'boost_loop', 'burn', 'door_open', 'door_close'];
+    await Promise.all(names.map(async n => {
+      try { this.sfxBuf[n] = await this.ctx.decodeAudioData(await (await fetch(assets.url(`assets/audio/sfx/${n}.mp3`))).arrayBuffer()); } catch { }
+    }));
+    this.startEngineLoops();
+  }
+  /** Play a sample; name may be a prefix with variants (laser_p0..4). Returns false if not loaded. */
+  play(name, vol = 1, rate = 1, dest = null, variants = 0) {
+    if (!this.ctx || !this.sfxBuf) return false;
+    const buf = this.sfxBuf[variants ? name + Math.floor(Math.random() * variants) : name];
+    if (!buf) return false;
+    const C = this.ctx, src = C.createBufferSource(); src.buffer = buf;
+    src.playbackRate.value = rate * (0.94 + Math.random() * 0.12);
+    const g = C.createGain(); g.gain.value = vol;
+    src.connect(g).connect(dest || this.sfx);
+    src.start();
+    return true;
+  }
+  startEngineLoops() {
+    const C = this.ctx;
+    const loop = (n) => {
+      const b = this.sfxBuf[n]; if (!b) return null;
+      const src = C.createBufferSource(); src.buffer = b; src.loop = true; src.loopStart = 0.05; src.loopEnd = b.duration - 0.05;
+      const g = C.createGain(); g.gain.value = 0; src.connect(g).connect(this.sfx); src.start();
+      return { src, g };
+    };
+    this.engLoop = loop('engine_loop'); this.boostLoop = loop('boost_loop');
+  }
+  door(open, pos, heavy) {
+    if (!this.ctx || !this.lastListener) return;
+    const d = Math.hypot(pos.x - this.lastListener.x, pos.y - this.lastListener.y, pos.z - this.lastListener.z);
+    if (d > 14) return;
+    this.play(open ? 'door_open' : 'door_close', Math.max(0, 1 - d / 14) * (heavy ? 0.9 : 0.6), heavy ? 0.7 : 1.0);
+  }
+
   // ---------------------------------------------------------------- SFX
-  laser(vol = 1, player = false) {
+  laser(vol = 1, player = false, kind = null) {
     if (!this.ctx || vol <= 0.02) return;
+    if (kind === 'turret' ? this.play('turret', vol * 0.55, 1, null, 3) : this.play(player ? 'laser_p' : 'laser_ai', vol * (player ? 0.5 : 0.4), player ? 1 : 0.9, null, 5)) return;
     const C = this.ctx, t = C.currentTime;
     const o = C.createOscillator(); o.type = player ? 'sawtooth' : 'square';
     const f0 = player ? 1500 : 1100 + Math.random() * 300;
@@ -163,6 +208,7 @@ export class Audio {
   }
   hit(shield) {
     if (!this.ctx) return;
+    if (this.play(shield ? 'shield' : 'hull', shield ? 0.7 : 0.9, 1, null, 5)) return;
     const C = this.ctx, t = C.currentTime;
     const n = this.noiseSource(); const f = C.createBiquadFilter(); f.type = shield ? 'highpass' : 'lowpass'; f.frequency.value = shield ? 2200 : 700;
     const g = C.createGain(); this.env(g, t, 0.003, shield ? 0.25 : 0.5, shield ? 0.25 : 0.35);
@@ -178,6 +224,11 @@ export class Audio {
   }
   explosion(vol = 1, size = 10) {
     if (!this.ctx) return;
+    if (this.sfxBuf?.boom0) {
+      this.play('boom', vol * 0.9, size > 14 ? 0.75 : 1.0, null, 5);
+      if (size > 10) this.play('bigboom', vol * Math.min(1, size / 25), 1, null, 2);
+      return;
+    }
     const C = this.ctx, t = C.currentTime;
     const n = this.noiseSource(); const f = C.createBiquadFilter(); f.type = 'lowpass';
     f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(90, t + 1.6);
@@ -208,6 +259,7 @@ export class Audio {
   }
   burn() {
     if (!this.ctx) return;
+    this.play('burn', 0.8, 0.85);
     const C = this.ctx, t = C.currentTime;
     const n = this.noiseSource(); const f = C.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(200, t); f.frequency.linearRampToValueAtTime(1200, t + 3); f.frequency.linearRampToValueAtTime(150, t + 7);
     const g = C.createGain(); g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.7, t + 2); g.gain.linearRampToValueAtTime(0.001, t + 7.5);
@@ -217,16 +269,59 @@ export class Audio {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     const target = this.engineOn ? 0.05 + throttle * 0.12 + (boost ? 0.12 : 0) : 0;
-    this.engG.gain.setTargetAtTime(target, t, 0.15);
+    this.engG.gain.setTargetAtTime(target * (this.engLoop ? 0.45 : 1), t, 0.15);
+    if (this.engLoop) {
+      this.engLoop.g.gain.setTargetAtTime(this.engineOn ? 0.18 + throttle * 0.35 : 0, t, 0.2);
+      this.engLoop.src.playbackRate.setTargetAtTime(0.7 + throttle * 0.55 + (boost ? 0.15 : 0), t, 0.3);
+      this.boostLoop?.g.gain.setTargetAtTime(this.engineOn && boost ? 0.55 : 0, t, 0.12);
+    }
     this.eng.frequency.setTargetAtTime(38 + throttle * 30 + (boost ? 25 : 0), t, 0.2);
     this.engNF.frequency.setTargetAtTime(250 + throttle * 500 + (boost ? 900 : 0), t, 0.2);
   }
-  setEngine(on) { this.engineOn = on; if (!on && this.ctx) this.engG.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1); }
+  setEngine(on) {
+    this.engineOn = on;
+    if (!on && this.ctx) { const t = this.ctx.currentTime; this.engG.gain.setTargetAtTime(0, t, 0.1); this.engLoop?.g.gain.setTargetAtTime(0, t, 0.1); this.boostLoop?.g.gain.setTargetAtTime(0, t, 0.1); }
+  }
 
   // ---------------------------------------------------------------- music
+  // ---------------------------------------------------------------- recorded tracks (streamed <audio>, faded through the music bus)
+  track(name) {
+    this.tracks ||= {};
+    if (!this.tracks[name]) {
+      const el = new window.Audio(assets.url(`assets/audio/music/${name}.mp3`));
+      el.loop = true; el.preload = 'auto';
+      const src = this.ctx.createMediaElementSource(el);
+      const g = this.ctx.createGain(); g.gain.value = 0;
+      src.connect(g).connect(this.music);
+      this.tracks[name] = { el, g, name };
+    }
+    return this.tracks[name];
+  }
+  /** Crossfade to a track (null = silence). */
+  playTrack(name, fade = 2.5) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (this.curTrack?.name === name) return;
+    const old = this.curTrack;
+    if (old) {
+      old.g.gain.cancelScheduledValues(t); old.g.gain.setValueAtTime(old.g.gain.value, t); old.g.gain.linearRampToValueAtTime(0, t + fade);
+      clearTimeout(old.stopT); old.stopT = setTimeout(() => { if (this.curTrack !== old) old.el.pause(); }, fade * 1000 + 100);
+    }
+    this.curTrack = null;
+    if (!name) return;
+    const tr = this.track(name);
+    clearTimeout(tr.stopT);
+    if (tr.el.paused) { if (!/battle/.test(name)) tr.el.currentTime = 0; tr.el.play().catch(() => { }); }
+    tr.g.gain.cancelScheduledValues(t); tr.g.gain.setValueAtTime(tr.g.gain.value, t);
+    tr.g.gain.linearRampToValueAtTime(TRACK_VOL[name] ?? 0.6, t + fade);
+    this.curTrack = tr;
+  }
+
   setMusic(mode, opts = {}) {
     if (!this.ctx || this.musicMode === mode) return;
     this.musicMode = mode;
+    this.battle = false;
+    this.playTrack(trackFor(mode, this.moon), 1.6);
     this.music.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
     setTimeout(() => {
       if (this.musicMode !== mode) return;
@@ -241,7 +336,21 @@ export class Audio {
     if (this.band) { this.band.out.disconnect(); this.band = null; }
     if (this.hum) { this.hum.forEach(n => { try { n.stop(); } catch { } }); this.humG && this.humG.disconnect(); this.hum = null; }
   }
-  setCombat(v) { if (this.seq) this.seq.combat = v; }
+  /** Combat intensity 0..1: in flight the score switches to a battle track and back after a quiet spell. */
+  setCombat(v) {
+    if (this.seq) this.seq.combat = v;
+    if (!this.ctx || this.musicMode !== 'space') return;
+    const now = this.ctx.currentTime;
+    if (v > 0.3) this.lastCombat = now;
+    if (!this.battle && v > 0.3) {
+      this.battle = true;
+      this.battleN = ((this.battleN || 0) % 2) + 1;
+      this.playTrack('battle' + this.battleN, 1.2);
+    } else if (this.battle && now - (this.lastCombat || 0) > 8) {
+      this.battle = false;
+      this.playTrack(trackFor('space', this.moon), 4);
+    }
+  }
 
   setupHum() {
     const C = this.ctx;
@@ -266,6 +375,7 @@ export class Audio {
 
   setListener(pos, fwd, up) {
     if (!this.ctx) return;
+    this.lastListener = pos.clone ? pos.clone() : pos;
     const L = this.ctx.listener, t = this.ctx.currentTime;
     if (L.positionX) {
       L.positionX.setTargetAtTime(pos.x, t, 0.05); L.positionY.setTargetAtTime(pos.y, t, 0.05); L.positionZ.setTargetAtTime(pos.z, t, 0.05);
@@ -282,15 +392,19 @@ export class Audio {
     const spb = 60 / bpm;
     while (s.next < C.currentTime + 0.25) {
       if (s.mode === 'jazz') this.jazzBeat(s, s.next, spb);
-      else if (s.mode === 'space' || s.mode === 'menu') this.ambientBeat(s, s.next, spb);
+      else if ((s.mode === 'space' || s.mode === 'menu') && !this.curTrack) this.ambientBeat(s, s.next, spb);
       else if (s.mode === 'station') this.stationBeat(s, s.next, spb);
       s.next += spb; s.beat++;
       if (s.beat % 4 === 0) s.bar++;
     }
   }
 
-  /** Each moon has its own harmonic colour for the flight score. */
-  setMoon(id) { this.moon = id; }
+  /** Each moon has its own harmonic colour and its own recorded track for the flight score. */
+  setMoon(id) {
+    const changed = this.moon !== id;
+    this.moon = id;
+    if (changed && this.musicMode === 'space' && !this.battle) this.playTrack(trackFor('space', id), 2.5);
+  }
 
   // ambient: slow evolving pads + sparse bells, pulse when in combat. Harmony depends on the moon.
   ambientBeat(s, t, spb) {

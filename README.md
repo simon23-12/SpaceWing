@@ -27,7 +27,8 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 - **Vertonung:** Funksprüche und Dialoge sind mit lokaler Sprachsynthese (Piper) vertont; im All laufen sie durch einen Funkfilter mit Rauschen und Squelch.
 - **Wirtschaft:** zehn Handelswaren, deren Preise auf Story-Ereignisse reagieren (Saturnzoll, Embargo, Krieg), generierte Aufträge, sieben Upgrade-Bereiche pro Schiff, Lackierungen, Schiffskauf und -verkauf.
 - **Story:** acht Storymissionen mit drei Enden, siehe [docs/STORY.md](docs/STORY.md).
-- **Audio prozedural:** Laser, Explosionen, Triebwerk, Ambient-Score und ein improvisierendes Jazztrio (räumlich, mit Lichtverzögerung aus Kraken-Hafen).
+- **Soundtrack:** eigene Stücke pro Mond, Kampfmusik blendet bei Gefechten ein und wieder aus; dazu prozedurale Lounge-Musik auf der Station und ein improvisierendes Jazztrio in der Bar.
+- **Sound:** gesampelte Laser, Explosionen, Treffer, Triebwerk und Türen (CC0), das Jazztrio in der Bar ist prozedural und räumlich, mit Lichtverzögerung aus Kraken-Hafen.
 
 ## Technik
 
@@ -71,7 +72,14 @@ Alles ist kostenlos und frei lizenziert. Es gibt keine bezahlten Assets, Abos od
 | Animationen (Idle, Sitzen, Reden, Gehen, Trinken, …) | [Quaternius Universal Animation Library 1 + 2, Standard](https://opengameart.org/content/universal-animation-library-2) | CC0 1.0 |
 | Stimmen der Vertonung | [Piper](https://github.com/OHF-Voice/piper1-gpl) (lokal, Werkzeug GPL 3) mit den Stimmen [de_DE-thorsten, thorsten_emotional, kerstin](https://huggingface.co/rhasspy/piper-voices/tree/main/de/de_DE) | Stimmen CC0 1.0 |
 | Weitere Stimmen der Vertonung | Piper-Stimme de_DE-mls, trainiert auf [Multilingual LibriSpeech](http://openslr.org/94/) (Pratap et al. 2020) | CC BY 4.0 |
-| Alles andere (Schiffe, Stationen, Räume, Planeten, Himmel, Renderings, Musik, Effekte) | eigene Blender-Skripte in `blender/`, prozedurales WebAudio | Projekt |
+| Soundeffekte (Laser, Explosionen, Treffer, Schilde, Triebwerk, Nachbrenner, Türen) | [Kenney: Sci-Fi Sounds](https://opengameart.org/content/sci-fi-sounds) | CC0 1.0 |
+| Musik: Hauptmenü | „Starfield Romance“ von Yoiyami ([OpenGameArt](https://opengameart.org/node/182246)) | CC0 1.0 |
+| Musik: Flug Rhea | „Outer Space Loop“ von wipics ([OpenGameArt](https://opengameart.org/content/outer-space-loop)) | CC0 1.0 |
+| Musik: Flug Enceladus, Mimas, Iapetus | „Airy“, „Sector“, „Pulse“ aus dem Dark Sci-Fi Audio Pack von SRG774 ([OpenGameArt](https://opengameart.org/content/dark-sci-fi-audio-pack)) | CC0 1.0 |
+| Musik: Flug Titan | „Observing the Star“ von yd ([OpenGameArt](https://opengameart.org/node/15560)) | CC0 1.0 |
+| Musik: Kämpfe | „Space Battle“ von MintoDog ([OpenGameArt](https://opengameart.org/node/172812)), „Space Synth Wave“ von Alex McCulloch ([OpenGameArt](https://opengameart.org/content/space-synth-wave)) | CC0 1.0 |
+| Musik: Aussichtskuppel | „Space Echo“ von Centurion_of_war ([OpenGameArt](https://opengameart.org/node/158292)) | CC0 1.0 |
+| Alles andere (Schiffe, Stationen, Räume, Planeten, Himmel, Renderings, Stationsmusik, Bar-Jazz) | eigene Blender-Skripte in `blender/`, prozedurales WebAudio | Projekt |
 
 Die heruntergeladenen Pakete liegen außerhalb des Repos (`../SpaceWing_vendor`). Die Vertonung erzeugt `tools/voices.py` (Zeilen aus `tools/extract_lines.mjs`) nach `public/assets/voice/`. `blender/humans.py` baut aus den MakeHuman-Paketen die GLB-Dateien in `public/assets/npcs/` und retargetet die Animationen auf das MakeHuman-Rig.
 

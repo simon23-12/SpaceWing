@@ -147,7 +147,7 @@ export class RoomMode {
       this.spaceQK = new THREE.Quaternion();
     }
     // doors and lift
-    for (const d of deckMeta.doors || []) this.doors.push(new DeckDoor(d, this.scene));
+    for (const d of deckMeta.doors || []) this.doors.push(new DeckDoor(d, this.scene, this.game.audio));
     if (deckMeta.lift) this.lift = new Lift(deckMeta.lift, this.scene, this.doors.filter(d => d.kind === 'lift'), this.game.audio);
     // spawn
     const sp = this.findSpawn(this.startRoom, this.spawnKey);
@@ -202,7 +202,8 @@ export class RoomMode {
     if (this.envs) this.scene.environment = this.envs[id] || this.envs.bruecke;
     if (this.labelEl) this.labelEl.textContent = this.areaName();
     if (id === 'bar') this.game.audio?.setMusic('jazz', { pos: (this.markers.find(m => m.kind === 'band')?.pos || new THREE.Vector3()).toArray() });
-    else if (prev === 'bar' || prev === null) this.game.audio?.setMusic('station');
+    else if (id === 'aussicht') this.game.audio?.setMusic('dome');
+    else if (prev === 'bar' || prev === 'aussicht' || prev === null) this.game.audio?.setMusic('station');
     if (!force) this.game.checkStationEvents?.();
   }
 

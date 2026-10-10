@@ -15,45 +15,77 @@ function shipTex(id, name, srgb) {
 }
 
 const plumeVert = `
-  varying vec2 vUv;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vV;
   #include <common>
   #include <logdepthbuf_pars_vertex>
-  void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-  #include <logdepthbuf_vertex>
+  void main(){
+    vUv = uv;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+    gl_Position = projectionMatrix * mv;
+    #include <logdepthbuf_vertex>
   }`;
 const plumeFrag = `
-  uniform vec3 color; uniform float power, time;
-  varying vec2 vUv;
+  uniform vec3 color; uniform float power, time, boost, seed, layer;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vV;
   #include <logdepthbuf_pars_fragment>
+  float h(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  float vnoise(vec3 p){
+    vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(h(i), h(i + vec3(1,0,0)), f.x), mix(h(i + vec3(0,1,0)), h(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(h(i + vec3(0,0,1)), h(i + vec3(1,0,1)), f.x), mix(h(i + vec3(0,1,1)), h(i + vec3(1,1,1)), f.x), f.y), f.z);
+  }
   void main(){
     #include <logdepthbuf_fragment>
-    float along = clamp(vUv.y, 0.0, 1.0);   // 1 at nozzle, 0 at tail
-    float across = clamp(abs(vUv.x - 0.5) * 2.0, 0.0, 1.0);
-    float core = pow(1.0 - across, 3.0);
-    float flick = 0.85 + 0.15 * sin(time * 60.0 + along * 20.0);
-    float diamonds = 0.75 + 0.25 * sin(along * 38.0 - time * 40.0);
-    float a = core * pow(along, 1.6) * power * flick * diamonds;
-    vec3 c = mix(color, vec3(1.0), core * core * core * along * along);
-    gl_FragColor = vec4(c * a * 3.0, 1.0);
+    float along = clamp(vUv.y, 0.0, 1.0);                       // 1 at the nozzle, 0 at the tail
+    float facing = pow(abs(dot(normalize(vN), normalize(vV))), layer > 0.5 ? 1.6 : 2.6);
+    // turbulent plasma: noise streaming away from the nozzle, faster with more thrust
+    vec3 q = vec3(vUv.x * 7.0, along * 9.0 - time * (10.0 + 18.0 * power), seed);
+    float turb = 0.55 + 0.45 * vnoise(q) * (0.6 + 0.4 * vnoise(q * 2.3 + 7.0));
+    float fall = pow(along, mix(2.6, 1.1, power));
+    // shock diamonds in the core, strong on afterburner
+    float diam = mix(1.0, 0.55 + 0.45 * pow(0.5 + 0.5 * cos(along * 46.0 - time * 3.0), 3.0), (0.25 + 0.75 * boost) * (1.0 - layer));
+    float flick = 0.9 + 0.1 * sin(time * 73.0 + seed * 9.0);
+    float a = facing * fall * turb * diam * flick * power;
+    // white-hot near the nozzle, engine colour further out, a warmer fringe on the outer layer
+    vec3 hot = mix(color, vec3(1.0), smoothstep(0.55, 1.0, along) * (1.0 - layer) * facing);
+    vec3 c = mix(hot, color * vec3(1.15, 0.95, 0.85), layer * (1.0 - along));
+    gl_FragColor = vec4(c * a * (layer > 0.5 ? 0.75 : 1.8), 1.0);
   }`;
 
-/** Exhaust plume: two crossed planes with additive shader, pointing along +Z (backwards). */
+let glowTex = null;
+function nozzleGlowTex() {
+  if (glowTex) return glowTex;
+  const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s;
+  const g = cv.getContext('2d'), grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.2, 'rgba(255,255,255,0.55)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.12)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, s, s);
+  glowTex = new THREE.CanvasTexture(cv); glowTex.colorSpace = THREE.SRGBColorSpace;
+  return glowTex;
+}
+
+/** Exhaust: a hot inner cone with shock diamonds, a wider soft outer cone and a glow at the nozzle. Points along +Z. */
 function makePlume(radius, color) {
   const g = new THREE.Group();
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: plumeVert, fragmentShader: plumeFrag, transparent: true, depthWrite: false,
-    blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { color: { value: new THREE.Color(color) }, power: { value: 0.5 }, time: { value: 0 } },
-  });
-  const geo = new THREE.PlaneGeometry(radius * 2, 1, 1, 1);
-  geo.translate(0, -0.5, 0); // from 0 (nozzle) to -1
-  geo.rotateX(-Math.PI / 2); // extend along +Z
-  for (let i = 0; i < 2; i++) {
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.z = i * Math.PI / 2;
+  const mk = (rTop, rTip, layer) => {
+    const geo = new THREE.CylinderGeometry(rTop, rTip, 1, 28, 18, true);
+    geo.translate(0, -0.5, 0);            // nozzle at y=0 (uv.y = 1), tail at y=-1
+    geo.rotateX(-Math.PI / 2);            // extend along +Z (backwards)
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: plumeVert, fragmentShader: plumeFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { color: { value: new THREE.Color(color) }, power: { value: 0.5 }, time: { value: 0 }, boost: { value: 0 }, seed: { value: Math.random() * 10 }, layer: { value: layer } },
+    });
+    const m = new THREE.Mesh(geo, mat); m.frustumCulled = false;
     g.add(m);
-  }
-  g.userData.mat = mat;
+    return m;
+  };
+  const core = mk(radius * 0.6, radius * 0.05, 0);
+  const outer = mk(radius * 1.35, radius * 0.45, 1);
+  outer.scale.set(1, 1, 0.8);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: nozzleGlowTex(), color: new THREE.Color(color).multiplyScalar(1.4), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  glow.scale.setScalar(radius * 3.2);
+  g.add(glow);
+  g.userData = { core, outer, glow, mats: [core.material, outer.material], len: 1, radius };
   return g;
 }
 
@@ -140,11 +172,19 @@ export class ShipModel {
   /** throttle 0..1, boost bool */
   update(dt, throttle, boost = false) {
     this.time += dt;
-    const p = Math.min(1, 0.15 + throttle * 0.85) * (boost ? 1.6 : 1);
+    const p = Math.min(1, 0.15 + throttle * 0.85) * (boost ? 1.45 : 1);
+    this.boostK = (this.boostK || 0) + ((boost ? 1 : 0) - (this.boostK || 0)) * Math.min(1, dt * 4);
     for (const pl of this.plumes) {
-      pl.userData.mat.uniforms.power.value = p;
-      pl.userData.mat.uniforms.time.value = this.time;
-      pl.scale.set(1, 1, (0.6 + 4.5 * throttle) * (boost ? 1.8 : 1));
+      const U = pl.userData;
+      // the plume length follows thrust with a little lag, so throttle changes look like the jet growing and collapsing
+      const target = (0.5 + 4.6 * throttle) * (1 + this.boostK * 0.9);
+      U.len += (target - U.len) * Math.min(1, dt * 5);
+      const flick = 1 + 0.06 * Math.sin(this.time * 41 + U.radius * 13) + 0.04 * Math.sin(this.time * 97);
+      for (const m of U.mats) { m.uniforms.power.value = p; m.uniforms.time.value = this.time; m.uniforms.boost.value = this.boostK; }
+      U.core.scale.set(1 + this.boostK * 0.1, 1 + this.boostK * 0.1, U.len * flick);
+      U.outer.scale.set(1 + this.boostK * 0.25, 1 + this.boostK * 0.25, U.len * 0.8 * flick);
+      U.glow.material.opacity = Math.min(1, 0.35 + p * 0.55) * flick;
+      U.glow.scale.setScalar(U.radius * (1.9 + p * 1.1 + this.boostK * 1.0));
     }
     for (const g of this.glows) {
       if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(0.5 + 1.5 * p);

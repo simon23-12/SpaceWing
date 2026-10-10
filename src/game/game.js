@@ -26,7 +26,7 @@ export class Game {
     this.clock = new THREE.Clock();
     if (import.meta.env.DEV) window.__S = { state, newGame, addShip };
     addEventListener('keydown', (e) => this.onKey(e));
-    addEventListener('pointerdown', () => { this.audio.start(); this.applyVolume(); }, { once: false });
+    addEventListener('pointerdown', () => { this.audio.start(); this.applyVolume(); if (this.mode?.kind === 'title') this.audio.setMusic('menu'); }, { once: false });
     const loop = () => { requestAnimationFrame(loop); this.frame(); };
     loop();
   }
