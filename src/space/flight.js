@@ -10,6 +10,7 @@ import { assets } from '../core/assets.js';
 import { Debris } from './debris.js';
 import { input } from '../core/input.js';
 import { FACTIONS, MOONS, moonOfZone } from '../game/data.js';
+import { cargoFree } from '../game/state.js';
 import { Streaks } from '../ui/streaks.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -31,6 +32,7 @@ export class FlightMode {
     this.ships = [];
     this.waypoints = [];
     this.missiles = [];
+    this.salvage = [];
     this.listeners = {};
     this.hostileOverrides = new Set();
     this.camMode = 'chase';
@@ -561,6 +563,7 @@ export class FlightMode {
     this.collisions(dt);
     this.bolts.update(dt, this.camera, (a, b, bolt) => this.boltHit(a, b, bolt));
     this.updateMissiles(dt);
+    this.updateSalvage(dt);
     this.fx.update(dt); this.trails.update(dt);
     if (this.station) this.station.update(dt, this.camera);
     if (this.debris) this.debris.update(dt, this.camera);
@@ -676,9 +679,49 @@ export class FlightMode {
     this.game.audio?.explosion(Math.max(0.15, 1 - s.pos.distanceTo(this.camera.position) / 4000), size);
     if (s.isPlayer) { s.alive = false; s.obj.visible = false; return; }
     this.removeShip(s);
+    if (this.isHostile(s, this.player) && !this.player.record?.uid?.startsWith('TEMP')) this.spawnSalvage(s.pos, s.vel, s.model.length > 18 ? 4 : 1 + Math.floor(Math.random() * 3));
     if (killer && killer.isPlayer) this.game.state.kills++;
     this.emit('destroyed', s, killer);
     if (this.player.target === s) this.player.target = null;
+  }
+
+  // ------------------------------------------------------------------ salvage: wreck pieces you can scoop up and sell
+  spawnSalvage(pos, vel, n) {
+    if (!this.salvageGeo) {
+      this.salvageGeo = new THREE.BoxGeometry(1.4, 0.8, 1.0); this.salvageGeo.userData.shared = true;
+      this.salvageMat = new THREE.MeshStandardMaterial({ color: 0x7d746a, roughness: 0.55, metalness: 0.7, emissive: new THREE.Color(1.0, 0.5, 0.12), emissiveIntensity: 0.35 });
+    }
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(this.salvageGeo, this.salvageMat);
+      m.position.copy(pos).add(new THREE.Vector3().randomDirection().multiplyScalar(4));
+      m.scale.setScalar(1.2 + Math.random() * 0.9);
+      this.scene.add(m);
+      this.salvage.push({ mesh: m, vel: vel.clone().multiplyScalar(0.25).add(new THREE.Vector3().randomDirection().multiplyScalar(6 + Math.random() * 8)),
+        spin: new THREE.Vector3().randomDirection().multiplyScalar(1.5), life: 150 });
+    }
+  }
+
+  updateSalvage(dt) {
+    const p = this.player;
+    for (let i = this.salvage.length - 1; i >= 0; i--) {
+      const s = this.salvage[i];
+      s.life -= dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.rotation.x += s.spin.x * dt; s.mesh.rotation.y += s.spin.y * dt;
+      const d = s.mesh.position.distanceTo(p.pos);
+      if (p.alive && d < 24 + p.hitRadius && !this.gunner) {
+        const rec = p.record, cap = p.stats.salvage || 2, have = rec.cargo?.schrott || 0;
+        if (have >= cap || cargoFree(rec) <= 0) {
+          if (this.time - (this.netFullT || -9) > 4) { this.netFullT = this.time; this.hud.showToast(have >= cap ? `Bergungsnetz voll (${cap} t) – in der Werkstatt aufrüsten` : 'Frachtraum voll', 2.5); }
+        } else {
+          rec.cargo.schrott = have + 1;
+          this.hud.showToast(`+1 t Bergungsschrott · Netz ${have + 1}/${cap} t`, 1.8);
+          this.game.audio?.blip?.();
+          s.life = 0;
+        }
+      } else if (d < 220) s.mesh.position.lerp(p.pos, Math.min(1, dt * 0.35));   // the net pulls nearby pieces in a little
+      if (s.life <= 0) { this.scene.remove(s.mesh); this.salvage.splice(i, 1); }
+    }
   }
 
   updateMissiles(dt) {

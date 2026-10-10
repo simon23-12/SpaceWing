@@ -308,21 +308,6 @@
     1.0
    ],
    "seated": true
-  },
-  {
-   "kind": "crew",
-   "id": "hc0",
-   "pos": [
-    21.2,
-    0,
-    1.0
-   ],
-   "dir": [
-    -0.5,
-    0.0,
-    0.866
-   ],
-   "seated": false
   }
  ],
  "window_dir": [

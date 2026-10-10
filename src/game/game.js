@@ -238,7 +238,8 @@ export class Game {
     if (m.kind === 'band') { this.ui.notify('„Roche-Grenze“ – Saffi Lindqvist (Gesang, hier: Saxofon-Hologramm), Bass, Rhodes. Live mit 2,3 s Lichtverzögerung.'); return; }
     if (m.kind === 'terminal') {
       if (m.id === 'boerse') return this.ui.openBoerse();
-      if (m.id === 'werft' || m.id === 'hangar_werft') return this.ui.openWerft();
+      if (m.id === 'hangar_werft') return this.ui.openWerkstatt();
+      if (m.id === 'werft') return this.ui.openWerft();
       if (m.id === 'karte') return this.ui.openMap(null);
       if (m.id === 'kabine_terminal') return this.ui.openTerminal();
       if (m.id === 'bett') return this.sleep();

@@ -64,30 +64,45 @@ const openStations = (g) => STATION_IDS().filter(s => MOONS[moonOfStation(s)]?.u
 const openZones = (g) => MOON_ORDER.filter(m => MOONS[m].unlock(g)).flatMap(m => MOONS[m].zones).filter(z => !ZONES[z].hostile);
 const jumpNote = (from, toZone) => { const a = moonOfZone(from), b = moonOfZone(toZone); return a === b ? '' : ` Sprungklasse ${JUMP_CLASS[MOONS[b].jump]} nötig.`; };
 
+function cargoJob(g, r, station, to, id, tier) {
+  const coms = Object.keys(COMMODITIES).filter(c => !COMMODITIES[c].illegal && !COMMODITIES[c].salvage);
+  const com = coms[Math.floor(r() * coms.length)];
+  const local = moonOfStation(to) === moonOfStation(station);
+  const amount = Math.max(2, Math.min(local ? 7 : 99, 3 + Math.floor(r() * (local ? 5 : 6 + tier * 8))));
+  const dist = travelInfo(STATIONS[station].zone, STATIONS[to].zone).distance;
+  const risk = r() < 0.35 + tier * 0.05 ? 1 + Math.floor(r() * (1 + tier)) : 0;
+  const pay = Math.round(((local ? 330 : 260) + dist / 1000 * 0.55 + amount * 22 + risk * (local ? 260 : 650)) / 10) * 10;
+  const client = ['Kollektiv-Versorgung', 'Hallström Nachfolge GmbH', 'Ringgilde Clan Abara', 'Konsortiums-Logistik', 'Freie Händler Rhea', 'Dr. Ibe Medizintechnik', 'Inktomi Bergbau AG', 'Depotverwaltung L4'][Math.floor(r() * 8)];
+  return { id, kind: 'fracht', from: station, to, com, amount, pay, risk, client,
+    title: `Fracht: ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name}`,
+    text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${local ? ` Kein Sprung nötig: Fusionsbrand im ${MOONS[moonOfStation(station)].name}-System.` : jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` };
+}
+
+/** Freight inside the current moon system never runs out: the board is topped up whenever it runs low. */
+function topUpLocal(g, station, board) {
+  const local = openStations(g).filter(s => s !== station && moonOfStation(s) === moonOfStation(station));
+  if (!local.length) return;
+  const tier = Math.min(4, Math.floor((g.earned || 0) / 15000));
+  const r = rnd(g.day * 104729 + (g.jobSeq = (g.jobSeq || 0) + 1) * 7477);
+  while (board.jobs.filter(j => j.kind === 'fracht' && local.includes(j.to)).length < 3) {
+    board.jobs.unshift(cargoJob(g, r, station, local[Math.floor(r() * local.length)], `L${g.day}-${station}-${g.jobSeq}-${board.jobs.length}`, tier));
+  }
+}
+
 export function generateJobs(g, station) {
   const key = station + ':' + g.day;
-  if (g.jobBoard[station]?.key === key) return g.jobBoard[station].jobs;
+  if (g.jobBoard[station]?.key === key) { topUpLocal(g, station, g.jobBoard[station]); return g.jobBoard[station].jobs; }
   const r = rnd(g.day * 7919 + station.length * 31 + (g.kills || 0));
   const jobs = [];
   const others = openStations(g).filter(s => s !== station);
-  const n = 4 + Math.floor(r() * 3);
+  const n = 3 + Math.floor(r() * 3);
   const tier = Math.min(4, Math.floor((g.earned || 0) / 15000));
   for (let i = 0; i < n; i++) {
-    let kind = r() < 0.6 ? 'fracht' : r() < 0.6 ? 'kopfgeld' : 'eskorte';
+    let kind = r() < 0.5 ? 'fracht' : r() < 0.6 ? 'kopfgeld' : 'eskorte';
     if (kind === 'fracht' && !others.length) kind = r() < 0.6 ? 'kopfgeld' : 'eskorte';
     const id = `J${g.day}-${station}-${i}`;
     if (kind === 'fracht') {
-      const to = others[Math.floor(r() * others.length)];
-      const coms = Object.keys(COMMODITIES).filter(c => !COMMODITIES[c].illegal);
-      const com = coms[Math.floor(r() * coms.length)];
-      const amount = 4 + Math.floor(r() * (6 + tier * 8));
-      const dist = travelInfo(STATIONS[station].zone, STATIONS[to].zone).distance;
-      const risk = r() < 0.35 + tier * 0.05 ? 1 + Math.floor(r() * (1 + tier)) : 0;
-      const pay = Math.round((260 + dist / 1000 * 0.55 + amount * 22 + risk * 650) / 10) * 10;
-      const client = ['Kollektiv-Versorgung', 'Hallström Nachfolge GmbH', 'Ringgilde Clan Abara', 'Konsortiums-Logistik', 'Freie Händler Rhea', 'Dr. Ibe Medizintechnik'][Math.floor(r() * 6)];
-      jobs.push({ id, kind, from: station, to, com, amount, pay, risk, client,
-        title: `Fracht: ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name}`,
-        text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` });
+      jobs.push(cargoJob(g, r, station, others[Math.floor(r() * others.length)], id, tier));
     } else if (kind === 'kopfgeld') {
       const zones = openZones(g).filter(z => z !== 'iapetus');
       const zone = zones[Math.floor(r() * zones.length)];
@@ -105,7 +120,8 @@ export function generateJobs(g, station) {
     }
   }
   g.jobBoard[station] = { key, jobs };
-  return jobs;
+  topUpLocal(g, station, g.jobBoard[station]);
+  return g.jobBoard[station].jobs;
 }
 
 export function acceptJob(game, job) {
@@ -229,12 +245,32 @@ async function bountyScript(c, game, job) {
 }
 
 async function ambushScript(c, game, n) {
-  const f = c.flight;
+  const f = c.flight, p = f.player;
   await c.wait(5 + Math.random() * 6);
+  // in the home system (Rhea) a raid can always be outrun: the raiders are slower than the player's afterburner
+  const escapable = moonOfZone(f.zoneId) === 'rhea';
   const dir = new THREE.Vector3().randomDirection(); dir.y *= 0.3;
-  const wave = await c.pirates(n, f.player.pos.clone().addScaledVector(dir.normalize(), 3200), { dist: 300, skill: 0.4 + Math.random() * 0.25 });
+  const wave = await c.pirates(n, p.pos.clone().addScaledVector(dir.normalize(), 3000), { dist: 300, skill: 0.4 + Math.random() * 0.25 });
+  if (escapable) for (const s of wave) s.stats = { ...s.stats, speed: Math.min(s.stats.speed, p.stats.speed * 0.9), boost: Math.min(s.stats.boost, p.stats.boost * 0.7) };
   c.say(wave[0].name, ['Hübsche Fracht hast du da. Wäre schade drum.', 'Schakale grüßen! Ladung abwerfen oder sterben.', 'Halt still, das tut nur kurz weh.'][Math.floor(Math.random() * 3)], 'schakale');
-  await c.until(() => c.alive(wave).length === 0);
+  if (escapable) {
+    c.say('Bordcomputer', 'Warnung: Schakale auf Abfangkurs. Die Wespen sind langsamer als unser Nachbrenner. Ausweichen ist möglich.', 'neutral');
+    c.objective('Überfall! Mit dem Nachbrenner entkommen [Shift] oder kämpfen (Prämie und Trümmer)');
+  }
+  let far = 0, engaged = false;
+  const fled = await c.until(dt => {
+    const alive = c.alive(wave);
+    if (!alive.length) return true;
+    const d = Math.min(...alive.map(s => s.pos.distanceTo(p.pos)));
+    if (d < 1600) engaged = true;
+    far = escapable && engaged && d > 2800 ? far + dt : 0;
+    return far > 2.5;
+  }).then(() => c.alive(wave).length > 0);
+  if (!fled) { if (escapable) c.objective(''); return; }
+  c.say(wave.find(s => s.alive).name, 'Verdammt, der ist zu schnell. Abdrehen, Jungs!', 'schakale');
+  f.hud.showToast('ENTKOMMEN', 2.5);
+  c.objective('');
+  for (const s of c.alive(wave)) s.ai = { mode: 'flee', t: 0 };
 }
 
 async function escortScript(c, game, job) {

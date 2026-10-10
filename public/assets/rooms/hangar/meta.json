@@ -40,6 +40,24 @@
    ],
    "color": "#e8f0ff",
    "energy": 2400
+  },
+  {
+   "pos": [
+    12.5,
+    2.4,
+    -15.6
+   ],
+   "color": "#ffd9a8",
+   "energy": 160
+  },
+  {
+   "pos": [
+    15.5,
+    2.4,
+    -15.6
+   ],
+   "color": "#ffd9a8",
+   "energy": 160
   }
  ],
  "markers": [
@@ -59,19 +77,34 @@
    "label": "Einsteigen und starten"
   },
   {
-   "kind": "terminal",
-   "id": "hangar_werft",
+   "kind": "crew",
+   "id": "yara",
    "pos": [
-    -17,
+    13.6,
     0,
-    -10.5
+    -14.95
    ],
    "dir": [
     0.0,
     0.0,
     -1.0
    ],
-   "label": "Werft-Terminal"
+   "seated": false
+  },
+  {
+   "kind": "terminal",
+   "id": "hangar_werft",
+   "pos": [
+    12.5,
+    0,
+    -14.9
+   ],
+   "dir": [
+    0.0,
+    0.0,
+    -1.0
+   ],
+   "label": "Werkstatt: Schiff modden & lackieren"
   },
   {
    "kind": "spawn",

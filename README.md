@@ -22,9 +22,12 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 - **Flug mit Verfolgerkamera oder Cockpit:** Das 3D-Cockpit hat Live-Anzeigen für Radar, Ziel und Systeme. Dazu kommen Flughilfe mit Newton-Modus, Nachbrenner, Laser, Raketen mit Zielerfassung, KI-Gegner, Eskorten und Andock-Autopilot.
 - **Realistischer Saturn:** abgeplatteter Planet mit Wolkenbändern und Polarhexagon, Ringe mit realer Radialstruktur (C-, B- und A-Ring, Cassini-Teilung, Encke-Lücke, F-Ring), gegenseitige Schatten von Planet und Ringen sowie die Monde Mimas, Enceladus, Tethys, Dione, Rhea, Titan (mit Atmosphäre), Iapetus (zweifarbig, mit Äquatorgrat) und Phoebe.
 - **Reisen:** Hyperraumsprung zwischen den Monden, Fusionsbrand innerhalb eines Mondsystems (Mimas ↔ Ringrand, Iapetus ↔ Phoebe).
-- **Wirtschaft:** neun Handelswaren, deren Preise auf Story-Ereignisse reagieren (Saturnzoll, Embargo, Krieg), generierte Aufträge, sieben Upgrade-Bereiche pro Schiff, Lackierungen, Schiffskauf und -verkauf.
+- **Geld verdienen im Heimatsystem:** Zwischen Hochstation Cassini, dem Bergbauposten Inktomi und dem Frachtdepot L4 gibt es immer Frachtaufträge, ganz ohne Sprungtriebwerk. Unterwegs überfallen manchmal Schakale: Im Rhea-System kann man ihnen mit dem Nachbrenner immer entkommen. Wer kämpft, bekommt Abschussprämien und kann Trümmer einsammeln und als Bergungsschrott verkaufen (Bergungsnetz in der Werkstatt aufrüstbar).
+- **Werkstatt in Hangar 7:** Mechanikerin Yara Benedek baut Mods ein, repariert und lackiert gegen Kredits.
+- **Vertonung:** Funksprüche und Dialoge sind mit lokaler Sprachsynthese (Piper) vertont; im All laufen sie durch einen Funkfilter mit Rauschen und Squelch.
+- **Wirtschaft:** zehn Handelswaren, deren Preise auf Story-Ereignisse reagieren (Saturnzoll, Embargo, Krieg), generierte Aufträge, sieben Upgrade-Bereiche pro Schiff, Lackierungen, Schiffskauf und -verkauf.
 - **Story:** acht Storymissionen mit drei Enden, siehe [docs/STORY.md](docs/STORY.md).
-- **Audio komplett prozedural:** Laser, Explosionen, Triebwerk, Ambient-Score und ein improvisierendes Jazztrio (räumlich, mit Lichtverzögerung aus Kraken-Hafen).
+- **Audio prozedural:** Laser, Explosionen, Triebwerk, Ambient-Score und ein improvisierendes Jazztrio (räumlich, mit Lichtverzögerung aus Kraken-Hafen).
 
 ## Technik
 
@@ -66,8 +69,10 @@ Alles ist kostenlos und frei lizenziert. Es gibt keine bezahlten Assets, Abos od
 | Körper, Hauttexturen, Augen, Brauen, Wimpern, Haare, Kleidung der NPCs | [MakeHuman System Assets, Skins 01/02](https://static.makehumancommunity.org/assets/assetpacks/index.html) | CC0 1.0 |
 | Werkzeug zum Zusammenbauen (Rig „game_engine“) | [MPFB 2](https://extensions.blender.org/add-ons/mpfb/) (Blender-Erweiterung) | Code GPL 3, erzeugte Figuren CC0 |
 | Animationen (Idle, Sitzen, Reden, Gehen, Trinken, …) | [Quaternius Universal Animation Library 1 + 2, Standard](https://opengameart.org/content/universal-animation-library-2) | CC0 1.0 |
-| Alles andere (Schiffe, Stationen, Räume, Planeten, Himmel, Renderings, Audio) | eigene Blender-Skripte in `blender/`, prozedurales WebAudio | Projekt |
+| Stimmen der Vertonung | [Piper](https://github.com/OHF-Voice/piper1-gpl) (lokal, Werkzeug GPL 3) mit den Stimmen [de_DE-thorsten, thorsten_emotional, kerstin](https://huggingface.co/rhasspy/piper-voices/tree/main/de/de_DE) | Stimmen CC0 1.0 |
+| Weitere Stimmen der Vertonung | Piper-Stimme de_DE-mls, trainiert auf [Multilingual LibriSpeech](http://openslr.org/94/) (Pratap et al. 2020) | CC BY 4.0 |
+| Alles andere (Schiffe, Stationen, Räume, Planeten, Himmel, Renderings, Musik, Effekte) | eigene Blender-Skripte in `blender/`, prozedurales WebAudio | Projekt |
 
-Die heruntergeladenen Pakete liegen außerhalb des Repos (`../SpaceWing_vendor`); `blender/humans.py` baut daraus die GLB-Dateien in `public/assets/npcs/` und retargetet die Animationen auf das MakeHuman-Rig.
+Die heruntergeladenen Pakete liegen außerhalb des Repos (`../SpaceWing_vendor`). Die Vertonung erzeugt `tools/voices.py` (Zeilen aus `tools/extract_lines.mjs`) nach `public/assets/voice/`. `blender/humans.py` baut aus den MakeHuman-Paketen die GLB-Dateien in `public/assets/npcs/` und retargetet die Animationen auf das MakeHuman-Rig.
 
 **Grenze:** Fotorealistische, frei lizenzierte Menschen in Spielqualität gibt es kostenlos praktisch nicht. Scans und MetaHumans sind entweder lizenzgebunden oder an Dienste und Accounts gekoppelt. MakeHuman ist die realistischste wirklich freie Quelle. Die Figuren sind halbrealistisch, mit echten Fotohaut-Texturen, aber vereinfachten Haaren (Polygonschalen statt Strähnen) und ohne Gesichtsanimation.

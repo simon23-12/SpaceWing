@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FACTIONS } from '../game/data.js';
 import { hostile } from './ship.js';
+import { CommScreen, drawStatus, drawDrive } from './hudParts.js';
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3();
 
@@ -23,15 +24,11 @@ export class HUD {
     this.comm = el('div', 'hud-comm hidden', this.root);
     this.toast = el('div', 'hud-toast', this.root);
     this.promptEl = el('div', 'hud-prompt hidden', this.root);
-    this.left = el('div', 'hud-panel hud-left', this.root, `
-      <div class="bar"><label>SCHILD</label><div class="track"><div class="fill shield"></div></div><span class="v sv"></span></div>
-      <div class="bar"><label>RUMPF</label><div class="track"><div class="fill hull"></div></div><span class="v hv"></span></div>
-      <div class="bar"><label>ENERGIE</label><div class="track"><div class="fill energy"></div></div><span class="v ev"></span></div>
-      <div class="mini"><span class="msl"></span><span class="fa"></span></div>`);
-    this.right = el('div', 'hud-panel hud-right', this.root, `
-      <div class="speed"><span class="spd">0</span><small>m/s</small></div>
-      <div class="bar"><label>SCHUB</label><div class="track"><div class="fill thr"></div></div></div>
-      <div class="mini cam"></div>`);
+    this.left = el('div', 'hud-gauge hud-left', this.root, '<canvas width="330" height="148"></canvas>');
+    this.right = el('div', 'hud-gauge hud-right', this.root, '<canvas width="230" height="148"></canvas>');
+    this.statusCv = this.left.querySelector('canvas'); this.driveCv = this.right.querySelector('canvas');
+    this.commScreen = new CommScreen(this.comm);
+    this.hitT = 0; this.lastShield = null;
     this.target = el('div', 'hud-panel hud-target hidden', this.root);
     this.radar = el('canvas', 'hud-radar', this.root);
     this.radar.width = this.radar.height = 220;
@@ -40,10 +37,6 @@ export class HUD {
       ? 'Maus: Turm drehen · LMB/Leertaste: Feuer · T: Ziel durchschalten · Y: Ziel voraus · H: Hilfe'
       : 'Maus: Steuern · W/S: Schub · A/D: Rollen · Q/E: Seitwärts · Shift: Boost · LMB/Leertaste: Laser · RMB/F: Rakete · T: Ziel · C: Kamera · L: Andocken · M: Systemkarte · H: Hilfe');
     this.help.style.opacity = 0;
-    this.q = { sv: this.left.querySelector('.sv'), hv: this.left.querySelector('.hv'), ev: this.left.querySelector('.ev'),
-      shield: this.left.querySelector('.shield'), hull: this.left.querySelector('.hull'), energy: this.left.querySelector('.energy'),
-      msl: this.left.querySelector('.msl'), fa: this.left.querySelector('.fa'), spd: this.right.querySelector('.spd'),
-      thr: this.right.querySelector('.thr'), cam: this.right.querySelector('.cam') };
     this.commQueue = [];
     this.commT = 0;
     this.toastT = 0;
@@ -75,29 +68,26 @@ export class HUD {
 
   update(dt, flight) {
     // comm
-    if (this.commT > 0) { this.commT -= dt; if (this.commT <= 0) this.comm.classList.add('hidden'); }
+    if (this.commT > 0) { this.commT -= dt; if (this.commT <= 0) this.commScreen.hide(); }
+    if (this.commT > 0) this.commScreen.update(dt, flight.game.audio?.voiceLevel?.() || 0);
     if (this.commT <= 0 && this.commQueue.length) {
       const m = this.commQueue.shift();
-      this.comm.innerHTML = `<div class="who" style="color:${m.color}">${m.speaker}</div><div class="txt">${m.text}</div>`;
-      this.comm.classList.remove('hidden');
       this.commT = m.dur;
-      flight.game.audio?.blip?.();
+      const A = flight.game.audio, name = flight.game.state?.callsign;
+      const vl = A?.voiceLength?.(m.text, name) || 0;
+      if (vl) { this.commT = Math.max(m.dur, vl + 1.0); A.speak(m.text, { name, radio: true }); }
+      else A?.blip?.();
+      this.commScreen.show(m, vl);
     }
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.toast.classList.remove('on'); }
 
     const p = flight.player;
     if (!p) return;
-    const q = this.q;
-    q.shield.style.width = (100 * p.shield / p.maxShield) + '%';
-    q.hull.style.width = (100 * p.hull / p.maxHull) + '%';
-    q.energy.style.width = (100 * p.energy / p.stats.energy) + '%';
-    q.sv.textContent = Math.round(p.shield); q.hv.textContent = Math.round(p.hull); q.ev.textContent = Math.round(p.energy);
-    q.hull.classList.toggle('crit', p.hull / p.maxHull < 0.3);
-    q.msl.textContent = `RAKETEN ${p.missiles}`;
-    q.fa.textContent = p.flightAssist ? 'FLUGHILFE AN' : 'FLUGHILFE AUS';
-    q.spd.textContent = Math.round(p.speed());
-    q.thr.style.width = (100 * p.throttle) + '%';
-    q.cam.textContent = this.gunner ? 'GESCHÜTZTURM' : flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER';
+    if (this.lastShield != null && p.shield + p.hull < this.lastShield - 0.5) this.hitT = 1;
+    this.lastShield = p.shield + p.hull;
+    this.hitT = Math.max(0, this.hitT - dt * 2.5);
+    drawStatus(this.statusCv, p, flight, this.hitT);
+    drawDrive(this.driveCv, p, this.gunner ? 'GESCHÜTZTURM' : flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER');
 
     this.draw(flight);
     this.drawRadar(flight);
@@ -185,6 +175,17 @@ export class HUD {
           if (k >= 1) { ctx.fillStyle = '#ff4040'; ctx.fillText('ERFASST', sp.x - 20, sp.y + size + 18); }
         }
       }
+    }
+    // salvage pieces: small amber diamonds
+    ctx.fillStyle = '#ffb050'; ctx.strokeStyle = '#ffb050'; ctx.lineWidth = 1;
+    let labelled = false;
+    for (const sv of flight.salvage || []) {
+      const d = p.pos.distanceTo(sv.mesh.position);
+      if (d > 3500) continue;
+      const sp = this.project(cam, sv.mesh.position);
+      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) continue;
+      ctx.beginPath(); ctx.moveTo(sp.x, sp.y - 5); ctx.lineTo(sp.x + 5, sp.y); ctx.lineTo(sp.x, sp.y + 5); ctx.lineTo(sp.x - 5, sp.y); ctx.closePath(); ctx.stroke();
+      if (!labelled && d < 1500) { labelled = true; ctx.fillText(`Trümmer ${Math.round(d)} m`, sp.x + 9, sp.y + 4); }
     }
     // waypoints
     for (const w of flight.waypoints) {

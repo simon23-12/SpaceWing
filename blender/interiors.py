@@ -208,6 +208,19 @@ def plant(name, mat, base, n=18, length=0.9, seed=1):
     return ob
 
 
+def picture(X, S, name, art, loc, rot_z, w, h, frame_mat):
+    """Framed picture: the image itself is a separate 'pic_<art>' plane textured at runtime (assets/art/<art>.jpg),
+    the frame is baked with the room. rot_z=0 faces -Y."""
+    bpy.ops.mesh.primitive_plane_add(size=1.0)
+    pl = bpy.context.active_object
+    pl.name = f'pic_{art}_{name}'
+    pl.scale = (w, h, 1); pl.rotation_euler = (R(90), 0, rot_z); pl.location = loc
+    pl.data.materials.append(mat_simple('pic_mat', '#777777', 0.5))
+    X.append(pl)
+    back = Vector((-math.sin(rot_z), math.cos(rot_z), 0)) * 0.025   # behind the image, towards the wall
+    S.append(box(f'picframe_{name}', frame_mat, (w + 0.09, 0.035, h + 0.09), (loc[0] + back.x, loc[1] + back.y, loc[2]), rot=(0, 0, rot_z)))
+
+
 def marker(kind, ident, loc, rot_z=0.0, **props):
     """Interactables, doors, spawns, npc spots. Stored in meta.json (three.js coordinates)."""
     fwd = Vector((math.cos(rot_z), math.sin(rot_z), 0))
@@ -458,21 +471,21 @@ def bruecke():
         INFO.setdefault('hotspots', []).append({'id': target, 'label': label, 'objs': [f'door{k}', f'sign{k}', f'doorframe{k}']})
     for k, (x, label, target, w, h) in enumerate(doorsS):
         door(k, x, Y0, 0.0, label, target, w, h, Vector((0, 1, 0)))
-    for k, (x, label, target) in enumerate(((1.5, 'SÖLDNERBÖRSE', 'boerse'), (9.5, 'WERFT & MARKT', 'werft'))):
+    for k, (x, label, target) in enumerate(((2.5, 'SÖLDNERBÖRSE', 'boerse'), (8.6, 'WERFT & MARKT', 'werft'))):
         inward = Vector((0, 1, 0))
         cpos = Vector((x, Y0 + 1.8, 0))
-        S.append(box(f'counter{k}', trim, (5.0, 0.9, 1.1), (cpos.x, cpos.y, 0.55), bevel=0.03))
-        S.append(box(f'countertop{k}', dark, (5.2, 1.05, 0.06), (cpos.x, cpos.y, 1.12)))
-        S.append(box(f'counterled{k}', led_c, (4.9, 0.04, 0.04), (cpos.x, cpos.y + 0.47, 1.02)))
+        S.append(box(f'counter{k}', trim, (4.2, 0.9, 1.1), (cpos.x, cpos.y, 0.55), bevel=0.03))
+        S.append(box(f'countertop{k}', dark, (4.4, 1.05, 0.06), (cpos.x, cpos.y, 1.12)))
+        S.append(box(f'counterled{k}', led_c, (4.1, 0.04, 0.04), (cpos.x, cpos.y + 0.47, 1.02)))
         bpy.ops.mesh.primitive_plane_add(size=1.0)
         scr = bpy.context.active_object
         scr.name = f'screen_{target}'
-        scr.scale = (4.6, 2.4, 1)
+        scr.scale = (4.0, 2.25, 1)
         scr.rotation_euler = (R(90), 0, R(180))
         scr.location = (x, Y0 + 0.24, 3.6)
         scr.data.materials.append(light_mat('screen_lit_' + target, '#2f6f9c', 2.5))
         X.append(scr)
-        S.append(box(f'screenframe{k}', dark, (4.9, 0.12, 2.7), (x, Y0 + 0.1, 3.6)))
+        S.append(box(f'screenframe{k}', dark, (4.3, 0.12, 2.55), (x, Y0 + 0.1, 3.6)))
         Gl.append(text_mesh(f'csign{k}', label, mat_emit('glow_sign_' + target, '#9fe0ff', 8), 0.42, (x, Y0 + 0.2, 5.45), rot=(R(90), 0, R(180))))
         marker('terminal', target, (x, Y0 + 2.9, 0), R(-90), label=label)
         marker('npc', 'oduya' if target == 'boerse' else 'haendler', (x, Y0 + 0.85, 0), R(90))
@@ -487,8 +500,19 @@ def bruecke():
     Gl.append(text_mesh('emblem', 'HOCHSTATION CASSINI', mat_emit('glow_emblem', '#ffe2b0', 6), 0.8, (X0 + 0.2, 0, 5.6), rot=(R(90), 0, R(90))))
     Gl.append(text_mesh('emblem2', 'RHEA-ORBIT · FREIHAFEN SEIT 2198', mat_emit('glow_emblem2', '#9fe0ff', 6), 0.3, (X0 + 0.2, 0, 4.7), rot=(R(90), 0, R(90))))
     # pilasters, baseboards, coves
-    for x in (-15, -10, -5, 0, 5, 10, 15):
+    for x in (-15, -13.1, -7.75, -2.4, 5.55, 11.6, 15):   # clear of the doors and the two counter screens
         S.append(box(f'pilS{x}', trim, (0.5, 0.5, H), (x, Y0 + 0.2, H / 2), bevel=0.04))
+    frame_br = mat_metal('frame_br', '#2a2b2e', 0.4, metal=0.7)
+    picture(X, S, 'br_e', 'saturn', (X1 - 0.14, 1.75, 2.6), R(-90), 3.0, 1.69, frame_br)
+    picture(X, S, 'br_s1', 'kraken', (-1.0, Y0 + 0.14, 2.2), R(180), 1.6, 0.9, frame_br)
+    picture(X, S, 'br_s2', 'eisvogel', (13.3, Y0 + 0.14, 2.2), R(180), 2.2, 1.24, frame_br)
+    picture(X, S, 'br_w1', 'quelle', (X0 + 0.14, -5.5, 2.4), R(90), 2.4, 1.35, frame_br)
+    picture(X, S, 'br_w2', 'herschel', (X0 + 0.14, 5.5, 2.4), R(90), 2.4, 1.35, frame_br)
+    leaf_br = mat_simple('leaf_br', '#3a6a30', 0.6)
+    pot_br = mat_metal('pot_br', '#3a3c40', 0.5, metal=0.3)
+    for k, (x, y, z) in enumerate(((-12.4, 7.2, 0.35), (-6.0, 7.2, 0.35), (0.0, 7.2, 0.35), (6.0, 7.2, 0.35), (12.4, 7.2, 0.35), (-13.9, -7.6, 0.0), (14.1, 0.35, 0.0), (14.1, 3.15, 0.0))):
+        S.append(cyl(f'br_pot{k}', pot_br, 0.38, 0.7, (x, y, z + 0.35), rot=(0, 0, 0), n=24, r2=0.3))
+        S.append(plant(f'br_plant{k}', leaf_br, (x, y, z + 0.68), n=20, length=1.1 if z == 0 else 0.85, seed=40 + k))
     S.append(box('baseS', led_c, (30, 0.04, 0.04), (0, Y0 + 0.5, 0.07)))
     S.append(box('coveS', led_w, (30, 0.05, 0.05), (0, Y0 + 0.5, H - 0.3)))
     S.append(box('coveE', led_w, (0.05, 18, 0.05), (X1 - 0.5, 0, H - 0.3)))
@@ -519,7 +543,7 @@ def bruecke():
     for x in (-10, 0, 10):
         area_light(f'key{x}', (x, 0, H - 0.2), (0, 0, 0), 4.0, 600, '#ffe6c8', shape='RECTANGLE', size_y=10)
     point_light('holo_l', (0, 0.5, 1.6), 60, '#5fd0ff', 0.4)
-    for x in (1.5, 9.5):
+    for x in (2.5, 8.6):
         point_light(f'scr{x}', (x, Y0 + 1.2, 3.6), 80, '#5fb0ff', 1.0)
     marker('spawn', 'default', (-11.0, -1.0, 0), R(0))
     marker('spawn', 'from_bar', (-10.5, Y0 + 1.8, 0), R(90))
@@ -829,7 +853,8 @@ def hangar():
     rnd = random.Random(5)
     for i in range(16):
         x = rnd.uniform(-19, -8) if i % 2 else rnd.uniform(10, 19)
-        y = (-1 if x < 0 else rnd.choice([-1, 1])) * rnd.uniform(10, 15)
+        sgn_ = -1 if x < 0 else rnd.choice([-1, 1])
+        y = -rnd.uniform(10, 15) if sgn_ else 0   # all crates on the south side: the north-east corner is Yara's workshop
         sz = rnd.choice([(2.4, 2.4, 2.4), (2.4, 4.8, 2.4), (1.2, 1.2, 1.2)])
         stack = rnd.random() < 0.3
         S.append(box(f'crate{i}', crate1 if i % 3 else crate2, sz, (x, y, sz[2] / 2), rot=(0, 0, R(rnd.choice([0, 90, 3, -4]))), bevel=0.04))
@@ -855,7 +880,63 @@ def hangar():
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (0.05, 2.8, 0.06), (-21.8, 9.0, 3.45)))
     Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, 0, 10), rot=(R(90), 0, R(90))))
     marker('ship', 'ship', (2, 0, 0.2), R(0), label='Einsteigen und starten')
-    marker('terminal', 'hangar_werft', (-17, 10.5, 0), R(90), label='Werft-Terminal')
+    # ---- Yara Benedek's workshop in the north-east corner (under the catwalk)
+    red = mat_paint('toolchest', '#a8241c', color2='#5a1410', wear=0.5, dirt=0.4, scale=3, panel=0.4)
+    steel = mat_metal('bench_steel', '#8a8d92', 0.3, metal=0.9, scale=3)
+    peg = mat_simple('pegboard', '#3a3d42', 0.8)
+    floorpaint = mat_simple('ws_floor', '#3c3f45', 0.85)
+    tank_g = mat_paint('gas_green', '#2f6a3a', wear=0.5, dirt=0.4, scale=3, panel=0.0)
+    tank_r = mat_paint('gas_red', '#8a2a20', wear=0.5, dirt=0.4, scale=3, panel=0.0)
+    S.append(box('ws_floor', floorpaint, (12.0, 7.6, 0.012), (13.5, 12.6, 0.006)))
+    for (cx, cy, sx, sy) in ((13.5, 8.82, 12.0, 0.12), (7.56, 12.6, 0.12, 7.6), (19.44, 12.6, 0.12, 7.6)):
+        S.append(box(f'ws_line{cx}{cy}', hazard, (sx, sy, 0.014), (cx, cy, 0.008)))
+    for k, bx in enumerate((12.5, 15.5)):
+        S.append(box(f'ws_bench{k}', steel, (2.6, 0.95, 0.06), (bx, 15.95, 0.95)))
+        S.append(box(f'ws_bench_body{k}', trim, (2.5, 0.85, 0.85), (bx, 15.95, 0.47), bevel=0.02))
+        S.append(box(f'ws_peg{k}', peg, (2.5, 0.04, 1.4), (bx, 16.84, 1.9)))
+        for t in range(7):   # tools on the pegboard
+            tx = bx - 1.0 + t * 0.33
+            if t % 3 == 0: S.append(box(f'ws_wrench{k}{t}', steel, (0.05, 0.03, 0.42), (tx, 16.8, 1.85), rot=(0, R(8), 0)))
+            elif t % 3 == 1: S.append(cyl(f'ws_driver{k}{t}', red, 0.025, 0.3, (tx, 16.8, 1.95), rot=(0, 0, 0), n=8))
+            else: S.append(box(f'ws_hammer{k}{t}', dark, (0.16, 0.05, 0.08), (tx, 16.79, 2.15)))
+        S.append(box(f'ws_lamp{k}', trim, (1.2, 0.18, 0.08), (bx, 15.95, 2.7)))
+        S.append(box(f'ws_lamp_glow{k}', led, (1.1, 0.12, 0.02), (bx, 15.95, 2.655)))
+        S.append(cyl(f'ws_lamp_wire{k}', dark, 0.01, 3.3, (bx, 15.95, 4.35), rot=(0, 0, 0), n=6))
+        point_light(f'ws_pl{k}', (bx, 15.6, 2.4), 160, '#ffd9a8', 0.3)
+    S.append(box('ws_vise', dark, (0.2, 0.3, 0.18), (11.6, 15.7, 1.07)))
+    S.append(box('ws_part', trim, (0.6, 0.4, 0.25), (15.2, 15.9, 1.1), rot=(0, 0, R(12)), bevel=0.04))
+    S.append(cyl('ws_partcyl', trim, 0.16, 0.5, (16.2, 15.8, 1.14), rot=(0, R(90), 0), n=16))
+    # rolling tool chest
+    S.append(box('ws_chest', red, (1.3, 0.65, 1.05), (9.2, 15.9, 0.6), bevel=0.02))
+    for d in range(5):
+        S.append(box(f'ws_drawer{d}', steel, (1.2, 0.01, 0.015), (9.2, 15.57, 0.25 + d * 0.18)))
+    for sx in (-0.55, 0.55):
+        S.append(cyl(f'ws_wheel{sx}', dark, 0.06, 0.05, (9.2 + sx, 15.7, 0.06), rot=(0, R(90), 0), n=12))
+    # engine on an assembly stand
+    # engine on an assembly stand (axis along x)
+    S.append(cyl('ws_engine', steel, 0.55, 2.2, (14.0, 11.8, 1.25), rot=(0, R(90), 0), n=32))
+    S.append(cyl('ws_engine_bell', trim, 0.62, 0.7, (15.4, 11.8, 1.25), rot=(0, R(90), 0), n=32, r2=0.45))
+    S.append(cyl('ws_engine_intake', dark, 0.42, 0.06, (12.88, 11.8, 1.25), rot=(0, R(90), 0), n=32))
+    for k, ex in enumerate((13.2, 13.9, 14.6)):
+        S.append(cyl(f'ws_engine_band{k}', trim, 0.58, 0.08, (ex, 11.8, 1.25), rot=(0, R(90), 0), n=32))
+    S.append(box('ws_engine_box', red, (0.5, 0.35, 0.3), (13.9, 11.8, 1.85), bevel=0.03))
+    for sx in (-0.9, 0.9):
+        S.append(box(f'ws_stand{sx}', hazard, (0.12, 0.12, 0.75), (14.0 + sx, 11.8, 0.38)))
+    S.append(box('ws_stand_base', trim, (2.2, 0.9, 0.08), (14.0, 11.8, 0.04)))
+    S.append(box('ws_cradle', trim, (2.0, 0.2, 0.12), (14.0, 11.8, 0.72)))
+    # welding bottles and a stack of hull plates
+    for k, (x, m) in enumerate(((18.6, tank_g), (19.0, tank_r))):
+        S.append(cyl(f'ws_gas{k}', m, 0.17, 1.4, (x, 16.3, 0.7), rot=(0, 0, 0), n=16))
+    for k in range(4):
+        S.append(box(f'ws_plate{k}', mat_paint('ws_plate_m', '#a8602f', color2='#8b8f8c', wear=0.8, rust=0.5, dirt=0.6, scale=2),
+                     (1.6, 0.05, 1.1), (17.8, 10.0 + k * 0.07, 0.6), rot=(R(-12), 0, 0)))
+    S.append(box('ws_shelf', trim, (0.5, 2.4, 2.2), (19.1, 13.4, 1.1), bevel=0.02))
+    for k in range(6):
+        S.append(box(f'ws_bin{k}', mat_simple(f'bin{k % 3}', ['#2f5a8a', '#c8901a', '#5a5d62'][k % 3], 0.6), (0.4, 0.6, 0.3), (19.1 - 0.05, 12.6 + (k % 3) * 0.75, 0.55 + (k // 3) * 0.8)))
+    Gl.append(text_mesh('ws_sign', 'WERKSTATT · Y. BENEDEK', mat_emit('glow_sign_ws', '#ffb050', 8), 0.32, (13.5, 16.86, 3.25), rot=(R(90), 0, R(180))))
+    area_light('ws_area', (13.5, 13.0, 5.6), (0, 0, 0), 5.0, 900, '#ffe6c8', size_y=4.0)
+    marker('crew', 'yara', (13.6, 14.95, 0), R(90), seated=False)
+    marker('terminal', 'hangar_werft', (12.5, 14.9, 0), R(90), label='Werkstatt: Schiff modden & lackieren')
     marker('spawn', 'default', (-19.5, 9.0, 0), R(0))
     INFO['window_dir'] = b2t((1, 0, 0))
     return S, Gl, Gs, X
@@ -1027,9 +1108,24 @@ def deck():
     Gl.append(box('vending_front', mat_emit('glow_vend', '#ffb060', 4), (0.75, 0.02, 1.2), (-17.2, -10.31, 1.25)))
     Gl.append(text_mesh('vending_txt', 'KAFFEE · 3 Cr', sgn('', '#fff2d0'), 0.08, (-17.2, -10.33, 1.95), rot=(R(90), 0, 0)))
     plant_dk = mat_simple('plant_dk', '#2f5a2a', 0.7)
-    for x in (-30.5, -6.8):
+    for x in (-30.5, -19.2, -6.8):
         S.append(cyl(f'rg_pot{x}', trim, 0.3, 0.6, (x, -9.95, 0.3), rot=(0, 0, 0), n=20))
         S.append(plant(f'rg_fern{x}', plant_dk, (x, -9.95, 0.6), n=16, length=0.7, seed=int(-x)))
+    for x in (-34.9, -2.9):   # tall palms at both ends of the corridor
+        S.append(cyl(f'rg_bigpot{x}', trim, 0.36, 0.7, (x, -11.15, 0.35), rot=(0, 0, 0), n=20, r2=0.3))
+        S.append(plant(f'rg_palm{x}', plant_dk, (x, -11.15, 0.68), n=22, length=1.25, seed=int(-x) + 7))
+    # pictures: big prints on the north wall, small ones between the cabin doors
+    frame_dk = mat_metal('frame_dk', '#2a2b2e', 0.4, metal=0.7)
+    for k, (x, art) in enumerate(((-28.6, 'saturn'), (-21.6, 'quelle'), (-14.6, 'herschel'), (-7.7, 'spacewing'))):
+        picture(X, S, f'rgN{k}', art, (x, -9.69, 1.7), 0.0, 1.5, 0.84, frame_dk)
+    for k, (x, art) in enumerate(((-30.5, 'kestrel'), (-22.25, 'lanze'), (-13.5, 'corsair'), (-9.5, 'vault'))):
+        picture(X, S, f'rgS{k}', art, (x, -12.48, 1.55), R(180), 0.9, 0.51, frame_dk)
+    # lift corridor: a print each side and a palm in the lobby
+    picture(X, S, 'lcN', 'kraken', (17.2, 6.69, 1.7), 0.0, 1.4, 0.79, frame_dk)
+    picture(X, S, 'lcS', 'eisvogel', (17.2, 4.31, 1.7), R(180), 1.4, 0.79, frame_dk)
+    for k, (x, y) in enumerate(((22.25, 7.0), (22.25, 4.0))):
+        S.append(cyl(f'lb_pot{k}', trim, 0.3, 0.6, (x, y, 0.3), rot=(0, 0, 0), n=20))
+        S.append(plant(f'lb_fern{k}', plant_dk, (x, y, 0.6), n=18, length=0.8, seed=60 + k))
     # ---------------------------------------------------------------- hangar corridor (x 15.125..22.875, y -3.5..-0.5)
     HX0, HX1, HH = 15.125, 22.875, 3.6
     S.append(box('hc_floor', floor, (HX1 - HX0, 3.5, 0.2), ((HX0 + HX1) / 2, -2.0, -0.1)))
@@ -1112,7 +1208,6 @@ def deck():
         marker('walk', 'rg', (x, -11.0, 0))
     marker('spawn', 'default', (-14.0, -11.0, 0), R(0))
     marker('crew', 'rg0', (-13.6, -10.45, 0), R(-90), seated=True)
-    marker('crew', 'hc0', (21.2, -1.0, 0), R(-120), seated=False)
     INFO['window_dir'] = b2t((0, 1, 0))
     return S, Gl, Gs, X
 

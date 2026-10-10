@@ -55,7 +55,7 @@ export class Renderer {
     this.passNear = new RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
     this.passNear.clear = false;
     this.passNear.clearDepth = true;
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.55, 0.6, 0.82);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.3, 0.45, 0.9);
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.passFar);
     this.composer.addPass(this.passNear);

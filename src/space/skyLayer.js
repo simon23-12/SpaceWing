@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { BODIES, SATURN, SUN_DIR } from './universe.js';
 import { assets } from '../core/assets.js';
-import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 
 const sunDir = new THREE.Vector3(...SUN_DIR).normalize();
 
@@ -149,17 +148,6 @@ const plumeFrag = `
     gl_FragColor = vec4(vec3(0.75, 0.85, 1.0) * d * fwd * 0.09, 1.0);
   }`;
 
-function makeFlareTex(kind) {
-  const s = 128, c = document.createElement('canvas'); c.width = c.height = s;
-  const g = c.getContext('2d');
-  const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  if (kind === 'ring') { grd.addColorStop(0.0, 'rgba(0,0,0,0)'); grd.addColorStop(0.75, 'rgba(120,180,255,0.0)'); grd.addColorStop(0.88, 'rgba(140,200,255,0.25)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); }
-  else { grd.addColorStop(0, 'rgba(255,255,255,0.5)'); grd.addColorStop(0.5, 'rgba(180,210,255,0.12)'); grd.addColorStop(1, 'rgba(0,0,0,0)'); }
-  g.fillStyle = grd; g.fillRect(0, 0, s, s);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
 function makeSunTexture() {
   const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
   const g = c.getContext('2d');
@@ -255,14 +243,6 @@ export class SkyLayer {
     this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeSunTexture(), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, color: new THREE.Color(6, 5.6, 5) }));
     this.sunSprite.scale.setScalar(3.2e6);
     this.scene.add(this.sunSprite);
-    // subtle lens flare ghosts
-    const lf = new Lensflare();
-    const dot = makeFlareTex('dot'), ring = makeFlareTex('ring');
-    lf.addElement(new LensflareElement(ring, 260, 0.0, new THREE.Color(0.6, 0.7, 1.0)));
-    lf.addElement(new LensflareElement(dot, 60, 0.35, new THREE.Color(0.5, 0.6, 0.9)));
-    lf.addElement(new LensflareElement(dot, 90, 0.6, new THREE.Color(0.7, 0.5, 0.3)));
-    lf.addElement(new LensflareElement(ring, 180, 0.85, new THREE.Color(0.4, 0.6, 1.0)));
-    this.sunSprite.add(lf);
     // Enceladus geysers (south pole plumes)
     const enc = this.moons.enceladus;
     if (enc) {

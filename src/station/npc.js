@@ -73,7 +73,7 @@ export class NPC {
     this.play(this.idleClip, 0, opts.phase ?? Math.random());
     // head look-at state
     this.look = { yaw: 0, pitch: 0, w: 0 };
-    this.lookLimit = opts.seated ? 1.0 : 1.15;
+    this.lookLimit = opts.seated ? 0.85 : 1.0;
     this.material = null;
   }
 
@@ -127,9 +127,12 @@ export class NPC {
 
   /** dt seconds, lookAt world position (or null). */
   update(dt, lookAt) {
-    this.mixer.update(dt);
     const head = this.bones.head, neck = this.bones.neck_01;
+    // undo last frame's look offset first: clips without head/neck tracks would otherwise accumulate it (spinning head)
+    if (this.baseQ && head && neck) { neck.quaternion.copy(this.baseQ[0]); head.quaternion.copy(this.baseQ[1]); }
+    this.mixer.update(dt);
     if (!head || !neck) return;
+    this.baseQ = [neck.quaternion.clone(), head.quaternion.clone()];
     // target angles in the character's own frame (it faces +Z)
     let tyaw = 0, tpitch = 0, tw = 0;
     if (lookAt) {
@@ -140,7 +143,7 @@ export class NPC {
       this.root.getWorldQuaternion(_q).invert();
       _v2.applyQuaternion(_q);
       const yaw = Math.atan2(_v2.x, _v2.z), pitch = Math.atan2(_v2.y, Math.hypot(_v2.x, _v2.z));
-      if (dist < 5.5 && Math.abs(yaw) < 1.9) {
+      if (dist < 5.5 && Math.abs(yaw) < 1.35) {
         tyaw = THREE.MathUtils.clamp(yaw, -this.lookLimit, this.lookLimit);
         tpitch = THREE.MathUtils.clamp(pitch, -0.45, 0.35);
         tw = THREE.MathUtils.smoothstep(5.5 - dist, 0, 1.8);

@@ -33,7 +33,7 @@ export const PEOPLE = {
   crew_a: { name: 'Deckwart Halvorsen', role: 'Stationsdienst · Deck 4', color: '#9fc4ff', ini: 'DH' },
   crew_b: { name: 'Sorrel Ndiaye', role: 'Lebenserhaltung · Deck 4', color: '#9fc4ff', ini: 'SN' },
   crew_c: { name: 'Ama Quist', role: 'Eisfrachterin aus Enceladus', color: '#bfe6ff', ini: 'AQ' },
-  crew_d: { name: 'Yara Benedek', role: 'Mechanikerin · Hangar 7', color: '#ffd36a', ini: 'YB' },
+  crew_d: { name: 'Yara Benedek', role: 'Mechanikerin · Werkstatt Hangar 7', color: '#ffd36a', ini: 'YB' },
   crew_e: { name: 'Jun Takeda', role: 'Liga-Zollbeamter (außer Dienst)', color: '#9fb4ff', ini: 'JT' },
   self:   { name: 'Du', role: '', color: '#7fd4ff', ini: '··' },
   comp:   { name: 'Bordcomputer', role: '', color: '#9fd6ff', ini: '>_' },
@@ -97,7 +97,7 @@ export function npcDialogue(game, npc) {
     return tree(MAGS, ['Setz dich, ' + name + '. Die Spacewing zieht immer noch nach links, oder?', 'Na, Pilot. Was macht der Rost?', 'Trink nicht, was Kix „Spezial“ nennt. Was gibt’s?'][g.day % 3], [
       { q: 'Erzähl mir von der Spacewing.', a: ['Hawker-Lindqvist SW-2. Ein Keil mit zwei Triebwerken, so groß wie Frachtcontainer. Kein Flügel, keine Romantik. Im Vakuum braucht man keine Flügel, nur Schub und Nerven.', 'Teo hat sie vierzig Jahre geflogen. Die Kanonen schwenken, wenn du sie lässt. Und sie zieht nach links.'] },
       { q: 'Wie komme ich zu den anderen Monden?', a: [jumpHint, 'Und nicht jeder Mond lässt dich rein. Titan zum Beispiel will erst wissen, auf welcher Seite du stehst.'] },
-      { q: 'Wer war Teo?', a: ['Mein Mann. Kurierflieger, Idiot, der beste Pilot im Ring. Ist vor acht Jahren bei Mimas verschwunden.', 'Er hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'] },
+      { q: 'Wer war Teo?', a: ['Mein Vater. Kurierflieger, Sturkopf, der beste Pilot im Ring. Ist vor acht Jahren bei Mimas verschwunden.', 'Er hätte dich gemocht. Er mochte Leute, die nicht aufgeben.'] },
       { q: 'Worum geht es in diesem Handelskrieg eigentlich?', a: ['Wasser, Methan, Helium. Enceladus hat das Wasser, Titan das Methan, die Ringe das Erz. Die Liga will an allem Zoll verdienen, das Konsortium will alles besitzen.', 'Und wir dazwischen fliegen das Zeug hin und her und werden beschossen. So ist das hier draußen.'] },
     ], 'Bis später, Mags.');
   }
@@ -129,7 +129,7 @@ export function npcDialogue(game, npc) {
     { q: 'Wie werde ich bekannter?', a: ['Verdien Geld. Ab zwanzigtausend Kredits nennt man dich hier Frachtpilot, dann öffnet sogar das Herschel-Depot auf Mimas seine Tore.'] },
   ], 'Danke, Femi.');
   if (npc === 'haendler') return tree('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', [
-    { q: 'Zur Werft.', a: ['Leg los. Und fass die Spacewing nicht an der linken Gondel an, die ist heiß.'], act: (gm) => gm.ui.openWerft() },
+    { q: 'Zeig mir Schiffe und Waren.', a: ['Leg los. Umbauen und Lackieren macht übrigens Yara, unten in ihrer Werkstatt in Hangar 7.'], act: (gm) => gm.ui.openWerft() },
     { q: 'Was kann ein Sprungtriebwerk?', a: [jumpHint.replace('Lenka baut dir eins ein.', 'Ich baue es dir ein.'), 'Ohne Sprung brauchst du für den Weg nach Titan zwei Wochen Fusionsbrand. Mit Sprung einen Herzschlag und einen Kater.'] },
     { q: 'Lohnt sich ein Apartment?', a: ['Wenn du auf zwei Stationen eins besitzt, reist du per Transit-Kapsel hin und her, ohne zu fliegen. Dein Schiff kommt mit dem Frachtdienst nach.', 'Kabine 4-117 kannst du hier am Terminal in deiner Kabine kaufen. Dann ist auch Schluss mit der Miete.'] },
     { q: 'Welches Schiff als Nächstes?', a: ['Die Kestrel ist ein echter Jäger. Die Mule fährt Fracht, viel Fracht. Wer Geld hat, nimmt die Corsair und wird in Ruhe gelassen.'] },
@@ -171,7 +171,10 @@ export function npcDialogue(game, npc) {
     { q: 'Wie ist es auf Enceladus?', a: ['Kalt. Die „Quelle“ liegt über den Tigerstreifen am Südpol, da bohren wir das Eis. Das Kollektiv gehört allen, die dort arbeiten. Kein Konsortium, keine Liga.'] },
     { q: 'Und der Handelskrieg?', a: ['Wenn Titan oder die Liga unsere Quelle blockieren, verdurstet der halbe Saturn. Das wissen alle. Genau deshalb haben wir Angst.'] },
   ], 'Gute Reise.');
-  if (npc === 'crew_d') return tree(npc, 'Yara, Mechanikerin. Ist das dein Keil da draußen? Hübsche Gondeln.', [
+  if (npc === 'crew_d') return tree(npc, g.ships.length ? 'Willkommen in meiner Werkstatt. Was soll ich an deinem Schiff schrauben?' : 'Yara, Mechanikerin. Das hier ist meine Werkstatt. Komm wieder, wenn du ein eigenes Schiff hast.', [
+    { q: 'Bau mir was ein. (Werkstatt)', if: g.ships.length > 0, a: ['Zeig her, was du an Kredits hast. Mods, Reparaturen, neuer Lack. Alles, was die alte Dame aushält.'], act: (gm) => gm.ui.openWerkstatt() },
+    { q: 'Wie verdiene ich am Anfang Geld?', a: ['Fracht. Zwischen Cassini, dem Bergbauposten Inktomi und dem Depot L4 gibt es immer etwas zu fahren, ganz ohne Sprung.', 'Und wenn dich Schakale überfallen: Nachbrenner und weg, die Wespen holen dich hier im Rhea-System nicht ein. Oder du schießt sie ab und sammelst die Trümmer ein. Schrott kauft jede Station.'] },
+    { q: 'Was bringt ein Bergungsnetz?', a: ['Ab Werk passen zwei Tonnen Trümmer ins Netz der Spacewing. Jede Stufe, die ich dir einbaue, drei Tonnen mehr. Bei den Preisen für Schrott rechnet sich das schnell.'] },
     { q: 'Was würdest du an der Spacewing verbessern?', a: ['Erst das Sprungtriebwerk, sonst bleibst du ewig bei Rhea. Dann Schilde. Die SW-2 hat einen Rumpf wie ein Panzer, aber Schilde wie ein Regenschirm.'] },
     { q: 'Warum sieht sie aus wie ein Keil?', a: ['Weil im All Flügel nichts bringen. Alles, was zählt, sind die zwei großen Triebwerke hinten und die schwenkbaren Kanonen an den Seiten. Der Rumpf hält nur alles zusammen.'] },
   ], 'Danke, Yara.');
@@ -300,7 +303,7 @@ export const STORY = {
       return [
         say(MAGS, 'So. Sechsunddreißig Tonnen Eis, null Kratzer am Eisvogel. Du schießt besser, als du aussiehst.', { scene: 'hangar' }),
         say(MAGS, 'Hier sind deine zwölfhundert. Und noch etwas.'),
-        say(MAGS, 'Die SW-2 da hinten in der Ecke. Eine Hawker-Lindqvist „Spacewing“. Sie hat Teo gehört, meinem Mann. Er ist vor acht Jahren bei Mimas verschwunden.'),
+        say(MAGS, 'Die SW-2 da hinten in der Ecke. Eine Hawker-Lindqvist „Spacewing“. Sie hat Teo gehört, meinem Vater. Er ist vor acht Jahren bei Mimas verschwunden.'),
         say(MAGS, 'Seitdem steht sie hier rum und rostet, und ich zahle Hangarmiete für einen Geist. Sie gehört dir.', {
           choices: [{ t: 'Das kann ich nicht annehmen.', go: 'no' }, { t: 'Danke, Mags. Ich pass auf sie auf.', go: 'yes' }] }),
         say(MAGS, 'Doch, kannst du. Sie will fliegen und ich habe meinen Eisvogel. Ende der Diskussion.', { label: 'no', go: 'yes2' }),

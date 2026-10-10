@@ -76,6 +76,7 @@ export const UPGRADES = {
   missiles: { name: 'Raketenwerfer',  desc: '+2 Raketen, schnellere Zielerfassung', base: 3000 },
   cargo:    { name: 'Frachtraum',     desc: '+20 % Ladekapazität',             base: 1800 },
   reactor:  { name: 'Energiekern',    desc: '+15 % Energie-Regeneration',     base: 2600 },
+  salvage:  { name: 'Bergungsnetz',   desc: '+3 t Trümmer einsammeln (Grundausstattung: 2 t)', base: 1400 },
   jump:     { name: 'Sprungtriebwerk', desc: 'Hyperraumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
 };
 export const MAX_UPGRADE = 5;
@@ -114,6 +115,7 @@ export function shipStats(ship) {
     missiles: c.missiles + 2 * L('missiles'), lockTime: 1.6 / (1 + 0.15 * L('missiles')),
     cargo: Math.round(c.cargo * (1 + 0.2 * L('cargo'))), regen: c.regen * (1 + 0.15 * L('reactor')),
     jump: Math.max(c.jump || 0, L('jump')),
+    salvage: 2 + 3 * L('salvage'),
   };
 }
 
@@ -127,6 +129,7 @@ export const COMMODITIES = {
   elektronik: { name: 'Elektronik', unit: 'Kiste', base: 290 },
   luxus:      { name: 'Luxusgüter', unit: 'Kiste', base: 640 },
   waffen:     { name: 'Waffen (Konterbande)', unit: 'Kiste', base: 880, illegal: true },
+  schrott:    { name: 'Bergungsschrott', unit: 't', base: 150, salvage: true },
 };
 
 // Station markets: multipliers < 1 = produced here (cheap), > 1 = in demand.
@@ -134,6 +137,12 @@ export const STATIONS = {
   cassini:  { name: 'Hochstation Cassini', zone: 'rhea', faction: 'cassini', walkable: true, apartment: 6000, flat: 'Kabine 4-117 (Ringgang, Deck 4)',
     market: { wasser: 1.1, helium3: 1.0, methan: 1.05, nahrung: 1.2, medizin: 1.1, erz: 1.15, elektronik: 0.75, luxus: 1.0 },
     blurb: 'Freihafen im Rhea-Orbit. Neutral, laut, voll.' },
+  inktomi:  { name: 'Bergbauposten Inktomi', zone: 'inktomi', faction: 'cassini',
+    market: { erz: 0.55, wasser: 0.7, nahrung: 1.35, medizin: 1.4, elektronik: 1.3, luxus: 1.3, methan: 1.15 },
+    blurb: 'Bohrtürme im niedrigen Rhea-Orbit über dem Inktomi-Krater. Schichtarbeit, Staub, Heimweh.' },
+  lagrange: { name: 'Frachtdepot L4', zone: 'lagrange', faction: 'cassini',
+    market: { nahrung: 0.7, medizin: 0.85, elektronik: 1.05, erz: 1.3, wasser: 1.3, luxus: 1.15, helium3: 0.9 },
+    blurb: 'Umschlagplatz und Hydrokultur-Farm im Lagrange-Punkt hinter Rhea. Hier wird alles einmal umgeladen.' },
   quelle:   { name: 'Quelle (Enceladus)', zone: 'enceladus', faction: 'kollektiv', apartment: 9000, flat: 'Wohnzelle im Eisschacht 3',
     market: { wasser: 0.45, nahrung: 0.7, methan: 1.45, helium3: 1.3, medizin: 1.5, elektronik: 1.35, erz: 1.1 },
     blurb: 'Genossenschaftliche Eisförderung an den Tigerstreifen.' },
@@ -161,7 +170,7 @@ export const RANKS = [
  */
 export const MOONS = {
   rhea: {
-    name: 'Rhea', zones: ['rhea'], station: 'cassini', jump: 0, color: '#c8d0d8',
+    name: 'Rhea', zones: ['rhea', 'inktomi', 'lagrange'], station: 'cassini', jump: 0, color: '#c8d0d8',
     tag: 'Freihafen', mood: { tint: [1.0, 0.98, 0.95], amt: 0.0, exposure: 1.0, music: 'space' },
     desc: 'Grauer Eismond mit hellen Kraterstrahlen. Hier dreht sich Hochstation Cassini: neutral, laut, voll. Dein Zuhause.',
     unlock: () => true, why: '',

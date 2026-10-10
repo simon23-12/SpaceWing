@@ -99,5 +99,5 @@ export function price(g, station, com, side = 'buy') {
 
 export function availableAt(station, com) {
   const st = STATIONS[station];
-  return com in st.market && (st.market[com] < 1.2 || com === 'waffen');
+  return com in st.market && !COMMODITIES[com].salvage && (st.market[com] < 1.2 || com === 'waffen');
 }

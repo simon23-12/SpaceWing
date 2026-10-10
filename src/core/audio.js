@@ -1,4 +1,13 @@
-// Procedural audio: SFX synthesis, ambient score and a live jazz trio for the bar. No samples.
+// Procedural audio: SFX synthesis, ambient score and a live jazz trio for the bar.
+// The only samples are the voice-over lines (Piper TTS, tools/voices.py); comms get a radio filter at runtime.
+import { assets } from './assets.js';
+
+/** Same key as tools/voices.py: FNV-1a over UTF-16 code units of the normalised line. */
+export function voiceKey(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
 
 const MOON_PROGS = {
   rhea: { prog: [[50, 57, 62, 65, 69], [46, 53, 58, 62, 65], [48, 55, 60, 64, 67], [45, 52, 57, 60, 64]], bells: 0.22, bellOct: 24, pad: 1 },          // D dorian
@@ -38,6 +47,87 @@ export class Audio {
     this.engG.connect(this.sfx);
     this.eng.start(); this.engN.start();
     this.scheduler = setInterval(() => this.tick(), 50);
+    this.voiceOut = C.createGain(); this.voiceOut.gain.value = 1.15; this.voiceOut.connect(this.master);
+    this.voiceAn = C.createAnalyser(); this.voiceAn.fftSize = 512; this.voiceOut.connect(this.voiceAn); this.voiceBuf = new Float32Array(512);
+    this.loadVoices();
+  }
+
+  // ---------------------------------------------------------------- voice-over
+  async loadVoices() {
+    if (this.voiceIdx) return;
+    this.voiceIdx = {};
+    this.voiceBufs = new Map();
+    try { this.voiceIdx = await (await fetch(assets.url('assets/voice/index.json'))).json(); } catch { }
+  }
+  lineKey(text, name) {
+    let t = String(text || '');
+    if (name) t = t.split(name).join('{name}');
+    return voiceKey(t.replace(/\s+/g, ' ').trim());
+  }
+  /** Loudness (RMS) of the voice channel right now, for the comm screen meter. */
+  voiceLevel() {
+    if (!this.voiceAn || !this.voice) return 0;
+    this.voiceAn.getFloatTimeDomainData(this.voiceBuf);
+    let s = 0; for (let i = 0; i < this.voiceBuf.length; i++) s += this.voiceBuf[i] * this.voiceBuf[i];
+    return Math.sqrt(s / this.voiceBuf.length);
+  }
+  /** Seconds of recorded speech for a line, 0 if it has none. */
+  voiceLength(text, name) { return this.voiceIdx?.[this.lineKey(text, name)] || 0; }
+  stopVoice() {
+    const v = this.voice; this.voice = null;
+    if (!v) return;
+    try { v.src.stop(); } catch { }
+    v.hiss?.stop?.();
+  }
+  /** Speak a line. radio: band-limited, a little overdriven, hiss and squelch clicks like a comm channel. */
+  async speak(text, { name, radio = false } = {}) {
+    if (!this.ctx || !this.voiceIdx) return 0;
+    const key = this.lineKey(text, name);
+    if (!this.voiceIdx[key]) { this.stopVoice(); return 0; }
+    const token = (this.voiceToken = (this.voiceToken || 0) + 1);
+    let buf = this.voiceBufs.get(key);
+    if (!buf) {
+      try {
+        const data = await (await fetch(assets.url(`assets/voice/${key}.mp3`))).arrayBuffer();
+        buf = await this.ctx.decodeAudioData(data);
+      } catch { return 0; }
+      this.voiceBufs.set(key, buf);
+      if (this.voiceBufs.size > 40) this.voiceBufs.delete(this.voiceBufs.keys().next().value);
+    }
+    if (token !== this.voiceToken) return 0;
+    this.stopVoice();
+    const C = this.ctx, t = C.currentTime + (radio ? 0.12 : 0.02);
+    const src = C.createBufferSource(); src.buffer = buf;
+    const v = { src };
+    if (radio) {
+      const hp = C.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 420; hp.Q.value = 0.7;
+      const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2900; lp.Q.value = 0.9;
+      const mid = C.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1600; mid.gain.value = 5;
+      const sh = C.createWaveShaper(); const curve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 3.2) / Math.tanh(3.2); }
+      sh.curve = curve;
+      const g = C.createGain(); g.gain.value = 0.85;
+      src.connect(hp).connect(mid).connect(lp).connect(sh).connect(g).connect(this.voiceOut);
+      // carrier hiss under the voice + squelch bursts at key-up and key-down
+      const hiss = this.noiseSource(true); const hf = C.createBiquadFilter(); hf.type = 'bandpass'; hf.frequency.value = 2400; hf.Q.value = 0.5;
+      const hg = C.createGain(); hg.gain.value = 0;
+      hiss.connect(hf).connect(hg).connect(this.voiceOut);
+      const end = t + buf.duration;
+      hg.gain.setValueAtTime(0, t - 0.1); hg.gain.linearRampToValueAtTime(0.035, t - 0.02); hg.gain.setValueAtTime(0.035, end);
+      hg.gain.linearRampToValueAtTime(0.16, end + 0.02); hg.gain.exponentialRampToValueAtTime(0.0005, end + 0.2);
+      hiss.start(t - 0.1); hiss.stop(end + 0.25);
+      this.click(t - 0.1);
+      v.hiss = hiss;
+    } else src.connect(this.voiceOut);
+    src.start(t);
+    this.voice = v;
+    src.onended = () => { if (this.voice === v) this.voice = null; };
+    return buf.duration;
+  }
+  click(t) {
+    const C = this.ctx, o = C.createOscillator(); o.type = 'square'; o.frequency.value = 1900;
+    const g = C.createGain(); this.env(g, t, 0.002, 0.05, 0.03);
+    o.connect(g).connect(this.voiceOut); o.start(t); o.stop(t + 0.05);
   }
 
   impulse(sec, decay) {

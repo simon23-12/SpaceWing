@@ -32,6 +32,14 @@ export const ZONES = {
     name: 'Rhea-Orbit · Hochstation Cassini', body: 'rhea', offset: [0.8, 0.6, 0.25, 1650],
     station: { id: 'cassini', model: 'station_cassini', pos: [0, 0, 0] },
   },
+  inktomi: {
+    name: 'Rhea-System · Bergbauposten Inktomi', body: 'rhea', offset: [0.55, -0.35, 0.55, 1080],
+    station: { id: 'inktomi', model: 'station_small', pos: [0, 0, 0], tint: [1.08, 0.96, 0.84] }, debris: 'rock',
+  },
+  lagrange: {
+    name: 'Rhea-System · Frachtdepot L4', body: 'rhea', offset: [-0.35, 0.25, -0.3, 12500],
+    station: { id: 'lagrange', model: 'station_cassini', pos: [0, 0, 0], tint: [0.86, 0.94, 1.08] },
+  },
   enceladus: {
     name: 'Enceladus · Geysirfeld „Quelle“', body: 'enceladus', offset: [0.7, 0.5, -0.6, 560],
     station: { id: 'quelle', model: 'station_small', pos: [0, 0, 0], tint: [0.82, 0.95, 1.12] }, geysers: true, debris: 'ice',

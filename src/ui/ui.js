@@ -301,12 +301,19 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ shipyard
-  openWerft(initialTab = 'werft') {
+  /** Yara's workshop in Hangar 7: upgrades ("mods"), repairs and paint. */
+  openWerkstatt() {
+    return this.panel('Werkstatt', 'Hangar 7 · Yara Benedek · Mods, Reparatur, Lackierung', (body, rebuild) => this.shipUpgrades(body, rebuild));
+  }
+
+  openWerft(initialTab) {
     const station = this.g.location;
-    let tab = initialTab;
-    return this.panel('Werft & Markt', `${STATIONS[station].name} · Lenka Brandvold`, (body, rebuild, close, w) => {
+    // on Cassini the mods are done in Yara's workshop; Lenka sells ships and goods
+    const home = station === 'cassini';
+    let tab = initialTab || (home ? 'kauf' : 'werft');
+    return this.panel(home ? 'Werft & Markt' : 'Werft & Markt', `${STATIONS[station].name}${home ? ' · Lenka Brandvold' : ''}`, (body, rebuild, close, w) => {
       const old = w.querySelector('.tabs'); if (old) old.remove();
-      this.tabs(body, [['werft', 'Mein Schiff'], ['kauf', 'Schiffe kaufen'], ['hangar', 'Hangar'], ['markt', 'Markt']], tab, (k) => { tab = k; rebuild(); });
+      this.tabs(body, [...(home ? [] : [['werft', 'Mein Schiff']]), ['kauf', 'Schiffe kaufen'], ['hangar', 'Hangar'], ['markt', 'Markt']], tab, (k) => { tab = k; rebuild(); });
       if (tab === 'markt') return this.marketBody(body, rebuild, station);
       if (tab === 'kauf') return this.shipShop(body, rebuild);
       if (tab === 'hangar') return this.hangarList(body, rebuild);
@@ -565,7 +572,7 @@ export class UI {
       this.dlg = el;
       let i = 0, typing = null, full = '';
       const labels = {}; steps.forEach((s, k) => { if (s.label) labels[s.label] = k; });
-      const finish = () => { removeEventListener('keydown', key); el.remove(); this.dlg = null; resolve(); };
+      const finish = () => { removeEventListener('keydown', key); el.remove(); this.dlg = null; this.game.audio?.stopVoice?.(); resolve(); };
       const show = () => {
         if (i >= steps.length) return finish();
         const s = steps[i];
@@ -579,7 +586,7 @@ export class UI {
         full = s.text; const t = el.querySelector('.txt'); t.textContent = '';
         let n = 0; clearInterval(typing);
         typing = setInterval(() => { n += 2; t.textContent = full.slice(0, n); if (n >= full.length) { clearInterval(typing); typing = null; } }, 16);
-        this.game.audio?.blip();
+        if (!(s.who !== 'self' && this.game.audio?.voiceLength?.(s.text, this.g?.callsign) && this.game.audio.speak(s.text, { name: this.g?.callsign }))) this.game.audio?.blip();
         const ch = el.querySelector('.choices'); ch.innerHTML = '';
         el.querySelector('.cont').style.display = s.choices ? 'none' : '';
         if (s.choices) s.choices.forEach((c, k) => {

@@ -457,7 +457,31 @@ def export_char(cid):
 
 
 
+# comm-only faces: speakers you only ever see on the radio screen (portrait only, never exported as game characters)
+CHARS.update({
+    'c_schakal1': dict(comm=True, gender=1.0, age=0.42, muscle=0.8, weight=0.5, height=0.55, race=(0.1, 0.0, 0.9), skin='young_caucasian_male2',
+                       eyes='grey', brows='eyebrow011', lashes='eyelashes01', hair=('short01', '#2a2420', 0.9),
+                       clothes=[('male_casualsuit05', ('#3a2a22', '#1a1614'), 0.85), ('shoes03', None, 0)]),
+    'c_schakal2': dict(comm=True, gender=0.0, age=0.4, muscle=0.7, weight=0.45, height=0.5, race=(0.3, 0.2, 0.5), skin='young_caucasian_female2',
+                       eyes='ice', brows='eyebrow006', lashes='eyelashes02', hair=('bob02', '#a8261c', 0.85),
+                       clothes=[('female_casualsuit01', ('#2a2a2e', '#18181a'), 0.85), ('shoes04', None, 0)]),
+    'c_lotse': dict(comm=True, gender=0.0, age=0.5, muscle=0.5, weight=0.45, height=0.5, race=(0.2, 0.6, 0.2), skin='young_asian_female',
+                    eyes='brown', brows='eyebrow003', lashes='eyelashes03', hair=('ponytail01', '#181412', 0.9),
+                    clothes=[('female_elegantsuit01', '#2f5a8a', 0.8), ('shoes04', None, 0)]),
+    'c_kollektiv': dict(comm=True, gender=1.0, age=0.55, muscle=0.6, weight=0.6, height=0.55, race=(0.5, 0.1, 0.4), skin='young_african_male',
+                        eyes='brown', brows='eyebrow009', lashes='eyelashes01', hair=('short03', '#1a1614', 0.9),
+                        clothes=[('male_worksuit01', '#2f6aa8', 0.85), ('shoes03', None, 0)]),
+    'c_frachter': dict(comm=True, gender=1.0, age=0.7, muscle=0.55, weight=0.7, height=0.5, race=(0.0, 0.1, 0.9), skin='old_caucasian_male',
+                       eyes='blue', brows='eyebrow005', lashes='eyelashes01', hair=('short02', '#9a948c', 0.8),
+                       clothes=[('male_worksuit01', '#5a6068', 0.85), ('shoes03', None, 0)]),
+    'c_wache': dict(comm=True, gender=1.0, age=0.48, muscle=0.75, weight=0.5, height=0.6, race=(0.1, 0.4, 0.5), skin='middleage_asian_male',
+                    eyes='brown', brows='eyebrow012', lashes='eyelashes01', hair=('short04', '#141210', 0.9),
+                    clothes=[('male_elegantsuit01', '#e8e4d8', 0.85), ('shoes04', None, 0)]),
+})
+
 PORTRAITS = {
+    'c_schakal1': ('#ff5a4a', '#1a0806'), 'c_schakal2': ('#ff5a4a', '#1a0806'), 'c_lotse': ('#8fd18f', '#08140c'),
+    'c_kollektiv': ('#6fc3ff', '#06121c'), 'c_frachter': ('#c8c8c8', '#101214'), 'c_wache': ('#f2c35a', '#14100a'),
     'mags': ('#ffcf7a', '#2a1a10'), 'oduya': ('#8fd18f', '#0c1a10'), 'haendler': ('#d39a6a', '#1c120a'), 'juno': ('#d7b8ff', '#140c1e'),
     'varga': ('#f2c35a', '#1c1406'), 'morrow': ('#f2c35a', '#14100a'), 'brandt': ('#9fb4ff', '#0a0e1c'), 'noor': ('#6fc3ff', '#06121c'),
     'vesper': ('#d7b8ff', '#100a1a'), 'rook': ('#ff5a4a', '#1a0806'), 'saffi': ('#ff8ad8', '#1a0814'),
@@ -512,7 +536,7 @@ def portraits(ids):
 
 if __name__ == '__main__' or True:
     what = BL_ARGS[0] if BL_ARGS else 'chars'
-    ids = BL_ARGS[1:] if len(BL_ARGS) > 1 else list(CHARS)
+    ids = BL_ARGS[1:] if len(BL_ARGS) > 1 else [c for c in CHARS if not CHARS[c].get('comm')]
     if what == 'anims':
         result = build_anims()
     elif what == 'chars':

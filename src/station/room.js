@@ -109,6 +109,11 @@ export class RoomMode {
           if (!/dome/.test(n)) colliders.push(this.colliderGeo(o));
         } else if (n.startsWith('screen')) {
           this.setupScreen(o, n.replace('screen_', ''));
+        } else if (n.startsWith('pic_')) {
+          // framed prints on the walls: their own texture, not part of the lightmap
+          const art = n.slice(4).split('_')[0];
+          const t = assets.tex(`assets/art/${art}.jpg`); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+          o.material = new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(0.82, 0.8, 0.78) });
         } else if (n.startsWith('field')) {
           o.visible = false;
         } else if (n.startsWith('hull')) {
@@ -260,7 +265,9 @@ export class RoomMode {
         const id = PATRONS[patron++ % PATRONS.length];
         jobs.push(add(id, m, m.seated ? { clip: Math.random() < 0.5 ? 'sit_talk' : 'sit', talkClip: 'sit_talk' } : { clip: Math.random() < 0.5 ? 'drink' : 'rail', talkClip: 'talk' }));
       } else if (m.kind === 'crew') {
-        jobs.push(add(m.id === 'hc0' ? 'crew_d' : 'crew_b', m, m.seated ? { clip: 'sit' } : { clip: 'phone' }));
+        if (m.id === 'hc0') continue;   // old spot of Yara (before her workshop), still in older deck bakes
+        jobs.push(add(m.id === 'yara' ? 'crew_d' : 'crew_b', m, m.seated ? { clip: 'sit' } : m.id === 'yara' ? { clip: 'fold' } : { clip: 'phone' })
+          .then(r => { if (r && m.id === 'yara') r.obj.rotation.y += Math.PI; }));   // Yara turns from her bench to the visitor
       } else if (m.kind === 'band') {
         jobs.push(this.addBand(m));
       }
@@ -404,7 +411,7 @@ export class RoomMode {
       lines = jobs.slice(0, 7).map(j => `${j.title.slice(0, 44)}  ·  ${j.pay.toLocaleString('de-DE')} Cr`);
       if (!lines.length) lines = ['Neue Aufträge am Terminal abrufen.'];
     } else if (s.kind === 'werft') {
-      lines = ['Kestrel K-9 ........ 145.000 Cr', 'Mule MT-3 ........... 95.000 Cr', 'Corsair HG-4 ....... 320.000 Cr', 'Sprungtriebwerke ab 9.000 Cr', 'Upgrades für alle Klassen', g.flags.zoll ? 'Helium-3: +25 % wegen Saturnzoll' : 'Helium-3: Normalpreis'];
+      lines = ['Kestrel K-9 ........ 145.000 Cr', 'Mule MT-3 ........... 95.000 Cr', 'Corsair HG-4 ....... 320.000 Cr', 'Sprungtriebwerke ab 2.500 Cr', 'Mods & Lack: Werkstatt Hangar 7', g.flags.zoll ? 'Helium-3: +25 % wegen Saturnzoll' : 'Helium-3: Normalpreis'];
     } else {
       lines = [`Pilot: ${g.callsign}`, `Kredits: ${g.credits.toLocaleString('de-DE')}`, `Tag ${g.day}`, 'Nachrichten: ' + (g.flags.zoll ? 'Liga erhebt Saturnzoll!' : 'Keine neuen.')];
     }

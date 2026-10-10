@@ -61,7 +61,7 @@ Eine Prognose sagt Massen vorher, keine Einzelnen. Das ist ihre größte Stärke
 
 **Der Spieler** – Rufzeichen frei wählbar (Standard: *Wren*). Ehemaliger Frachtpilot bei Hallström Logistik, die am Saturnzoll pleitegegangen ist. Ohne Schiff, ohne Kredits, mit drei Nächten Kabinenmiete. Ein Niemand, und genau darum geht es.
 
-**Magdalena „Mags“ Okafor** (61) – Eisfrachterpilotin aus der Ringgilde, flucht in drei Sprachen. Fliegt den *Eisvogel*, einen eisweißen Frachter mit Kugelturm und zwei Eistanks, ihr ganzer Stolz. Ihr verstorbener Mann **Teo** flog eine *Hawker‑Lindqvist SW‑2 „Spacewing“*, die seit acht Jahren in ihrer Hangarbucht verrostet. Mags ist ein *Faden*, eine Feldagentin des Archivs. Sie hat den Spieler nicht zufällig angesprochen.
+**Magdalena „Mags“ Okafor** (61) – Eisfrachterpilotin aus der Ringgilde, flucht in drei Sprachen. Fliegt den *Eisvogel*, einen eisweißen Frachter mit Kugelturm und zwei Eistanks, ihr ganzer Stolz. Ihr verschollener Vater **Teo** flog eine *Hawker‑Lindqvist SW‑2 „Spacewing“*, die seit acht Jahren in ihrer Hangarbucht verrostet. Mags ist ein *Faden*, eine Feldagentin des Archivs. Sie hat den Spieler nicht zufällig angesprochen.
 
 **KX‑9 „Kix“** – Barkeeper der Bar *Cassini‑Spalt*. Ein umgebauter Bergbauroboter mit vier Armen, trockenem Humor und einem Gedächtnis für jede offene Rechnung. Weiß alles, sagt wenig.
 

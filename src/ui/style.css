@@ -138,9 +138,26 @@ table.grid tr:hover td { background: rgba(127,212,255,.05); }
 .hud-zone { position: absolute; top: 16px; left: 22px; font-size: 14px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
 .hud-objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); font-size: 17px; background: rgba(0,0,0,.35); padding: 6px 16px; border: 1px solid rgba(255,207,122,.4); color: #ffe7b8; max-width: 70vw; text-align: center; }
 .hud-objective b { color: var(--warm); margin-right: 8px; letter-spacing: .2em; }
-.hud-comm { position: absolute; left: 22px; top: 22%; width: min(440px, 40vw); background: rgba(4,10,16,.72); border-left: 3px solid var(--accent); padding: 10px 14px; animation: commIn .25s; }
-.hud-comm .who { font-size: 14px; letter-spacing: .2em; text-transform: uppercase; margin-bottom: 4px; }
-.hud-comm .txt { font-family: var(--f-text); font-size: 16px; color: #e8f2f8; line-height: 1.4; letter-spacing: 0; }
+.hud-comm { position: absolute; left: 22px; top: 19%; width: min(560px, 46vw); display: flex; gap: 14px; align-items: stretch; --fc: #7fd4ff;
+  background: linear-gradient(100deg, rgba(4,12,20,.86), rgba(4,12,20,.55) 70%, rgba(4,12,20,0)); padding: 10px 18px 10px 10px;
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
+.hud-comm.cin { animation: commIn .35s cubic-bezier(.2,.8,.2,1); }
+.hud-comm::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--fc); box-shadow: 0 0 12px var(--fc); }
+.hud-comm .cport { position: relative; width: 132px; height: 132px; flex: none; border: 1px solid color-mix(in srgb, var(--fc) 55%, transparent); box-shadow: 0 0 18px color-mix(in srgb, var(--fc) 25%, transparent), inset 0 0 0 1px rgba(0,0,0,.6); }
+.hud-comm .cport canvas { width: 100%; height: 100%; display: block; }
+.hud-comm .cport::after { content: ''; position: absolute; inset: -5px; border: 1px solid transparent;
+  border-image: linear-gradient(90deg, var(--fc) 0 14px, transparent 14px calc(100% - 14px), var(--fc) calc(100% - 14px)) 1; opacity: .8; }
+.hud-comm .clive { position: absolute; left: 6px; top: 5px; font-size: 10px; letter-spacing: .22em; color: #fff; text-shadow: 0 0 4px #000; }
+.hud-comm .clive i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ff4a3a; margin-right: 5px; box-shadow: 0 0 6px #ff4a3a; animation: blink 1s steps(2) infinite; }
+.hud-comm .cbody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hud-comm .chead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 1px solid color-mix(in srgb, var(--fc) 30%, transparent); padding-bottom: 4px; margin-bottom: 6px; }
+.hud-comm .who { font-size: 16px; letter-spacing: .18em; text-transform: uppercase; text-shadow: 0 0 10px color-mix(in srgb, var(--fc) 60%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-comm .chan { font-size: 10px; letter-spacing: .2em; color: var(--dim); white-space: nowrap; }
+.hud-comm .txt { flex: 1; font-family: var(--f-text); font-size: 16px; color: #e8f2f8; line-height: 1.4; letter-spacing: 0; text-shadow: 0 1px 3px #000; }
+.hud-comm .cmeter { width: 100%; height: 14px; margin-top: 6px; opacity: .9; }
+@keyframes blink { 50% { opacity: .15; } }
+.hud-gauge { position: absolute; bottom: 14px; padding: 8px 10px 6px; background: radial-gradient(ellipse at 30% 60%, rgba(4,14,24,.62), rgba(4,14,24,0) 72%); }
+.hud-gauge canvas { display: block; }
 @keyframes commIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: none; } }
 .hud-toast { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-size: 24px; letter-spacing: .3em; color: #fff; text-shadow: 0 0 20px var(--accent); opacity: 0; transition: opacity .3s; text-align: center; }
 .hud-toast.on { opacity: 1; }
