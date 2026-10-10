@@ -80,6 +80,13 @@ export class FlightMode {
       this.debris = await Debris.create(this.zone.debris, this.zone.debris === 'ring' ? 1500 : 420);
       sc.add(this.debris.root);
     }
+    // simulator: a holographic grid sphere around the arena
+    if (this.opts.sim) {
+      const grid = new THREE.Mesh(new THREE.SphereGeometry(4500, 36, 18), new THREE.MeshBasicMaterial({ color: 0x2a8acf, wireframe: true, transparent: true, opacity: 0.18, depthWrite: false }));
+      grid.userData.follow = true; this.simGrid = grid; sc.add(grid);
+    }
+    // scrap drifting around the home station
+    if (this.zoneId === 'rhea' && this.station && !this.opts.sim) { this.scrapField = true; for (let i = 0; i < 26; i++) this.spawnFieldPiece(); }
     // player
     const rec = this.opts.playerRecord;
     this.player = await Ship.create({ record: rec, faction: 'player', player: true, name: this.game.state.callsign });
@@ -139,8 +146,11 @@ export class FlightMode {
         x.fillText('ZIEL', 12, 26);
         if (t && t.alive) {
           x.fillStyle = '#fff'; x.fillText(t.name.slice(0, 22), 12, 60);
-          x.fillStyle = '#5ab8ff'; x.fillRect(12, 80, 296 * t.shield / t.maxShield, 14);
-          x.fillStyle = '#e8e0c8'; x.fillRect(12, 104, 296 * t.hull / t.maxHull, 14);
+          if (t.isObject) { x.fillStyle = '#ffb050'; x.font = '600 16px Rajdhani, sans-serif'; x.fillText(t.info.slice(0, 32), 12, 100); x.font = '600 20px Rajdhani, sans-serif'; }
+          else {
+            x.fillStyle = '#5ab8ff'; x.fillRect(12, 80, 296 * t.shield / t.maxShield, 14);
+            x.fillStyle = '#e8e0c8'; x.fillRect(12, 104, 296 * t.hull / t.maxHull, 14);
+          }
           x.fillStyle = '#7fd4ff'; x.fillText(Math.round(p.pos.distanceTo(t.pos)) + ' m', 12, 150);
         } else { x.fillStyle = '#4a6a7a'; x.fillText('KEIN ZIEL', 12, 60); }
       } else {
@@ -251,7 +261,7 @@ export class FlightMode {
     const fwd = ship.forward(new THREE.Vector3());
     // converge on ~600 m (player) or the target lead point (AI)
     let aimPoint;
-    if (ship.isPlayer) aimPoint = ship.pos.clone().addScaledVector(fwd, 600);
+    if (ship.isPlayer) aimPoint = this.assistAim(ship, fwd, 0.07) || ship.pos.clone().addScaledVector(fwd, 600);
     else if (ship.target) aimPoint = this.leadFor(ship, ship.target);
     const color = ship.isPlayer ? '#ff4a3a' : ship.faction === 'schakale' ? '#4aff6a' : ship.faction === 'konsortium' ? '#ffcc44' : '#5ab0ff';
     const fireOne = (gp) => {
@@ -282,6 +292,7 @@ export class FlightMode {
   fireMissile(ship, target) {
     if (ship.missiles <= 0 || ship.missileCd > 0 || !target) return false;
     ship.missiles--; ship.missileCd = 0.8;
+    if (ship.isPlayer && ship.record?.uid && !ship.record.uid.startsWith('TEMP') && !ship.trainingMissiles) ship.record.missiles = ship.missiles;
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.6, 8).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xcfcfcf, metalness: 0.6, roughness: 0.4 }));
     m.position.copy(ship.pos).addScaledVector(ship.up(new THREE.Vector3()), -ship.radius * 0.25);
     m.quaternion.copy(ship.quat);
@@ -308,6 +319,8 @@ export class FlightMode {
       this.stick.y = (input.mouse.y - innerHeight / 2) / R * (this.game.settings?.invertY ? -1 : 1);
     } else { const k = Math.exp(-dt * 3); this.stick.x *= k; this.stick.y *= k; }
     if (!this.mouseSteer && (input.mouse.dx || input.mouse.dy) && !input.locked && !this.game.ui.modalOpen) this.mouseSteer = true;
+    const pad = input.pad;
+    if (pad?.active && (Math.abs(pad.yaw) + Math.abs(pad.pitch) > 0.02 || !input.locked)) { this.stick.x = pad.yaw; this.stick.y = pad.pitch * (this.game.settings?.invertY ? -1 : 1); }
     const l = Math.hypot(this.stick.x, this.stick.y);
     if (l > 1) { this.stick.x /= l; this.stick.y /= l; }
     const dz = (v) => Math.abs(v) < 0.04 ? 0 : (v - Math.sign(v) * 0.04) / 0.96;
@@ -326,6 +339,22 @@ export class FlightMode {
     if (input.hit('Digit3')) inp.throttle = 0.75; if (input.hit('Digit4')) inp.throttle = 1;
     if (input.mouse.wheel) inp.throttle = THREE.MathUtils.clamp(inp.throttle - input.mouse.wheel * 0.08, 0, 1);
     inp.boost = input.down('ShiftLeft') || input.down('ShiftRight');
+    if (pad?.active) {
+      if (Math.abs(pad.roll) > 0.02) inp.roll = -pad.roll;
+      if (pad.throttle != null) inp.throttle = pad.throttle;
+      else if (pad.throttleDelta) inp.throttle = THREE.MathUtils.clamp(inp.throttle + pad.throttleDelta * dt * 0.7, 0, 1);
+      if (pad.boost) inp.boost = true;
+      if (pad.fire) this.fireGuns(p);
+      if (pad.target) this.cycleTarget(true);
+      if (pad.ahead) this.targetAhead();
+      if (pad.cam) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
+      if (pad.dock) this.requestDock();
+      if (pad.map && !this.opts.sim) this.game.ui.openMap(this);
+      if (pad.missile) {
+        if (this.lock && this.lock.t >= p.stats.lockTime) { this.fireMissile(p, this.lock.target); this.lock.t = 0; }
+        else this.hud.showToast('Keine Zielerfassung', 1.2);
+      }
+    }
     if (input.hit('KeyZ')) { p.flightAssist = !p.flightAssist; this.hud.showToast(p.flightAssist ? 'Flughilfe AN' : 'Flughilfe AUS – Newton pur', 2); }
     if ((input.button(0) && input.locked) || input.down('Space')) this.fireGuns(p);
     if (input.hit('KeyT')) this.cycleTarget(true);
@@ -337,12 +366,18 @@ export class FlightMode {
       else this.hud.showToast('Keine Zielerfassung', 1.2);
     }
     if (input.hit('KeyL')) this.requestDock();
-    if (input.hit('KeyM')) this.game.ui.openMap(this);
+    if (input.hit('KeyM')) { if (this.opts.sim) this.hud.showToast('Im Simulator gibt es keine Systemkarte', 2); else this.game.ui.openMap(this); }
     if (input.hit('KeyN') && p.target) this.hud.showToast(`${p.target.name}: ${(FACTIONS[p.target.faction] || {}).name || ''}`, 1.5);
     if (p.turretAuto !== false && p.stats.turret) this.turretFire(p, dt, 0.65);
     // missile lock
+    // keep a hostile locked when nothing is selected, so the lead marker is always there in a fight
+    this.autoT = (this.autoT || 0) - dt;
+    if (this.autoT <= 0) {
+      this.autoT = 0.5;
+      if (!p.target || !p.target.alive) { const h = this.nearestHostile(p, 2500); if (h) p.target = h; else if (p.target && !p.target.alive) p.target = null; }
+    }
     const t = p.target;
-    if (t && t.alive && p.missiles > 0) {
+    if (t && t.alive && !t.isObject && p.missiles > 0) {
       const to = _v.copy(t.pos).sub(p.pos); const d = to.length();
       const ang = to.normalize().angleTo(p.forward(_w));
       if (d < 3500 && ang < 0.35) {
@@ -360,6 +395,8 @@ export class FlightMode {
     const sens = 0.0022 * (S.mouseSens || 1);
     a.yaw -= input.mouse.dx * sens;
     a.pitch -= input.mouse.dy * sens * (S.invertY ? -1 : 1);
+    const pad = input.pad;
+    if (pad?.active) { a.yaw -= pad.yaw * dt * 1.6; a.pitch -= pad.pitch * dt * 1.2 * (S.invertY ? -1 : 1); if (pad.fire) this.fireTurret(p); if (pad.target) this.cycleTarget(true); }
     a.pitch = THREE.MathUtils.clamp(a.pitch, -0.22, 1.35);
     a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
     if (input.button(0) || input.down('Space')) this.fireTurret(p);
@@ -375,19 +412,52 @@ export class FlightMode {
     const dir = cam.getWorldDirection(new THREE.Vector3());
     const right = _w.set(1, 0, 0).applyQuaternion(cam.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    const assist = this.assistAim(p, dir, 0.05, cam.position);
     for (const side of [-1, 1]) {
       const from = cam.position.clone().addScaledVector(dir, 2.2).addScaledVector(right, side * 0.55).addScaledVector(up, -0.35);
-      const d = dir.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(0.004)).normalize();
+      const d = (assist ? assist.clone().sub(from).normalize() : dir.clone()).add(new THREE.Vector3().randomDirection().multiplyScalar(0.004)).normalize();
       this.bolts.fire(from, d, BOLT_SPEED, p.vel, p, p.stats.laserDmg, '#ff9a3a');
     }
     this.shake = Math.min(0.25, (this.shake || 0) + 0.04);
     this.game.audio?.laser(0.9, true, 'turret');
   }
 
+  /** Aim assist: if the guns point within `cone` rad of a hostile's lead point, the bolts go to the lead point. */
+  assistAim(p, dir, cone, from = p.pos) {
+    let best = null, ba = cone;
+    const cands = p.target?.alive && !p.target.isObject ? [p.target] : this.ships.filter(s => s.alive && s !== p && this.isHostile(s, p));
+    for (const s of cands) {
+      if (s.pos.distanceTo(p.pos) > 1600) continue;
+      const lp = this.leadFor(p, s);
+      const a = _v.copy(lp).sub(from).normalize().angleTo(dir);
+      if (a < ba) { ba = a; best = lp; }
+    }
+    return best;
+  }
+
+  /** Things you can lock onto besides ships: the station and salvage pieces nearby. */
+  targetObjects() {
+    const p = this.player, out = [];
+    if (this.station) {
+      const st = this.station, zs = this.zone.station;
+      this._stTgt ||= { isObject: true, kind: 'station', name: st.name || 'Station', faction: st.faction || 'neutral', alive: true, vel: new THREE.Vector3(), radius: 200,
+        get pos() { return st.dock?.pos || st.pos; }, info: this.zone.hostile ? 'Feindliche Station · kein Andocken' : 'Andockbucht · [L] unter 3 km', station: zs?.id };
+      out.push(this._stTgt);
+    }
+    for (const sv of this.salvage) {
+      if (sv.mesh.position.distanceTo(p.pos) > 5000) continue;
+      sv.tgt ||= { isObject: true, kind: 'salvage', name: 'Bergungsschrott', faction: 'neutral', vel: sv.vel, radius: 2,
+        get pos() { return sv.mesh.position; }, get alive() { return sv.life > 0; }, info: 'ca. 1 t · Wert um 160 Cr · hinfliegen zum Einsammeln' };
+      out.push(sv.tgt);
+    }
+    return out;
+  }
+
   cycleTarget(hostileFirst) {
     const p = this.player;
-    const list = this.ships.filter(s => s !== p && s.alive && s.pos.distanceTo(p.pos) < 12000)
-      .sort((a, b) => (this.isHostile(b, p) - this.isHostile(a, p)) || a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos));
+    const objs = this.gunner ? [] : this.targetObjects();
+    const list = [...this.ships.filter(s => s !== p && s.alive && s.pos.distanceTo(p.pos) < 12000), ...objs]
+      .sort((a, b) => (this.isHostile(b, p) - this.isHostile(a, p)) || (!!a.isObject - !!b.isObject) || a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos));
     if (!list.length) { p.target = null; return; }
     const i = list.indexOf(p.target);
     p.target = list[(i + 1) % list.length];
@@ -397,7 +467,7 @@ export class FlightMode {
   targetAhead() {
     const p = this.player, f = this.gunner ? this.camera.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
     let best = null, ba = 0.5;
-    for (const s of this.ships) {
+    for (const s of [...this.ships, ...(this.gunner ? [] : this.targetObjects())]) {
       if (s === p || !s.alive) continue;
       const a = _v.copy(s.pos).sub(p.pos).normalize().angleTo(f);
       if (a < ba) { ba = a; best = s; }
@@ -414,6 +484,7 @@ export class FlightMode {
 
   requestDock() {
     if (this.state !== 'flying') return;
+    if (this.opts.sim) { this.game.endSim(this, false); return; }
     if (this.missionBlocksDock) { this.hud.showToast(this.missionBlocksDock, 2.5); return; }
     if (!this.station) { this.hud.showToast('Keine Station in Reichweite', 2); return; }
     if (this.zone.hostile) { this.hud.showToast('Andocken verweigert', 2); return; }
@@ -569,6 +640,7 @@ export class FlightMode {
     if (this.station) this.station.update(dt, this.camera);
     if (this.debris) this.debris.update(dt, this.camera);
     if (this.opts.mission) this.opts.mission.update?.(this, dt);
+    if (this.simGrid && p.pos.distanceTo(this.simGrid.position) > 3000) this.simGrid.position.lerp(p.pos, 0.02);
     this.updateCamera(dt);
     // far layer follows the camera (km)
     const o = this.anchorOverride || this.anchor;
@@ -580,7 +652,7 @@ export class FlightMode {
     // docking prompt
     if (this.state === 'flying' && !this.gunner) {
       const justLeft = this.opts.spawn === 'undock' && this.time < 12;
-      const prompt = this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
+      const prompt = this.opts.sim ? '<b>[L]</b> Simulation beenden' : this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
       this.hud.prompt(prompt);
     } else this.hud.prompt('');
     this.game.audio?.engine(p.throttle, p.input.boost);
@@ -726,8 +798,30 @@ export class FlightMode {
     }
   }
 
+  /** A drifting field of scrap around the home station: free money for anyone with a salvage net. */
+  spawnFieldPiece(far = false) {
+    if (!this.salvageGeo) this.spawnSalvage(new THREE.Vector3(0, -1e6, 0), new THREE.Vector3(), 0);
+    this.fieldGeos ||= [new THREE.BoxGeometry(2.2, 0.25, 1.6), new THREE.CylinderGeometry(0.35, 0.35, 3.2, 10), new THREE.BoxGeometry(1.4, 1.0, 1.2), new THREE.DodecahedronGeometry(0.9, 0)];
+    this.fieldGeos.forEach(g => g.userData.shared = true);
+    const c = this.station.pos;
+    let pos;
+    for (let k = 0; k < 8; k++) {
+      const d = new THREE.Vector3().randomDirection(); d.y *= 0.35; d.normalize();
+      pos = c.clone().addScaledVector(d, 700 + Math.random() * 2200);
+      if (!far || pos.distanceTo(this.player.pos) > 1500) break;
+    }
+    const m = new THREE.Mesh(this.fieldGeos[Math.floor(Math.random() * this.fieldGeos.length)], this.salvageMat);
+    m.position.copy(pos); m.scale.setScalar(1 + Math.random() * 1.2); m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
+    this.scene.add(m);
+    this.salvage.push({ mesh: m, vel: new THREE.Vector3().randomDirection().multiplyScalar(0.5 + Math.random() * 2), spin: new THREE.Vector3().randomDirection().multiplyScalar(0.25), life: Infinity, field: true });
+  }
+
   updateSalvage(dt) {
     const p = this.player;
+    if (this.scrapField) {
+      this.fieldT = (this.fieldT || 0) + dt;
+      if (this.fieldT > 15 && this.salvage.filter(s => s.field).length < 22) { this.fieldT = 0; this.spawnFieldPiece(true); }
+    }
     for (let i = this.salvage.length - 1; i >= 0; i--) {
       const s = this.salvage[i];
       s.life -= dt;

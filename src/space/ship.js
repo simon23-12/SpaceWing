@@ -44,7 +44,9 @@ export class Ship {
     this.throttle = opts.throttle ?? 0;
     this.maxShield = stats.shield; this.maxHull = stats.hull;
     this.shield = stats.shield; this.hull = stats.hull * (record.hull ?? 1);
-    this.energy = stats.energy; this.missiles = stats.missiles;
+    this.energy = stats.energy;
+    // the player's missiles are ammunition carried on the ship record (bought in the workshop); NPCs fly fully loaded
+    this.missiles = opts.player && record.uid && !record.uid.startsWith('TEMP') ? Math.min(record.missiles ?? stats.missiles, stats.missiles) : stats.missiles;
     this.radius = model.radius;
     this.hitRadius = Math.max(2.5, model.length * 0.42);
     this.alive = true;

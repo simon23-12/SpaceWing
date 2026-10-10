@@ -183,6 +183,7 @@ export class Director {
     this.ctx = scriptContext(flight);
     const g = this.game.state;
     const run = (fn) => fn(this.ctx, this.game).catch(e => { if (!(e instanceof Abort)) console.error(e); });
+    if (flight.opts.sim) { run((c) => simScript(c, this.game, flight.opts.sim)); return; }
     // story
     const st = STORY[g.story];
     if (st && st.flight && (!st.zone || st.zone === this.zoneId || st.anyZone)) {
@@ -228,6 +229,46 @@ export class Director {
   }
 
   dispose() { this.ctx?.kill(); }
+}
+
+// ============================================================================ combat simulator
+
+export const SIM_SCENARIOS = {
+  drohnen: { name: 'Zieldrohnen', desc: 'Sechs Drohnen, die nicht zurückschießen. Zum Üben von Zielen und Vorhalten.', waves: [{ n: 6, drone: true }] },
+  rotte: { name: 'Schakal-Rotte', desc: 'Drei Wespen, wie bei einem Überfall im Rhea-System.', waves: [{ n: 3, skill: 0.45 }] },
+  staffel: { name: 'Staffelangriff', desc: 'Zwei Wellen Wespen, die zweite besser bewaffnet.', waves: [{ n: 3, skill: 0.5 }, { n: 4, skill: 0.6, upgrades: { lasers: 2 } }] },
+  lanzen: { name: 'Lanzen-Duell', desc: 'Zwei Abfangjäger vom Typ Lanze. Schnell, wendig, schwer zu treffen.', waves: [{ n: 2, cls: 'lanze', name: 'Sim-Lanze', skill: 0.8, upgrades: { lasers: 2 } }] },
+  korsar: { name: 'Kanonenboot', desc: 'Eine schwer gepanzerte Corsair mit Rückenturm und zwei Begleitjägern. Raketen helfen.', waves: [{ n: 2, skill: 0.55 }, { n: 1, cls: 'corsair', name: 'Sim-Corsair', skill: 0.7 }] },
+};
+
+async function simScript(c, game, id) {
+  const f = c.flight, p = f.player, S = SIM_SCENARIOS[id], g = game.state;
+  await c.wait(1.5);
+  c.say('Simulator', `Simulation „${S.name}“ startet. Keine echten Schäden, keine Kosten. Abbrechen mit L.`, 'cassini');
+  const t0 = f.time;
+  for (let w = 0; w < S.waves.length; w++) {
+    const W = S.waves[w];
+    c.objective(`${S.name} · Welle ${w + 1} von ${S.waves.length}`);
+    await c.wait(w ? 3 : 2.5);
+    const center = p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 1600).add(new THREE.Vector3((Math.random() - 0.5) * 800, (Math.random() - 0.5) * 300, 0));
+    let wave;
+    if (W.drone) {
+      wave = await c.spawnWave(Array.from({ length: W.n }, (_, i) => ({ cls: 'wespe', faction: 'neutral', name: `Zieldrohne ${i + 1}`, paint: '#7fd4ff',
+        pos: center.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(250)), tags: ['noFriendlyFire', 'objective'],
+        ai: { mode: 'patrol', center: center.clone(), radius: 450, aggressive: false } })));
+      wave.forEach(d => { d.stats = { ...d.stats, speed: 90 + Math.random() * 60 }; d.shield = 0; d.maxShield = 1; d.hull = d.maxHull = 90; });
+    } else wave = await c.pirates(W.n, center, { cls: W.cls, name: W.name || 'Sim-Wespe', skill: W.skill, upgrades: W.upgrades, dist: 300 });
+    await c.until(() => c.alive(wave).length === 0);
+  }
+  const sec = Math.round(f.time - t0);
+  g.simBest = g.simBest || {};
+  const best = g.simBest[id];
+  if (!best || sec < best) g.simBest[id] = sec;
+  f.hud.showToast(`SIMULATION ABGESCHLOSSEN · ${sec} s${!best || sec < best ? ' · NEUE BESTZEIT' : ''}`, 4);
+  c.say('Simulator', 'Simulation abgeschlossen. Beende die Übung.', 'cassini');
+  c.objective('Simulation abgeschlossen');
+  await c.wait(4);
+  game.endSim(f, true);
 }
 
 async function bountyScript(c, game, job) {

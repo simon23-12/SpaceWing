@@ -245,6 +245,8 @@ export class RoomMode {
         n.root.position.copy(m.pos);
         n.root.rotation.y = Math.atan2(m.dir.x, m.dir.z);
         this.scene.add(n.root);
+        n.update(0, null);
+        n.calibrate(m.pos.y, m.seated && !opts.clip?.match?.(/^(idle|walk|fold|phone|drink|rail|keys)$/), m.room === 'deck' ? 0.42 : 0.5);
         const rec = { id, obj: n.root, base: n.root.position.clone(), npc: n, room: m.room, marker: m };
         this.npcs.push(rec);
         return rec;
@@ -283,6 +285,7 @@ export class RoomMode {
     }
     const holo = this.parts.bruecke?.meta.holo;
     if (holo) this.holoTable(this.parts.bruecke.toWorld(holo));
+    if (this.parts.bruecke) this.simPod(this.parts.bruecke.toWorld([-12.2, 0, -3.2]));
     const pad = this.parts.hangar?.meta.pad;
     if (pad) {
       const ship = this.game.launchShipRecord();
@@ -295,6 +298,37 @@ export class RoomMode {
     await Promise.all(jobs);
     const sees = SEES[this.roomId] || PARTS;
     for (const n of this.npcs) { n.obj.visible = sees.includes(n.room); if (n.extra) n.extra.visible = n.obj.visible; }
+  }
+
+  /** Combat simulator pod: a cockpit shell under a holographic hood, with a sign. */
+  simPod(pos) {
+    const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = Math.PI / 2;
+    const metal = new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.45, metalness: 0.7 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.7, metalness: 0.3 });
+    const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color('#4ad0ff').multiplyScalar(2), toneMapped: false });
+    const holo = new THREE.MeshBasicMaterial({ color: 0x4ad0ff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
+    const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.x = rx; g.add(m); return m; };
+    add(new THREE.CylinderGeometry(1.35, 1.45, 0.25, 40), metal, 0, 0.125);
+    add(new THREE.TorusGeometry(1.38, 0.03, 8, 64), glow, 0, 0.26, 0, Math.PI / 2);
+    add(new THREE.BoxGeometry(0.7, 0.12, 0.7), dark, 0, 0.62);                       // seat
+    add(new THREE.BoxGeometry(0.7, 0.8, 0.12), dark, 0, 1.0, 0.36);                   // backrest
+    add(new THREE.CylinderGeometry(0.12, 0.18, 0.4, 12), metal, 0, 0.45);
+    add(new THREE.BoxGeometry(0.9, 0.08, 0.35), metal, 0, 0.95, -0.45, -0.4);         // console
+    add(new THREE.BoxGeometry(0.7, 0.4, 0.02), glow, 0, 1.18, -0.55, -0.25);         // screen
+    const hood = add(new THREE.SphereGeometry(1.25, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), holo, 0, 0.3);
+    const ring = add(new THREE.TorusGeometry(1.26, 0.02, 6, 64), glow, 0, 1.1, 0, Math.PI / 2);
+    // sign
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+    const x = cv.getContext('2d'); x.fillStyle = '#7fe0ff'; x.font = '600 52px Rajdhani, sans-serif'; x.textAlign = 'center'; x.fillText('GEFECHTSSIMULATOR', 256, 64);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const sign = add(new THREE.PlaneGeometry(2.4, 0.45), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, color: new THREE.Color(1.6, 1.6, 1.6) }), 0, 2.2);
+    sign.userData.billboard = true;
+    this.scene.add(g);
+    this.animated.push({ kind: 'sim', hood, ring, sign });
+    const box = new THREE.Box3(new THREE.Vector3(-1.3, 0, -1.3), new THREE.Vector3(1.3, 2.4, 1.3));
+    g.updateMatrixWorld(true);
+    (this.shipBoxes ||= []).push({ box, inv: g.matrixWorld.clone().invert(), m: g.matrixWorld.clone() });
+    this.markers.push({ kind: 'terminal', id: 'sim', label: 'Gefechtssimulator', room: 'bruecke', pos: pos.clone(), dir: new THREE.Vector3(1, 0, 0) });
   }
 
   /** A parked ship model in the hangar, with a box collider so nobody walks into it. */
@@ -443,7 +477,7 @@ export class RoomMode {
     this.time += dt;
     const modal = this.game.ui.modalOpen || this.game.ui.dlg;
     this.ctp.classList.toggle('hidden', input.locked || !!modal);
-    if (!modal && input.locked) this.move(dt); else { this.vel.x = 0; this.vel.z = 0; this.move(dt, true); }
+    if (!modal && (input.locked || input.pad?.active)) this.move(dt); else { this.vel.x = 0; this.vel.z = 0; this.move(dt, true); }
     this.camera.position.set(this.pos.x, this.pos.y + this.height - 0.12 + Math.sin(this.time * 9) * this.bob * 0.025, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     let sq = this.spaceQ;
@@ -471,6 +505,11 @@ export class RoomMode {
     }
     for (const a of this.animated) {
       if (a.kind === 'band') a.mat.uniforms.time.value = this.time;
+      else if (a.kind === 'sim') {
+        a.ring.position.y = 0.4 + (Math.sin(this.time * 0.9) * 0.5 + 0.5) * 1.1;
+        a.hood.material.opacity = 0.12 + 0.06 * Math.sin(this.time * 2.3);
+        a.sign.lookAt(this.camera.position.x, a.sign.getWorldPosition(new THREE.Vector3()).y, this.camera.position.z);
+      }
       else if (a.kind === 'holo') {
         a.mats.forEach(m => m.uniforms.time.value = this.time);
         a.sat.rotation.y += dt * 0.3; a.ring.rotation.z += dt * 0.05;
@@ -513,6 +552,8 @@ export class RoomMode {
     if (!frozen) {
       this.yaw -= input.mouse.dx * 0.0022 * (this.game.settings.mouseSens || 1);
       this.pitch -= input.mouse.dy * 0.0022 * (this.game.settings.mouseSens || 1) * (this.game.settings.invertY ? -1 : 1);
+      const pad = input.pad;
+      if (pad?.active) { this.yaw -= (pad.std ? pad.roll : 0) * dt * 2.4; this.pitch -= (pad.std ? pad.look : 0) * dt * 1.8; }
       this.pitch = THREE.MathUtils.clamp(this.pitch, -1.45, 1.45);
     }
     const f = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
@@ -521,9 +562,11 @@ export class RoomMode {
     if (!frozen) {
       if (input.down('KeyW')) wish.add(f); if (input.down('KeyS')) wish.sub(f);
       if (input.down('KeyD')) wish.add(r); if (input.down('KeyA')) wish.sub(r);
+      const pad = input.pad;
+      if (pad?.active) { wish.addScaledVector(f, -pad.pitch).addScaledVector(r, pad.yaw); }
     }
-    const speed = input.down('ShiftLeft') ? 6.0 : 3.4;
-    if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(speed);
+    const speed = input.down('ShiftLeft') || input.pad?.boost ? 6.0 : 3.4;
+    { const l = wish.length(); if (l > 0) wish.multiplyScalar(speed / Math.max(1, l)); }
     const k = this.onGround ? 12 : 2;
     this.vel.x += (wish.x - this.vel.x) * Math.min(1, k * dt);
     this.vel.z += (wish.z - this.vel.z) * Math.min(1, k * dt);
@@ -597,7 +640,7 @@ export class RoomMode {
     const label = m ? this.labelFor(m) : '';
     this.promptEl.classList.toggle('hidden', !label);
     if (label) this.promptEl.innerHTML = `<b>[E]</b> ${label}`;
-    if (m && input.hit('KeyE')) {
+    if (m && (input.hit('KeyE') || input.pad?.use)) {
       if (m.kind === 'lift') this.lift.call(m.level);
       else this.game.onInteract(this, m);
     }

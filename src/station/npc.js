@@ -130,7 +130,11 @@ export class NPC {
     const head = this.bones.head, neck = this.bones.neck_01;
     // undo last frame's look offset first: clips without head/neck tracks would otherwise accumulate it (spinning head)
     if (this.baseQ && head && neck) { neck.quaternion.copy(this.baseQ[0]); head.quaternion.copy(this.baseQ[1]); }
+    // same for the seat correction: compressed clips may have no thigh tracks, so the offset must not accumulate
+    if (this.thighBase) { this.bones.thigh_l.quaternion.copy(this.thighBase[0]); this.bones.thigh_r.quaternion.copy(this.thighBase[1]); }
     this.mixer.update(dt);
+    this.thighBase = this.thighFix ? [this.bones.thigh_l.quaternion.clone(), this.bones.thigh_r.quaternion.clone()] : null;
+    if (this.thighFix && /sit/.test(this.current?.getClip().name || '')) this.applyThighFix();
     if (!head || !neck) return;
     this.baseQ = [neck.quaternion.clone(), head.quaternion.clone()];
     // target angles in the character's own frame (it faces +Z)
@@ -167,6 +171,45 @@ export class NPC {
     this.root.updateMatrixWorld(true);
     this.addLook(neck, 0.4);
     this.addLook(head, 0.6);
+  }
+
+  /** Ground the figure: soles on the floor, or (seated) the pelvis on the seat with the thighs angled so the feet reach the floor. */
+  calibrate(floorY, seated, seatH = 0.5) {
+    const V = THREE.Vector3, B = this.bones;
+    if (!B.ball_l || !B.pelvis) return;
+    this.root.updateMatrixWorld(true);
+    const foot = () => { this.root.updateMatrixWorld(true); return Math.min(B.ball_l.getWorldPosition(new V()).y, B.ball_r.getWorldPosition(new V()).y); };
+    const SOLE = 0.04;            // the ball joint sits a few cm above the sole
+    if (!seated) { this.root.position.y += floorY + SOLE - foot(); this.root.updateMatrixWorld(true); return; }
+    const fwd = new V(0, 0, 1).applyQuaternion(this.root.quaternion); fwd.y = 0; fwd.normalize();
+    const rel = B.pelvis.getWorldPosition(new V()).sub(this.root.position);
+    this.root.position.y += floorY + seatH + 0.09 - (this.root.position.y + rel.y);
+    this.root.position.addScaledVector(fwd, -0.06 - rel.dot(fwd));
+    // the clip was made for a lower seat: tilt the thighs down until the feet touch the floor again
+    const base = [B.thigh_l.quaternion.clone(), B.thigh_r.quaternion.clone()];
+    let best = 0, bestErr = Infinity;
+    for (const sign of [1, -1]) for (let a = 0; a <= 0.7; a += 0.025) {
+      B.thigh_l.quaternion.copy(base[0]); B.thigh_r.quaternion.copy(base[1]);
+      this.thighFix = a * sign; this.applyThighFix();
+      const err = Math.abs(foot() - (floorY + SOLE));
+      if (err < bestErr) { bestErr = err; best = a * sign; }
+    }
+    B.thigh_l.quaternion.copy(base[0]); B.thigh_r.quaternion.copy(base[1]);
+    this.thighFix = best;
+  }
+
+  applyThighFix() {
+    if (!this.thighFix) return;
+    this.root.updateMatrixWorld(true);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.root.getWorldQuaternion(_q));
+    const q = new THREE.Quaternion().setFromAxisAngle(right, this.thighFix);
+    for (const k of ['thigh_l', 'thigh_r']) {
+      const bone = this.bones[k]; if (!bone) continue;
+      bone.getWorldQuaternion(_q2);
+      const parentQ = bone.parent.getWorldQuaternion(new THREE.Quaternion());
+      bone.quaternion.copy(parentQ.invert().multiply(q.clone().multiply(_q2)));
+      bone.updateMatrixWorld(true);
+    }
   }
 
   addLook(bone, share) {

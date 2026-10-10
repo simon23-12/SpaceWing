@@ -100,14 +100,28 @@ export class HUD {
     this.target.classList.remove('hidden');
     const d = flight.player.pos.distanceTo(t.pos);
     const fc = FACTIONS[t.faction] || FACTIONS.neutral;
-    const key = t.id + '|' + Math.round(t.shield) + '|' + Math.round(t.hull) + '|' + Math.round(d / 10);
+    const dist = d > 2000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
+    if (t.isObject) {
+      const key = t.name + '|' + Math.round(d / 10);
+      if (this._tk === key) return;
+      this._tk = key;
+      this.target.innerHTML = `<div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
+        <div class="tfac">${t.kind === 'salvage' ? 'Objekt · Trümmer' : 'Objekt · Station · ' + fc.name}</div>
+        <div class="tinfo">${t.info}</div><div class="tdist">${dist}</div>`;
+      return;
+    }
+    const closing = Math.round(-flight.player.vel.clone().sub(t.vel).dot(t.pos.clone().sub(flight.player.pos).normalize()));
+    const key = t.id + '|' + Math.round(t.shield) + '|' + Math.round(t.hull) + '|' + Math.round(d / 10) + '|' + Math.round(closing / 10);
     if (this._tk === key) return;
     this._tk = key;
+    const cls = t.stats?.name ? `${t.stats.name}${t.stats.role ? ' · ' + t.stats.role : ''}` : '';
     this.target.innerHTML = `<div class="tname" style="color:${fc.color}">${t.name}</div>
+      <div class="tfac">${cls}</div>
       <div class="tfac">${fc.name}${t.cargoLabel ? ' · ' + t.cargoLabel : ''}</div>
       <div class="bar"><label>SCHILD</label><div class="track"><div class="fill shield" style="width:${100 * t.shield / t.maxShield}%"></div></div></div>
       <div class="bar"><label>RUMPF</label><div class="track"><div class="fill hull" style="width:${100 * t.hull / t.maxHull}%"></div></div></div>
-      <div class="tdist">${d > 2000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</div>`;
+      <div class="tdist">${dist} <small>${closing >= 0 ? '▼' : '▲'} ${Math.abs(closing)} m/s</small></div>
+      <div class="tinfo">${flight.isHostile(t, flight.player) ? 'Vorhalten: auf den Kreis vor dem Ziel zielen' : (FACTIONS[t.faction] || {}).name || ''}</div>`;
   }
 
   project(cam, pos) {
@@ -160,13 +174,25 @@ export class HUD {
         ctx.fillStyle = col;
         ctx.fillText(`${s.name}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + size + 4, sp.y - size + 8);
       }
+      if (!isT && hostileTo && d < 1500) {
+        // every close hostile shows where to aim (small diamond)
+        const l = this.project(cam, flight.leadFor(p, s));
+        if (!l.behind) { ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(l.x, l.y - 4); ctx.lineTo(l.x + 4, l.y); ctx.lineTo(l.x, l.y + 4); ctx.lineTo(l.x - 4, l.y); ctx.closePath(); ctx.stroke(); }
+      }
       if (isT) {
-        // lead indicator
+        // lead indicator: where the bolts must go; turns green when the guns line up (aim assist takes over)
         const lp = flight.leadFor(p, s);
         const l = this.project(cam, lp);
         if (!l.behind) {
-          ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(l.x, l.y, 6, 0, Math.PI * 2); ctx.stroke();
-          ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(l.x, l.y); ctx.stroke(); ctx.setLineDash([]);
+          const aimDir = this.gunner ? cam.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
+          const from = this.gunner ? cam.position : p.pos;
+          const onT = hostileTo && lp.clone().sub(from).normalize().angleTo(aimDir) < (this.gunner ? 0.05 : 0.07) && d < 1600;
+          const lc = onT ? '#5aff8a' : col;
+          ctx.strokeStyle = lc; ctx.lineWidth = onT ? 2.5 : 1.8;
+          ctx.beginPath(); ctx.arc(l.x, l.y, onT ? 11 : 9, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(l.x, l.y, 2, 0, Math.PI * 2); ctx.fillStyle = lc; ctx.fill();
+          ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(l.x, l.y); ctx.stroke(); ctx.setLineDash([]);
+          if (onT) { ctx.fillStyle = '#5aff8a'; ctx.fillText('IM ZIEL', l.x + 14, l.y + 4); }
         }
         if (flight.lock && flight.lock.target === s) {
           const k = Math.min(1, flight.lock.t / p.stats.lockTime);
@@ -174,6 +200,17 @@ export class HUD {
           ctx.beginPath(); ctx.arc(sp.x, sp.y, size + 10 + (1 - k) * 30, 0, Math.PI * 2 * k); ctx.stroke();
           if (k >= 1) { ctx.fillStyle = '#ff4040'; ctx.fillText('ERFASST', sp.x - 20, sp.y + size + 18); }
         }
+      }
+    }
+    // locked object (station / salvage): bracket and label
+    const tg = p.target;
+    if (tg && tg.isObject && tg.alive) {
+      const sp = this.project(cam, tg.pos), d = p.pos.distanceTo(tg.pos);
+      const oc = tg.kind === 'salvage' ? '#ffb050' : '#9fe0ff';
+      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) this.edgeArrow(ctx, sp, oc, true);
+      else {
+        ctx.strokeStyle = oc; ctx.lineWidth = 2; this.bracket(ctx, sp.x, sp.y, tg.kind === 'salvage' ? 14 : 30, true);
+        ctx.fillStyle = oc; ctx.fillText(`${tg.name}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 34, sp.y - 20);
       }
     }
     // salvage pieces: small amber diamonds
@@ -185,7 +222,7 @@ export class HUD {
       const sp = this.project(cam, sv.mesh.position);
       if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) continue;
       ctx.beginPath(); ctx.moveTo(sp.x, sp.y - 5); ctx.lineTo(sp.x + 5, sp.y); ctx.lineTo(sp.x, sp.y + 5); ctx.lineTo(sp.x - 5, sp.y); ctx.closePath(); ctx.stroke();
-      if (!labelled && d < 1500) { labelled = true; ctx.fillText(`Trümmer ${Math.round(d)} m`, sp.x + 9, sp.y + 4); }
+      if (!labelled && d < 1500 && sv.tgt !== p.target) { labelled = true; ctx.fillText(`Trümmer ${Math.round(d)} m`, sp.x + 9, sp.y + 4); }
     }
     // waypoints
     for (const w of flight.waypoints) {
@@ -196,27 +233,6 @@ export class HUD {
       ctx.beginPath(); ctx.moveTo(sp.x, sp.y - 10); ctx.lineTo(sp.x + 10, sp.y); ctx.lineTo(sp.x, sp.y + 10); ctx.lineTo(sp.x - 10, sp.y); ctx.closePath(); ctx.stroke();
       ctx.fillStyle = '#ffd36a';
       ctx.fillText(`${w.label}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 14, sp.y + 4);
-    }
-    // Saturn: always marked, the fixed point you navigate by
-    {
-      const an = flight.anchorOverride || flight.anchor;
-      const dist = Math.hypot(an[0], an[1], an[2]);
-      const ds = new THREE.Vector3(-an[0], -an[1], -an[2]).normalize();
-      const sp = this.project(cam, cam.getWorldPosition(new THREE.Vector3()).addScaledVector(ds, 5000));
-      const lbl = `SATURN  ${(dist / 1000).toFixed(0)} Tkm`;
-      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) {
-        this.edgeArrow(ctx, sp, '#e8c88a', false);
-        let dx = sp.x - W / 2, dy = sp.y - H / 2; if (sp.behind) { dx = -dx; dy = -dy; }
-        const a = Math.atan2(dy, dx), R = Math.min(W, H) * 0.42 - 22;
-        ctx.fillStyle = 'rgba(232,200,138,.75)'; ctx.font = '600 11px Rajdhani, sans-serif';
-        ctx.fillText('SATURN', W / 2 + Math.cos(a) * R - 18, H / 2 + Math.sin(a) * R + 4);
-      } else {
-        ctx.strokeStyle = 'rgba(232,200,138,.55)'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(sp.x, sp.y, 22, -0.4, 0.4); ctx.stroke();
-        ctx.beginPath(); ctx.arc(sp.x, sp.y, 22, Math.PI - 0.4, Math.PI + 0.4); ctx.stroke();
-        ctx.fillStyle = 'rgba(232,200,138,.8)'; ctx.font = '600 11px Rajdhani, sans-serif';
-        ctx.fillText(lbl, sp.x + 28, sp.y + 4);
-      }
     }
     // damage vignette
     flight.game.renderer.grade.uniforms.hit.value = Math.max(0, 0.6 - (p.time - p.lastHit) * 1.5) * (p.hull < p.maxHull ? 1 : 0.4);

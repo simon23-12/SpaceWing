@@ -107,9 +107,25 @@ if what == 'title':
     rim = bpy.data.lights.new('rim', 'AREA'); rim.energy = 2.0e7; rim.size = 400; rim.color = (0.55, 0.7, 1.0)
     ro = bpy.data.objects.new('rim', rim); bpy.context.scene.collection.objects.link(ro); ro.location = (-900, 1600, 900)
     ro.rotation_euler = (Vector((0, 0, 0)) - ro.location).to_track_quat('-Z', 'Y').to_euler()
-    cam = camera(tuple(C), tuple(T), lens=32)
-    cam.data.clip_end = 1e7
-    res['r'] = save('title')
+    if '--layers' in flags:
+        # main menu v2: further away and wider, rendered as two layers so the browser can move them independently
+        C2 = T - f * (T - C).length * 1.35
+        cam = camera(tuple(C2), tuple(T), lens=26)
+        cam.data.clip_end = 1e7
+        sky_objs = [o for o in bpy.data.objects if o.name in ('SATURN_BG', 'RINGS_BG', 'rhea')]
+        station_objs = [o for o in bpy.data.objects if o.type in ('MESH', 'CURVE') and o not in sky_objs]
+        for o in station_objs: o.hide_render = True
+        res['bg'] = save('title_bg', w=2560, h=1440)
+        for o in station_objs: o.hide_render = False
+        for o in sky_objs: o.visible_camera = False
+        sc = swlib.cycles(samples=samples, w=2560, h=1440, transform='AgX', look='AgX - Punchy', denoise=True)
+        sc.render.film_transparent = True
+        sc.render.image_settings.file_format = 'PNG'; sc.render.image_settings.color_mode = 'RGBA'
+        res['st'] = swlib.save_render(swlib.out('ui', 'title_st.png'), fmt='PNG', mode='RGBA')
+    else:
+        cam = camera(tuple(C), tuple(T), lens=32)
+        cam.data.clip_end = 1e7
+        res['r'] = save('title')
 elif what == 'hangar':
     S, Gl, Gs, X = interiors.hangar()
     interiors.setup_world_space(strength=0.8, saturn=True, sat_dir=(1.0, -0.15, 0.12), sat_dist=2600, sat_size=420)

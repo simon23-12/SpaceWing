@@ -144,6 +144,7 @@ export function npcDialogue(game, npc) {
     { q: 'Zeig mir die Aufträge.', a: ['Bitte sehr. Frisch vom Netz.'], act: (gm) => gm.ui.openBoerse() },
     { q: 'Wer zahlt am besten?', a: ['Das Konsortium zahlt gut und vergisst nichts. Das Kollektiv zahlt wenig und vergisst nie, wer geholfen hat. Die Ringgilde zahlt in bar und in Schnaps.', 'Kopfgelder auf Schakale zahlt die Börse selbst. Die sind ehrlich verdient.'] },
     { q: 'Was hat es mit dem Zoll auf sich?', a: ['Die Liga der Inneren Welten sagt, der Saturn soll seinen Anteil an der Ordnung des Systems zahlen. Das Konsortium sagt, die Liga soll sich um ihre eigenen Planeten kümmern.', 'Ich sage: Solange beide streiten, gibt es Arbeit.'] },
+    { q: 'Wo kann ich das Kämpfen üben?', a: ['Im Gefechtssimulator, hier auf dem Kommandodeck, am Westende. Er lädt dein eigenes Schiff, und wenn du abgeschossen wirst, stehst du einfach wieder auf.'] },
     { q: 'Wie werde ich bekannter?', a: ['Verdien Geld. Ab zwanzigtausend Kredits nennt man dich hier Frachtpilot, dann öffnet sogar das Herschel-Depot auf Mimas seine Tore.'] },
   ], 'Danke, Femi.');
   if (npc === 'haendler') return tree('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', [
@@ -398,7 +399,8 @@ export const STORY = {
         ai: { mode: 'patrol', center: ahead(1300), radius: 400, aggressive: false } });
       last.stats = { ...last.stats, speed: 120 }; last.shield = 0; last.maxShield = 1; last.hull = last.maxHull = 130;
       p.target = last;
-      await c.talk([M('Die da ist zäher. Halt sie im Visier, bis der Kreis rot wird, dann Rechtsklick oder F. Rakete raus.')]);
+      if (p.missiles < 2) { p.missiles = 2; p.trainingMissiles = true; }
+      await c.talk([M('Ich hab dir zwei Übungsraketen eingehängt, einen Werfer hat die Spacewing noch nicht. Den baut dir später Yara ein.'), M('Die da ist zäher. Halt sie im Visier, bis der Kreis rot wird, dann Rechtsklick oder F. Rakete raus.')]);
       c.objective('Die zähe Drohne mit einer Rakete treffen [Rechtsklick] / [F]');
       await c.until(() => !last.alive);
       await c.talk([
@@ -414,6 +416,7 @@ export const STORY = {
       if (station !== 'cassini' || !g.flags.m1bflown) return null;
       return [
         say(MAGS, 'Na also. Du fliegst wie jemand, der es ernst meint. Teo hätte gelacht und dir sofort den Steuerknüppel geklaut.', { scene: 'hangar' }),
+        say(MAGS, 'Und üb weiter. Auf dem Kommandodeck steht ein Gefechtssimulator. Da kannst du dich abschießen lassen, so oft du willst, und es kostet nichts.'),
         say(MAGS, 'Für den Sprit gebe ich dir dreihundert dazu. Ab jetzt verdienst du dein Geld selbst: Söldnerbörse auf dem Kommandodeck, bei Femi.', {
           act: (gm) => completeStory(gm, 'flugschule', 300, 'zoll', 'Flugstunde mit Mags. Die Spacewing gehorcht.') }),
       ];

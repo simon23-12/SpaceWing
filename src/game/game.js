@@ -41,6 +41,8 @@ export class Game {
 
   frame() {
     const dt = Math.min(0.1, this.clock.getDelta());
+    input.pollPad();
+    if (input.pad?.menu && this.mode?.isRoom) this.ui.pause();
     if (this.mode && !this.paused && this.mode.update) this.mode.update(dt);
     if (this.mode && this.mode.render3D !== false) this.renderer.render(dt);
     input.endFrame();
@@ -239,6 +241,7 @@ export class Game {
     if (m.kind === 'terminal') {
       if (m.id === 'boerse') return this.ui.openBoerse();
       if (m.id === 'hangar_werft') return this.ui.openWerkstatt();
+      if (m.id === 'sim') return g.flags.m1done ? this.ui.openSim() : this.ui.notify('Simulator gesperrt. Erst nach deiner ersten Tour mit Mags.');
       if (m.id === 'werft') return this.ui.openWerft();
       if (m.id === 'karte') return this.ui.openMap(null);
       if (m.id === 'kabine_terminal') return this.ui.openTerminal();
@@ -375,8 +378,24 @@ export class Game {
     await this.enterStation(stationId);
   }
 
+  /** Combat simulator: fly a copy of your active ship, nothing is lost. */
+  async startSim(id) {
+    const g = this.state, ship = activeShip(g);
+    if (!ship) { this.ui.notify('Ohne eigenes Schiff gibt es keine Simulation.'); return; }
+    const rec = { ...ship, uid: 'TEMP-SIM', hull: 1, cargo: {}, missiles: undefined, upgrades: { ...ship.upgrades } };
+    await this.startFlight('sim', 'arrive', rec, { sim: id });
+  }
+
+  async endSim(flight, won) {
+    if (this.mode !== flight) return;
+    await this.fadeOut(0.6);
+    await this.enterRoom('bruecke', 'from_sim');
+    if (!won) this.ui.notify('Simulation beendet.');
+  }
+
   async onPlayerDead(flight) {
     const g = this.state;
+    if (flight.opts.sim) { this.ui.notify('Simulation: abgeschossen. Kein echter Schaden.'); return this.endSim(flight, false); }
     await this.fadeOut(1.2);
     await this.leaveMode();
     this.ui.clear();

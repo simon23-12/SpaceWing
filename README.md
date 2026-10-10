@@ -23,7 +23,9 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 - **Realistischer Saturn:** abgeplatteter Planet mit Wolkenbändern und Polarhexagon, Ringe mit realer Radialstruktur (C-, B- und A-Ring, Cassini-Teilung, Encke-Lücke, F-Ring), gegenseitige Schatten von Planet und Ringen sowie die Monde Mimas, Enceladus, Tethys, Dione, Rhea, Titan (mit Atmosphäre), Iapetus (zweifarbig, mit Äquatorgrat) und Phoebe.
 - **Reisen:** Hyperraumsprung zwischen den Monden, Fusionsbrand innerhalb eines Mondsystems (Mimas ↔ Ringrand, Iapetus ↔ Phoebe).
 - **Geld verdienen im Heimatsystem:** Zwischen Hochstation Cassini, dem Bergbauposten Inktomi und dem Frachtdepot L4 gibt es immer Frachtaufträge, ganz ohne Sprungtriebwerk. Unterwegs überfallen manchmal Schakale: Im Rhea-System kann man ihnen mit dem Nachbrenner immer entkommen. Wer kämpft, bekommt Abschussprämien und kann Trümmer einsammeln und als Bergungsschrott verkaufen (Bergungsnetz in der Werkstatt aufrüstbar).
-- **Werkstatt in Hangar 7:** Mechanikerin Yara Benedek baut Mods ein, repariert und lackiert gegen Kredits.
+- **Werkstatt in Hangar 7:** Mechanikerin Yara Benedek baut Mods ein, repariert und lackiert gegen Kredits. Eine 3D-Vorschau zeigt jeden Umbau vorher, auch ohne Kredits. Raketenwerfer sind nachrüstbar, Raketen werden einzeln gekauft.
+- **Gefechtssimulator** auf dem Kommandodeck: fünf Übungsszenarien mit dem eigenen Schiff, ohne Schaden, mit Bestzeiten.
+- **Zielhilfe:** Vorhaltekreis vor jedem Gegner, der grün wird, wenn die Kanonen richtig ausgerichtet sind; Zielerfassung auch für Station und Trümmer.
 - **Vertonung:** Funksprüche und Dialoge sind mit lokaler Sprachsynthese (Piper) vertont; im All laufen sie durch einen Funkfilter mit Rauschen und Squelch.
 - **Wirtschaft:** zehn Handelswaren, deren Preise auf Story-Ereignisse reagieren (Saturnzoll, Embargo, Krieg), generierte Aufträge, sieben Upgrade-Bereiche pro Schiff, Lackierungen, Schiffskauf und -verkauf.
 - **Story:** acht Storymissionen mit drei Enden, siehe [docs/STORY.md](docs/STORY.md).
@@ -58,6 +60,10 @@ python3 tools/bl.py blender/ships.py spacewing
 **Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T Ziel · C Kamera · L andocken · M Systemkarte · Esc Pause
 
 **Auf der Station:** WASD gehen · Shift laufen · Maus umsehen · E benutzen/sprechen · Tab Deckplan
+
+**Gamepad (Xbox/PlayStation):** linker Stick lenken, rechter Stick rollen, RT Laser, LT Rakete, A Nachbrenner, LB/RB Schub, B Ziel, X Ziel voraus, Y Kamera, Start Karte, Back andocken. Auf der Station: linker Stick gehen, rechter Stick umsehen, A benutzen.
+
+**Joystick (HOTAS):** Knüppel lenken, Drehachse rollen, Schubhebel Schub, Abzug Laser, Taste 2 Rakete, Taste 3 Nachbrenner, Taste 4 Ziel.
 
 **Überall:** F12 Vollbild
 

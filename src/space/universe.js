@@ -40,6 +40,9 @@ export const ZONES = {
     name: 'Rhea-System · Frachtdepot L4', body: 'rhea', offset: [-0.35, 0.25, -0.3, 12500],
     station: { id: 'lagrange', model: 'station_cassini', pos: [0, 0, 0], tint: [0.86, 0.94, 1.08] },
   },
+  sim: {
+    name: 'GEFECHTSSIMULATOR · Übungsraum', body: 'rhea', offset: [0.3, 0.85, 0.45, 6000],
+  },
   enceladus: {
     name: 'Enceladus · Geysirfeld „Quelle“', body: 'enceladus', offset: [0.7, 0.5, -0.6, 560],
     station: { id: 'quelle', model: 'station_small', pos: [0, 0, 0], tint: [0.82, 0.95, 1.12] }, geysers: true, debris: 'ice',

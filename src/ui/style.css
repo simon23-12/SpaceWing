@@ -185,6 +185,8 @@ table.grid tr:hover td { background: rgba(127,212,255,.05); }
 .hud-target { right: 22px; top: 60px; bottom: auto; }
 .hud-target .tname { font-size: 18px; text-transform: uppercase; }
 .hud-target .tfac { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+.hud-target .tinfo { font-family: var(--f-text); font-size: 13px; color: #cfe4ee; letter-spacing: 0; margin-top: 4px; line-height: 1.35; }
+.hud-target .tdist small { font-size: 12px; color: var(--dim); margin-left: 6px; }
 .hud-target .tdist { text-align: right; font-size: 20px; color: #fff; margin-top: 4px; }
 .hud-radar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 200px; height: 200px; }
 .hud-help { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-family: var(--f-text); letter-spacing: 0; font-size: 13px; color: var(--dim); background: rgba(0,0,0,.5); padding: 6px 12px; transition: opacity 1s; max-width: 90vw; text-align: center; }
@@ -209,3 +211,11 @@ table.grid tr:hover td { background: rgba(127,212,255,.05); }
 .svrow { display: grid; grid-template-columns: 1fr auto 20px auto; gap: 6px; font-family: var(--f-head); letter-spacing: .06em; }
 .svrow .arrow { color: var(--dim); text-align: center; }
 tr.pvrow { cursor: pointer; } tr.pvrow:hover { background: rgba(127,212,255,.06); } tr.pvrow.sel { background: rgba(127,212,255,.12); box-shadow: inset 3px 0 0 var(--accent); }
+
+.fkey { position: absolute; z-index: 2; left: 24px; bottom: 20px; font-family: var(--f-head); letter-spacing: .2em; font-size: 13px; color: var(--dim); }
+.fkey b { color: #fff; border: 1px solid var(--line2); padding: 1px 6px; margin-right: 8px; letter-spacing: .05em; }
+.ammo { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--f-head); letter-spacing: .1em; font-size: 14px; }
+.title .tlayers { position: absolute; inset: 0; overflow: hidden; z-index: -1; }
+.title .tlayers::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 70% 40%, rgba(0,0,0,0) 0%, rgba(0,0,0,.5) 75%); }
+.title .tlayers > div { position: absolute; inset: -4%; background-size: cover; background-position: center; will-change: transform; }
+.title .tst { filter: drop-shadow(0 0 30px rgba(0,0,0,.35)); }

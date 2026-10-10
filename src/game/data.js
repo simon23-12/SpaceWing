@@ -16,7 +16,7 @@ export const FACTIONS = {
 export const SHIP_CLASSES = {
   spacewing: {
     name: 'SW-2 „Spacewing“', maker: 'Hawker-Lindqvist', role: 'Kurierjäger', price: 22000,
-    hull: 260, shield: 150, speed: 230, boost: 430, accel: 80, turn: 1.7, cargo: 8, guns: 2, missiles: 4,
+    hull: 260, shield: 150, speed: 230, boost: 430, accel: 80, turn: 1.7, cargo: 8, guns: 2, missiles: 0,
     energy: 100, regen: 18, laserDmg: 14, laserRate: 7, turret: false, length: 12.6, engine: '#7fb6ff',
     desc: 'Ein 40 Jahre alter Kurierjäger. Wendig, zäh, eigensinnig. Teo Okafor hat ihn geliebt.',
   },
@@ -73,7 +73,7 @@ export const UPGRADES = {
   shield:   { name: 'Schildgenerator', desc: '+15 % Schildkapazität',          base: 2800 },
   armor:    { name: 'Rumpfpanzerung', desc: '+15 % Rumpfstruktur',            base: 2200 },
   lasers:   { name: 'Laserkanonen',   desc: '+12 % Schaden, +5 % Feuerrate',   base: 3200 },
-  missiles: { name: 'Raketenwerfer',  desc: '+2 Raketen, schnellere Zielerfassung', base: 3000 },
+  missiles: { name: 'Raketenwerfer',  desc: '+2 Raketenschächte, schnellere Zielerfassung (Raketen kauft man dazu)', base: 3000 },
   cargo:    { name: 'Frachtraum',     desc: '+20 % Ladekapazität',             base: 1800 },
   reactor:  { name: 'Energiekern',    desc: '+15 % Energie-Regeneration',     base: 2600 },
   salvage:  { name: 'Bergungsnetz',   desc: '+3 t Trümmer einsammeln (Grundausstattung: 2 t)', base: 1400 },

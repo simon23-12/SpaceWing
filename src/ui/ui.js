@@ -1,12 +1,14 @@
 import { assets } from '../core/assets.js';
 import { SHIP_CLASSES, UPGRADES, MAX_UPGRADE, maxLevel, upgradePrice, PAINTS, PAINT_PRICE, shipStats, COMMODITIES, STATIONS, FACTIONS, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from '../game/data.js';
 import { activeShip, cargoUsed, cargoFree, addCredits, fmt, rank, price, availableAt, logEntry, addShip } from '../game/state.js';
-import { generateJobs, acceptJob, abandonJob } from '../game/missions.js';
+import { generateJobs, acceptJob, abandonJob, SIM_SCENARIOS } from '../game/missions.js';
 import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
 import { Streaks } from './streaks.js';
 import { ShipPreview } from './shipPreview.js';
+
+const MISSILE_PRICE = 150;
 
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -51,7 +53,8 @@ export class UI {
   // ------------------------------------------------------------------ title & loading
   title({ hasSave, onNew, onContinue }) {
     const el = $(`<div class="title">
-      <div class="bgimg" style="background-image:url(${assets.url('assets/ui/title.jpg')})"></div>
+      <div class="tlayers"><div class="tbg" style="background-image:url(${assets.url('assets/ui/title_bg.jpg')}), url(${assets.url('assets/ui/title.jpg')})"></div>
+        <div class="tst" style="background-image:url(${assets.url('assets/ui/title_st.png')})"></div></div>
       <h1>SPACEWING</h1><h2>SATURN</h2>
       <div class="menu">
         ${hasSave ? '<button class="btn warm" data-a="cont">Fortsetzen</button>' : ''}
@@ -59,10 +62,24 @@ export class UI {
         <button class="btn" data-a="help">Steuerung</button>
       </div>
       <div class="credit">Von Simon</div>
+      <div class="fkey"><b>F12</b> Vollbild</div>
     </div>`);
     // speed streaks drifting through the picture, slowly, towards the station
     const streaks = new Streaks(el, { count: 55, speed: 1.5, vx: 0.66, vy: 0.55, alpha: 0.85, color: [205, 228, 255], z: 0 });
-    el._cleanup = () => streaks.dispose();
+    // slow drift: Saturn and the station move a little against each other (and follow the mouse a bit)
+    const bg = el.querySelector('.tbg'), stl = el.querySelector('.tst');
+    let mx = 0, my = 0, raf = 0;
+    const onMove = (e) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; };
+    addEventListener('mousemove', onMove);
+    const t0 = performance.now();
+    const tick = () => {
+      const t = (performance.now() - t0) / 1000;
+      bg.style.transform = `scale(${1.07 + 0.025 * Math.sin(t / 23)}) translate(${Math.sin(t / 31) * 0.9 - mx * 0.6}%, ${Math.cos(t / 37) * 0.6 - my * 0.5}%)`;
+      stl.style.transform = `scale(${1.05 + 0.02 * Math.sin(t / 17 + 1)}) translate(${Math.sin(t / 13) * 1.3 - mx * 1.6}%, ${Math.cos(t / 15) * 0.9 - my * 1.2}%) rotate(${Math.sin(t / 19) * 0.7}deg)`;
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    el._cleanup = () => { streaks.dispose(); cancelAnimationFrame(raf); removeEventListener('mousemove', onMove); };
     el.querySelector('[data-a="new"]').onclick = () => {
       this.sfx();
       const menu = el.querySelector('.menu');
@@ -323,6 +340,17 @@ export class UI {
     }, { wide: true, onClose: () => this.disposePreview() });
   }
 
+  /** Combat simulator on the Kommandodeck. */
+  openSim() {
+    const g = this.g;
+    return this.panel('Gefechtssimulator', 'Kommandodeck · Übungsflüge mit deinem eigenen Schiff, ohne echten Schaden', (body) => {
+      body.innerHTML = '<div class="cards">' + Object.entries(SIM_SCENARIOS).map(([id, S], i) => `<div class="card simcard"><h4>${i + 1}. ${esc(S.name)}</h4>
+        <p style="font-size:14px;line-height:1.45">${esc(S.desc)}</p>
+        <div class="row"><span class="dim">${g.simBest?.[id] ? 'Bestzeit ' + g.simBest[id] + ' s' : 'noch nicht geflogen'}</span><button class="btn small warm" data-sim="${id}">Starten</button></div></div>`).join('') + '</div>';
+      body.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { this.sfx(); this.closeTop(); this.game.startSim(b.dataset.sim); });
+    });
+  }
+
   disposePreview() { this.pv?.dispose(); this.pv = null; this.pvWrap = null; }
 
   /** Before/after numbers for a mod, shown next to the 3D preview. */
@@ -363,6 +391,8 @@ export class UI {
         <span>Fracht</span><div class="meter"><div style="width:${Math.min(100, st.cargo)}%"></div></div><span>${st.cargo}</span>
       </div>
       ${ship.hull < 0.999 ? `<button class="btn warm" style="margin-top:12px" data-repair="1">Reparieren · ${fmt(repairCost)} Cr</button>` : ''}
+      ${st.missiles > 0 ? `<div class="ammo"><span>RAKETEN ${Math.min(ship.missiles ?? st.missiles, st.missiles)} / ${st.missiles}</span>${(ship.missiles ?? st.missiles) < st.missiles ? `<button class="btn small" data-ammo="1">+1 · ${MISSILE_PRICE} Cr</button><button class="btn small" data-ammo="all">Auffüllen · ${fmt(MISSILE_PRICE * (st.missiles - (ship.missiles ?? st.missiles)))} Cr</button>` : '<span class="good">voll</span>'}</div>`
+        : '<div class="ammo dim">Keine Raketenschächte. Raketenwerfer nachrüsten (rechts), dann Raketen kaufen.</div>'}
       </div><div>
       <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 10px">UPGRADES</h4><table class="grid">`;
     for (const [k, u] of Object.entries(UPGRADES)) {
@@ -394,6 +424,12 @@ export class UI {
       info.classList.remove('dim'); info.innerHTML = this.modDiff(ship, k);
       this.pv.showUpgrade(k, (ship.upgrades[k] || 0) + 1); this.sfx('blip');
     }));
+    body.querySelectorAll('[data-ammo]').forEach(bt => bt.onclick = () => {
+      const have = Math.min(ship.missiles ?? st.missiles, st.missiles), n = bt.dataset.ammo === 'all' ? st.missiles - have : 1;
+      const cost = n * MISSILE_PRICE;
+      if (g.credits < cost) { this.sfx('error'); this.notify('Nicht genug Kredits'); return; }
+      g.credits -= cost; ship.missiles = have + n; this.sfx('coins'); this.game.save(); rebuild();
+    });
     body.querySelector('[data-repair]')?.addEventListener('click', () => {
       if (g.credits < repairCost) { this.sfx('error'); this.notify('Nicht genug Kredits'); return; }
       g.credits -= repairCost; ship.hull = 1; this.sfx('coins'); rebuild();
@@ -401,6 +437,7 @@ export class UI {
     body.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
       const k = b.dataset.up, lv = ship.upgrades[k] || 0, p = upgradePrice(ship.cls, k, lv);
       if (g.credits < p) { this.sfx('error'); return; }
+      if (k === 'missiles') ship.missiles = Math.min(ship.missiles ?? shipStats(ship).missiles, shipStats(ship).missiles) + (lv === 0 && SHIP_CLASSES[ship.cls].missiles === 0 ? 2 : 0);
       g.credits -= p; ship.upgrades[k] = lv + 1; logEntry(g, `${UPGRADES[k].name} Stufe ${lv + 1} eingebaut`); this.sfx('coins'); this.game.save();
       this.pvKey = k; this.pv?.showUpgrade(k, lv + 1); rebuild();
     });
@@ -675,9 +712,9 @@ export class UI {
   controlsPanel() {
     this.panel('Steuerung', '', (body) => {
       body.innerHTML = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">IM ALL</h4><table class="grid">
-        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['Esc', 'Pause'], ['Gamepad', 'Stick lenken · RT Laser · LT Rakete · A Nachbrenner · LB/RB Schub'], ['Joystick', 'Knüppel lenken · Drehachse rollen · Schubhebel · Abzug Laser']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table></div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">AUF DER STATION</h4><table class="grid">
-        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild'], ['Esc', 'Pause']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild'], ['Esc', 'Pause'], ['Gamepad', 'Stick gehen/umsehen · A benutzen']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table><p class="dim" style="margin-top:14px">Maus-Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
         <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren</label>
         <p class="dim" style="margin-top:10px">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div></div>`;
