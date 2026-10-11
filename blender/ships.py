@@ -499,6 +499,190 @@ def eisvogel():
 SHIPS.update({'sankt_rostig': sankt_rostig, 'mule': mule, 'lanze': lanze, 'kestrel': kestrel, 'corsair': corsair, 'korvette': korvette, 'eisvogel': eisvogel})
 
 
+def wing_slice(name, mat, f1, f2, root_y, root_chord, tip_chord, span, sweep, thick, x0, tip_thick=None, grow=1.06):
+    """The part of a wing() between span fractions f1..f2, a little thicker: a coloured band on top of the wing."""
+    tt = tip_thick if tip_thick is not None else thick * 0.5
+    ch = lambda f: root_chord + (tip_chord - root_chord) * f
+    lead = lambda f: root_y + root_chord / 2 + sweep * f
+    th = lambda f: thick + (tt - thick) * f
+    return wing(name, mat, root_y=lead(f1) - ch(f1) / 2, root_chord=ch(f1) * 1.01, tip_chord=ch(f2) * 1.01,
+                span=span * (f2 - f1), sweep=lead(f2) - lead(f1), thick=th(f1) * grow, tip_thick=th(f2) * grow,
+                x0=x0 + span * f1, mirror=False)
+
+
+def kreuzschnabel():
+    """Arkwright & Vos XK-4 'Kreuzschnabel' - all-round fighter with four wings spread in an X, an engine at each wing
+    root and a long-barrelled cannon on each wingtip. Long narrow nose, sensor dome behind the cockpit. Off-white with
+    red bands, a little worn."""
+    paint = mat_paint('hull_xk', '#d6d4cc', color2='#9a9ea2', wear=0.5, rust=0.04, dirt=0.5, metal=0.25, rough=0.45)
+    red = mat_paint('hull_xk_red', '#a8302a', color2='#8e2a24', wear=0.55, rust=0.0, dirt=0.45, metal=0.2, rough=0.5, panel=0.6)
+    domem = mat_paint('hull_xk_dome', '#dcdcd6', color2='#2f5fa8', wear=0.35, dirt=0.4, scale=2.2, panel=1.2)
+    metal = mat_metal('metal_xk', '#64676b', 0.4, metal=0.8, grime=0.45)
+    dark = mat_rubber('dark_xk', '#1a1b1d')
+    glow = mat_emit('glow_engine_xk', '#ff9a8a', 11)
+    eye = mat_emit('glow_dome_xk', '#6fb8ff', 8)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_xk', '#0b1118')
+    P = []
+    # long narrow nose widening into a boxy rear fuselage that carries the four wings
+    fus = loft('fuselage', [
+        dict(y=6.9, w=0.12, h=0.1, z=-0.12),
+        dict(y=6.3, w=0.55, h=0.42, z=-0.1, e=2.6, top=0.8),
+        dict(y=4.0, w=0.95, h=0.78, z=-0.05, e=3.0, top=0.9),
+        dict(y=1.8, w=1.25, h=1.0, z=0.0, e=3.4),
+        dict(y=0.0, w=1.45, h=1.15, z=0.05, e=3.8, flat=0.9),
+        dict(y=-1.2, w=1.75, h=1.3, z=0.05, e=4.5, flat=0.9),
+        dict(y=-4.8, w=1.8, h=1.3, z=0.05, e=4.5),
+        dict(y=-5.4, w=1.5, h=1.0, z=0.05, e=3.6),
+    ], paint, n=40, sharp=30)
+    P.append(fus)
+    # red band around the nose
+    P.append(loft('nose_band', [dict(y=5.0, w=0.81, h=0.65, z=-0.072, e=2.83, top=0.86),
+                                dict(y=4.6, w=0.88, h=0.71, z=-0.063, e=2.9, top=0.87)], red, n=40))
+    P.append(box('chin_sensor', dark, (0.3, 0.9, 0.12), (0, 4.6, -0.42), bevel=0.03))
+    # cockpit: canopy with frame, sensor dome behind it
+    P.append(sphere('canopy', glass, 1.0, (0, 0.95, 0.5), scale=(0.54, 1.4, 0.48)))
+    P.append(box('canopy_spine', metal, (0.06, 2.3, 0.05), (0, 0.9, 0.985)))
+    for y in (0.3, 1.55):
+        hz = 0.48 * math.sqrt(1 - ((y - 0.95) / 1.4) ** 2)
+        P.append(box(f'canopy_rib{y}', metal, (0.62, 0.06, 0.05), (0, y, 0.5 + hz - 0.005)))
+    P.append(cyl('dome_ring', metal, 0.42, 0.14, (0, -1.25, 0.66), rot=(0, 0, 0), n=32))
+    P.append(sphere('dome', domem, 0.38, (0, -1.25, 0.72), scale=(1, 1, 0.9)))
+    P.append(sphere('dome_eye', eye, 0.06, (0, -0.9, 0.86)))
+    # four wings in an X: upper pair tilted up, lower pair tilted down, red band on each
+    ANG, X0, SPAN = 13.0, 0.7, 4.4
+    WP = dict(root_y=-3.0, root_chord=3.4, tip_chord=1.5, span=SPAN, sweep=-0.5, thick=0.08, x0=X0, tip_thick=0.06)
+    tips, exh, guns = [], [], []
+    for k, (s, dz) in enumerate(((1, 0.3), (-1, -0.2))):
+        rot = (0, R(-ANG * s), 0)
+        for nm, ob in (('wing', wing(f'wing{k}', paint, mirror=False, **WP)),
+                       ('band', wing_slice(f'wing_band{k}', red, 0.42, 0.56, **WP))):
+            ob.rotation_euler = rot; ob.location = (0, 0, dz)
+            swship.apply_all(ob); mirror_x(ob); P.append(ob)
+        a = R(ANG)
+        tx, tz = (X0 + SPAN) * math.cos(a) + 0.08, dz + s * (X0 + SPAN) * math.sin(a)
+        tips.append((tx, tz))
+        # engine at the wing root, stacked above / below the fuselage line
+        ex, ez = 1.35, dz + s * 1.35 * math.sin(a)
+        eng, _ = engine_pod(f'eng{k}', ex, ez, -0.3, -5.2, 0.5, paint, metal, glow, n=28)
+        P += eng
+        for j, y in enumerate((-1.6, -3.6)):
+            r = lathe(f'eng_band{k}{j}', [(y + 0.1, 0.53), (y - 0.1, 0.53)], metal, n=28, axis_pos=(ex, 0, ez))
+            P.append(r); mirror_x_world(r)
+        exh += [(-ex, ez), (ex, ez)]
+        # long cannon on the wingtip: pod, barrel, ring, flash hider
+        for nm, ob in (('pod', cyl(f'gun_pod{k}', metal, 0.16, 2.8, (tx, -2.2, tz))),
+                       ('pod_cap', sphere(f'gun_cap{k}', metal, 0.16, (tx, -0.8, tz), scale=(1, 1.6, 1))),
+                       ('barrel', cyl(f'gun_barrel{k}', dark, 0.065, 4.2, (tx, 1.3, tz))),
+                       ('ring', cyl(f'gun_ring{k}', metal, 0.1, 0.25, (tx, 0.6, tz))),
+                       ('hider', cyl(f'gun_hider{k}', metal, 0.12, 0.5, (tx, 3.55, tz), n=12))):
+            P.append(ob); mirror_x_world(ob)
+    # details: side panels, rear plate, antenna, greebles
+    for sx in (-1, 1):
+        P.append(box(f'side_panel{sx}', dark, (0.06, 1.6, 0.42), (0.86 * sx, -0.4, 0.0), bevel=0.02))
+    P.append(box('rear_plate', metal, (1.3, 0.2, 0.8), (0, -5.45, 0.05), bevel=0.04))
+    P.append(cyl('antenna', metal, 0.018, 0.8, (0.35, -3.8, 0.85), rot=(R(-30), 0, 0)))
+    grb = mat_metal('greeble_xk', '#8a8d90', 0.5, metal=0.5)
+    P += greebles(fus, grb, count=36, size=(0.1, 0.35), height=(0.02, 0.05), seed=61,
+                  region=lambda h: h.y < 5.6 and not (h.z > 0.3 and -1.8 < h.y < 2.6))
+    (ux, uz), (lx, lz) = tips
+    P += nav_lights((-lx, -3.75, lz), (lx, -3.75, lz), (0, -5.6, 0.45), gr, gg, gw)
+    E = [empty(f'exhaust_{i}', (x, -5.85, z)) for i, (x, z) in enumerate(exh)]
+    E += [empty('gun_0', (-ux, 3.9, uz)), empty('gun_1', (lx, 3.9, lz)), empty('gun_2', (ux, 3.9, uz)), empty('gun_3', (-lx, 3.9, lz)),
+          empty('cockpit', (0, 1.0, 0.85))]
+    return P, E, dict(dist=24, center=(0, 0, 0))
+
+
+def gabelweihe():
+    """Rook-Varga YB-2 'Gabelweihe' - fighter-bomber. A rounded cockpit pod with a twin ion turret, an open spine of
+    frames and pipes, a crossbar at the back and two long engine nacelles, so the ship looks like a fork from above.
+    Pale grey with ochre bands, heavily used."""
+    paint = mat_paint('hull_yb', '#bdb9ad', color2='#8f8c82', wear=0.75, rust=0.2, dirt=0.7, metal=0.25, rough=0.5)
+    ochre = mat_paint('hull_yb_band', '#c9962a', color2='#a87a22', wear=0.7, rust=0.1, dirt=0.6, metal=0.2, rough=0.5, panel=0.6)
+    metal = mat_metal('metal_yb', '#5f6266', 0.42, metal=0.8, grime=0.6)
+    dark = mat_rubber('dark_yb', '#18191b')
+    glow = mat_emit('glow_engine_yb', '#9fd0ff', 11)
+    gr, gg, gw = mat_emit('glow_red', '#ff2a1a', 12), mat_emit('glow_green', '#22ff66', 12), mat_emit('glow_white', '#ffffff', 14)
+    glass = mat_glass('glass_yb', '#0a1016')
+    P = []
+    # cockpit pod
+    cab = loft('cockpit', [
+        dict(y=8.2, w=0.3, h=0.25, z=-0.1),
+        dict(y=7.7, w=1.5, h=0.9, z=-0.05, e=3.0, flat=0.7),
+        dict(y=6.6, w=2.1, h=1.45, z=0.05, e=3.6, flat=0.8),
+        dict(y=4.5, w=2.3, h=1.6, z=0.1, e=4.2, flat=0.85),
+        dict(y=3.0, w=2.0, h=1.4, z=0.1, e=4.0),
+        dict(y=2.4, w=1.3, h=1.0, z=0.1, e=3.4),
+    ], paint, n=40, sharp=30)
+    P.append(cab)
+    P.append(loft('collar', [dict(y=3.5, w=2.14, h=1.5, z=0.1, e=4.1), dict(y=3.0, w=2.08, h=1.46, z=0.1, e=4.0)], metal, n=40))
+    for sx in (-1, 1):   # ochre bands on the cockpit flanks
+        P.append(box(f'cab_band{sx}', ochre, (0.05, 1.6, 0.5), (1.12 * sx, 5.2, 0.1), bevel=0.02))
+    P.append(sphere('canopy', glass, 1.0, (0, 5.7, 0.62), scale=(0.75, 1.25, 0.48)))
+    P.append(box('canopy_spine', metal, (0.07, 2.2, 0.06), (0, 5.6, 1.1)))
+    P.append(box('canopy_rib', metal, (1.3, 0.07, 0.06), (0, 5.4, 1.06)))
+    # twin ion turret behind the canopy
+    P.append(cyl('turret_base', metal, 0.48, 0.25, (0, 3.9, 0.92), rot=(0, 0, 0), n=32))
+    P.append(sphere('turret_ball', paint, 0.4, (0, 3.9, 1.1), scale=(1, 1, 0.75)))
+    for sx in (-1, 1):
+        P.append(cyl(f'turret_barrel{sx}', dark, 0.05, 1.7, (0.16 * sx, 4.9, 1.16)))
+        P.append(cyl(f'turret_muzzle{sx}', metal, 0.075, 0.2, (0.16 * sx, 5.75, 1.16)))
+    # chin cannons
+    for sx in (-1, 1):
+        P.append(box(f'chin_mount{sx}', metal, (0.32, 1.3, 0.3), (0.45 * sx, 6.9, -0.6), bevel=0.04))
+        P.append(cyl(f'chin_gun{sx}', dark, 0.06, 2.0, (0.45 * sx, 8.0, -0.6)))
+        P.append(cyl(f'chin_muzzle{sx}', metal, 0.09, 0.22, (0.45 * sx, 9.0, -0.6)))
+    # open spine: two beams, frames and pipes between cockpit and engine block
+    for sx in (-1, 1):
+        P.append(box(f'spine_beam{sx}', metal, (0.18, 5.0, 0.32), (0.32 * sx, 0.0, 0.25), bevel=0.03))
+        P.append(cyl(f'spine_pipe{sx}', metal, 0.07, 5.0, (0.52 * sx, 0.0, -0.1), n=12))
+    P.append(box('spine_core', dark, (0.5, 5.0, 0.45), (0, 0.0, -0.05), bevel=0.04))
+    for i in range(5):
+        P.append(box(f'spine_frame{i}', metal, (0.95, 0.12, 0.75), (0, 2.0 - i * 0.9, 0.1), bevel=0.02))
+    P.append(cyl('spine_cable', dark, 0.05, 5.0, (-0.2, 0.0, 0.48), n=10))
+    # engine block and crossbar
+    blk = loft('block', [dict(y=-1.4, w=1.2, h=0.8, z=0.1, e=3.5), dict(y=-1.9, w=1.9, h=1.1, z=0.1, e=4.0),
+                         dict(y=-3.9, w=1.9, h=1.1, z=0.1, e=4.0), dict(y=-4.5, w=1.3, h=0.8, z=0.1, e=3.5)], paint, n=36)
+    P.append(blk)
+    P.append(wing('crossbar', paint, root_y=-2.8, root_chord=2.4, tip_chord=1.5, span=2.4, sweep=-0.25, thick=0.16,
+                  x0=0.6, z0=0.05, tip_thick=0.18))
+    # two long nacelles: slim front tube with a domed cap, fat engine section, flared nozzle, four vanes at the back
+    NX, exh = 3.1, []
+    for sx in (1,):
+        parts = [
+            lathe('nacelle', [(-6.6, 0.62), (-6.2, 0.7), (-1.0, 0.7), (0.2, 0.5), (3.0, 0.5), (3.05, 0.62), (3.8, 0.62),
+                              (4.2, 0.5), (4.45, 0.3), (4.55, 0.0)][::-1], paint, n=32, axis_pos=(NX, 0, 0.05)),
+            lathe('nac_cap', [(3.25, 0.64), (3.65, 0.64)], ochre, n=32, axis_pos=(NX, 0, 0.05)),
+            lathe('nac_noz', [(-7.5, 0.62), (-6.58, 0.54)], dark, n=32, axis_pos=(NX, 0, 0.05)),
+            cyl('glow_disc', glow, 0.5, 0.05, (NX, -7.52, 0.05), n=32),
+        ]
+        for j, y in enumerate((-1.6, -4.0, -5.8)):
+            parts.append(lathe(f'nac_band{j}', [(y + 0.12, 0.73), (y - 0.12, 0.73)], metal, n=32, axis_pos=(NX, 0, 0.05)))
+        for j, a in enumerate((60, 120, 180, 240)):   # exposed rods along the engine section
+            ra = R(a)
+            parts.append(cyl(f'nac_rod{j}', metal, 0.045, 5.0, (NX + 0.76 * math.cos(ra), -3.7, 0.05 + 0.76 * math.sin(ra)), n=8))
+        for j, a in enumerate((45, 135, 225, 315)):  # vanes around the nozzle
+            ra = R(a)
+            parts.append(box(f'nac_vane{j}', metal, (0.06, 1.8, 0.45), (NX + 0.88 * math.cos(ra), -6.9, 0.05 + 0.88 * math.sin(ra)),
+                             rot=(0, R(90 - a), 0), bevel=0.01))
+        for p in parts:
+            P.append(p); mirror_x_world(p)
+        exh += [empty('exhaust_0', (-NX, -7.6, 0.05)), empty('exhaust_1', (NX, -7.6, 0.05))]
+    P.append(box('block_vent', dark, (0.9, 1.2, 0.08), (0, -2.9, 0.68), bevel=0.02))
+    P.append(cyl('antenna', metal, 0.02, 1.0, (0.5, -3.6, 0.95), rot=(R(-25), 0, 0)))
+    grb = mat_metal('greeble_yb', '#85888b', 0.5, metal=0.5)
+    P += greebles(cab, grb, count=24, size=(0.1, 0.35), height=(0.02, 0.06), seed=71,
+                  region=lambda h: h.y < 7.6 and not (h.z > 0.4 and 3.4 < h.y < 7.2))
+    P += greebles(blk, grb, count=22, size=(0.12, 0.4), height=(0.03, 0.08), seed=72)
+    P += nav_lights((-NX - 0.66, 3.4, 0.05), (NX + 0.66, 3.4, 0.05), (0, -4.3, 0.6), gr, gg, gw)
+    E = exh + [empty('gun_0', (-0.45, 9.2, -0.6)), empty('gun_1', (0.45, 9.2, -0.6)), empty('turret', (0, 3.9, 1.4)),
+               empty('cockpit', (0, 5.8, 1.0))]
+    return P, E, dict(dist=30, center=(0, 0, 0))
+
+
+SHIPS.update({'kreuzschnabel': kreuzschnabel, 'gabelweihe': gabelweihe})
+
+
 def _bool(ob, cutter, op='DIFFERENCE'):
     import bpy
     m = ob.modifiers.new('b', 'BOOLEAN'); m.object = cutter; m.operation = op

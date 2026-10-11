@@ -56,6 +56,18 @@ export const SHIP_CLASSES = {
     energy: 160, regen: 30, laserDmg: 20, laserRate: 9, turret: false, length: 15.4, engine: '#ffd28a',
     desc: 'Weiß und Gold, schnell wie ein Gerücht. Nur für Freunde des Konsortiums.',
   },
+  kreuzschnabel: {
+    name: 'XK-4 „Kreuzschnabel“', maker: 'Arkwright & Vos, Ganymed', role: 'Raumüberlegenheitsjäger', price: 190000,
+    hull: 460, shield: 380, speed: 305, boost: 520, accel: 110, turn: 2.05, cargo: 6, guns: 4, missiles: 6,
+    energy: 160, regen: 28, laserDmg: 15, laserRate: 9, turret: false, length: 12.8, engine: '#ff9a8a',
+    desc: 'Vier Flügel in X-Stellung, an jeder Spitze eine Kanone. Ein Allrounder, der in jeder Staffel eine gute Figur macht.',
+  },
+  gabelweihe: {
+    name: 'YB-2 „Gabelweihe“', maker: 'Rook-Varga Werften', role: 'Jagdbomber', price: 210000,
+    hull: 820, shield: 420, speed: 225, boost: 390, accel: 62, turn: 1.2, cargo: 14, guns: 2, missiles: 16,
+    energy: 170, regen: 26, laserDmg: 16, laserRate: 6, turret: true, length: 17, engine: '#9fd0ff',
+    desc: 'Cockpit mit Ionenturm, offener Rumpfrücken, zwei lange Triebwerksgondeln. Langsam, aber zäh und voller Raketen.',
+  },
   wespe: {
     name: 'Wespe', maker: 'Eigenbau', role: 'Piratenjäger', price: 0, npcOnly: true,
     hull: 170, shield: 90, speed: 265, boost: 420, accel: 95, turn: 2.0, cargo: 2, guns: 2, missiles: 0,
