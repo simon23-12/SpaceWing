@@ -436,6 +436,11 @@
  },
  {
   "speaker": "oduya",
+  "text": "Im Gefechtssimulator, hier auf dem Kommandodeck, am Westende. Er lädt dein eigenes Schiff, und wenn du abgeschossen wirst, stehst du einfach wieder auf.",
+  "radio": false
+ },
+ {
+  "speaker": "oduya",
   "text": "Verdien Geld. Ab zwanzigtausend Kredits nennt man dich hier Frachtpilot, dann öffnet sogar das Herschel-Depot auf Mimas seine Tore.",
   "radio": false
  },
@@ -866,6 +871,11 @@
  },
  {
   "speaker": "Mags",
+  "text": "Ich hab dir zwei Übungsraketen eingehängt, einen Werfer hat die Spacewing noch nicht. Den baut dir später Yara ein.",
+  "radio": true
+ },
+ {
+  "speaker": "Mags",
   "text": "Die da ist zäher. Halt sie im Visier, bis der Kreis rot wird, dann Rechtsklick oder F. Rakete raus.",
   "radio": true
  },
@@ -882,6 +892,11 @@
  {
   "speaker": "mags",
   "text": "Na also. Du fliegst wie jemand, der es ernst meint. Teo hätte gelacht und dir sofort den Steuerknüppel geklaut.",
+  "radio": false
+ },
+ {
+  "speaker": "mags",
+  "text": "Und üb weiter. Auf dem Kommandodeck steht ein Gefechtssimulator. Da kannst du dich abschießen lassen, so oft du willst, und es kostet nichts.",
   "radio": false
  },
  {
@@ -1368,6 +1383,11 @@
   "speaker": "juno",
   "text": "Das Modell sagt, der große Krieg kommt trotzdem. Nur später. In vierzig Jahren, wenn die Erde zu schwach ist, uns zu halten.",
   "radio": false
+ },
+ {
+  "speaker": "Simulator",
+  "text": "Simulation abgeschlossen. Beende die Übung.",
+  "radio": true
  },
  {
   "speaker": "Söldnerbörse",
