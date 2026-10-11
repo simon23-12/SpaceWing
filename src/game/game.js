@@ -344,6 +344,7 @@ export class Game {
     // flight report: what changed between undocking and the next docking (shown after landing)
     this.sortie = { time: 0, from: g.location, credits0: g.credits, earned0: g.earned, kills0: g.kills, salvage: 0, rec, hull0: rec.hull ?? 1, temp: !!rec.uid?.startsWith('TEMP') };
     this.keepPointer = !!this.mode?.isRoom;
+    if (this.mode?.isRoom && this.mode.launchCine && this.mode.roomId === 'hangar') await this.mode.launchCine();
     await this.startFlight(zone, 'undock', rec);
   }
 

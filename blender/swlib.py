@@ -51,13 +51,16 @@ def cycles(samples=64, w=1920, h=1080, transform="AgX", look=None, denoise=True,
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     prefs = bpy.context.preferences.addons["cycles"].preferences
-    try:
-        prefs.compute_device_type = "METAL"
-        prefs.get_devices()
-        for d in prefs.devices:
-            d.use = True
-    except Exception:
-        pass
+    for kind in ("METAL", "OPTIX", "CUDA", "HIP"):   # whichever GPU backend this machine has
+        try:
+            prefs.compute_device_type = kind
+            prefs.get_devices()
+            if any(d.type == kind for d in prefs.devices):
+                for d in prefs.devices:
+                    d.use = d.type == kind
+                break
+        except Exception:
+            pass
     sc.cycles.device = "GPU"
     sc.cycles.samples = samples
     sc.cycles.use_denoising = denoise

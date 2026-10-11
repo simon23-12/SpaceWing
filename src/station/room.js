@@ -12,6 +12,7 @@ import { NPC } from './npc.js';
 import { DeckDoor, Lift } from './deck.js';
 import { BARKS, PEOPLE } from '../game/story.js';
 import { GADGETS } from './gadgets.js';
+import { Particles, TEX } from '../space/effects.js';
 
 /*
  * Hochstation Cassini, Deck 4: one continuous, walkable level. Every room (Blender-baked GLB + lightmap)
@@ -304,8 +305,8 @@ export class RoomMode {
         jobs.push(add(id, m, m.seated ? { clip: Math.random() < 0.5 ? 'sit_talk' : 'sit', talkClip: 'sit_talk' } : { clip: Math.random() < 0.5 ? 'drink' : 'rail', talkClip: 'talk' }));
       } else if (m.kind === 'crew') {
         if (m.id === 'hc0') continue;   // old spot of Yara (before her workshop), still in older deck bakes
-        jobs.push(add(m.id === 'yara' ? 'crew_d' : 'crew_b', m, m.seated ? { clip: 'sit' } : m.id === 'yara' ? { clip: 'fold' } : { clip: 'phone' })
-          .then(r => { if (r && m.id === 'yara') r.obj.rotation.y += Math.PI; }));   // Yara turns from her bench to the visitor
+        jobs.push(add(m.id === 'yara' ? 'crew_d' : 'crew_b', m, m.seated ? { clip: 'sit' } : m.id === 'yara' ? { clip: 'idle', talkClip: 'talk' } : { clip: 'phone' })
+          .then(r => { if (r && m.id === 'yara') this.yaraAtWork(r); }));
       } else if (m.kind === 'band') {
         jobs.push(this.addBand(m));
       }
@@ -333,6 +334,53 @@ export class RoomMode {
     await Promise.all(jobs);
     const sees = SEES[this.roomId] || PARTS;
     for (const n of this.npcs) { n.obj.visible = sees.includes(n.room); if (n.extra) n.extra.visible = n.obj.visible; }
+  }
+
+  /** Yara works at her bench (hands busy, now and then a weld with sparks) and turns round when you come over. */
+  yaraAtWork(rec) {
+    const dir = rec.marker.dir.clone().setY(0).normalize();
+    const weld = rec.obj.position.clone().addScaledVector(dir, 0.62).add(new THREE.Vector3(0, 1.02, 0));
+    this.sparks ||= new Particles(this.scene, 400, TEX.soft);
+    const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.flash, color: new THREE.Color(0.75, 0.88, 1), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    flash.position.copy(weld); flash.scale.setScalar(0.5); this.scene.add(flash);
+    this.sparkFloor = rec.obj.position.y + 0.02;
+    rec.work = { benchYaw: rec.obj.rotation.y, weld, flash, t: 2 + Math.random() * 3, weldT: 0, turned: 0, near: false };
+  }
+
+  updateYara(n, dt) {
+    const W = n.work, o = n.obj;
+    const d = Math.hypot(this.pos.x - o.position.x, this.pos.z - o.position.z);
+    const near = n.talking || d < 3.2;
+    if (near !== W.near) {
+      W.near = near;
+      if (!n.talking && near) n.npc.play('idle', 0.5);
+      if (!near) W.t = Math.min(W.t, 0.8);
+      if (near) W.weldT = 0;
+    }
+    // turn towards the visitor (or back to the bench)
+    const want = near ? Math.atan2(this.pos.x - o.position.x, this.pos.z - o.position.z) : W.benchYaw;
+    let da = want - o.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da));
+    o.rotation.y += da * Math.min(1, dt * 3);
+    // at work: every few seconds a reach for a part or a short weld
+    if (!near) {
+      W.t -= dt;
+      if (W.t <= 0) {
+        n.npc.play('interact', 0.3);   // reaches into the work on the bench
+        if (Math.random() < 0.55) W.weldT = 1.0 + Math.random() * 1.4;
+        W.t = 2.2 + Math.random() * 2.6;
+      }
+    }
+    if (W.weldT > 0) {
+      W.weldT -= dt;
+      const on = Math.random() < 0.7;
+      W.flash.material.opacity = on ? 0.6 + Math.random() * 0.4 : 0.1;
+      W.flash.scale.setScalar(0.35 + Math.random() * 0.3);
+      if (this.sparks && d < 25) for (let i = 0; i < 3; i++) {
+        const v = new THREE.Vector3((Math.random() - 0.5) * 2.4, 0.6 + Math.random() * 1.8, (Math.random() - 0.5) * 2.4);
+        this.sparks.emit(W.weld, v, new THREE.Color(1.8, 1.25, 0.6), 0.012 + Math.random() * 0.01, 0.35 + Math.random() * 0.5, 0);
+      }
+      if (!W.hiss && this.game.audio?.weld) { W.hiss = true; this.game.audio.weld(W.weld); }
+    } else { W.flash.material.opacity = 0; W.hiss = false; }
   }
 
   /** Keepsakes in the cabin: the espresso machine on the galley counter, everything else in the display shelf. */
@@ -411,6 +459,55 @@ export class RoomMode {
 
   /** A mod bought in the workshop shows up on the parked ship right away. */
   refreshParkedShip() { const s = this.game.launchShipRecord(); if (this.shipModel && s) fitMods(this.shipModel, s.upgrades); }
+
+  /**
+   * Take-off from Hangar 7 (about 5 s, any key skips): the camera steps back to the side of the pad, the engines
+   * light, the ship lifts off, noses through the bay's force field and is gone. Resolves when the screen is black.
+   */
+  launchCine() {
+    const ship = this.shipModel, H = this.parts.hangar;
+    if (!ship || !H) return Promise.resolve();
+    return new Promise((resolve) => {
+      const root = ship.root, q0 = root.quaternion.clone();
+      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(root.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+      const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+      const worldStart = root.getWorldPosition(new THREE.Vector3());
+      // camera: a quick cut to the side of the bay, ahead of the pad; the ship lifts off and passes it on the way out
+      const camPos = H.toWorld([13, 3.4, -10.5]);
+      let cut = false;
+      this.game.fadeOut(0.2).then(() => { cut = true; this.camera.position.copy(camPos); this.game.fadeIn(0.35); });
+      for (const pl of ship.plumes) pl.visible = true;
+      for (const gl of ship.glows) if (gl.engine) gl.mesh.material.color.copy(gl.base);
+      this.game.audio?.setEngine(true);
+      let t = 0, done = false, faded = false;
+      const finish = () => { if (done) return; done = true; removeEventListener('keydown', skip); this.game.fadeOut(0.25).then(resolve); };
+      const skip = (e) => { if (e.code !== 'F12') finish(); };
+      addEventListener('keydown', skip);
+      this.uiEl?.classList.add('hidden');
+      this.cine = (room, dt) => {
+        if (!cut) return;
+        t += dt;
+        const lift = THREE.MathUtils.smoothstep(t, 0.6, 2.2) * 2.6;
+        const go = Math.max(0, t - 2.0);
+        const along = 4 * go * go + 6 * go;                                  // gentle at first, then out of the bay fast
+        const bank = Math.sin(Math.min(1, go / 2.5) * Math.PI) * 0.05;
+        // move along the ship's own forward in world space (the hangar part may be rotated)
+        const wp = worldStart.clone().add(new THREE.Vector3(0, lift + Math.sin(t * 2.1) * 0.04 * (1 - Math.min(1, go)), 0)).addScaledVector(fwd, along);
+        root.position.copy(root.parent.worldToLocal(wp));
+        root.quaternion.copy(q0).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.min(0.06, go * 0.03), 0, bank)));
+        const thr = t < 0.6 ? 0.15 : t < 2 ? 0.35 : 1;
+        ship.update(dt, thr, go > 1.2);
+        this.game.audio?.engine?.(thr, go > 1.2);
+        const cam = this.camera, look = root.getWorldPosition(new THREE.Vector3());
+        cam.position.copy(camPos).addScaledVector(side, Math.sin(t * 0.4) * 0.15);   // a hand-held drift
+        cam.lookAt(look.x, look.y + 0.5, look.z);
+        if (cam.fov !== 60) { cam.fov = 60; cam.updateProjectionMatrix(); }
+        if (!faded && along > 48) { faded = true; this.game.fadeOut(0.7).then(() => { done = true; removeEventListener('keydown', skip); resolve(); }); }
+        if (t > 9) finish();
+      };
+      this.isRoom = false;
+    });
+  }
 
   /** Push a standing capsule out of the parked ships' boxes (in the ship's own frame, horizontally). */
   pushOutShips(np, r) {
@@ -634,6 +731,12 @@ export class RoomMode {
     }
     if (this.animated.some(a => a.done)) this.animated = this.animated.filter(a => !a.done);
     for (const w of this.walkers) this.walk(w, dt);
+    for (const n of this.npcs) if (n.work && n.obj.visible) this.updateYara(n, dt);
+    if (this.sparks) {
+      const s = this.sparks;
+      for (let i = 0; i < s.n; i++) { s.vel[i * 3 + 1] -= 9.8 * dt; if (s.pos[i * 3 + 1] < this.sparkFloor && s.vel[i * 3 + 1] < 0) { s.vel[i * 3 + 1] *= -0.3; s.vel[i * 3] *= 0.5; s.vel[i * 3 + 2] *= 0.5; } }
+      s.update(dt);
+    }
     for (const n of this.npcs) {
       if (!n.obj.visible) continue;
       if (n.npc) n.npc.update(dt, n.holo ? null : this.camera.position);
@@ -798,6 +901,7 @@ export class RoomMode {
     if (!n?.npc) return;
     n.talking = on;
     if (!n.walk) n.npc.setTalking(on);
+    if (n.work && !on) n.work.near = null;   // after the talk: re-decide between facing you and going back to work
   }
 
   labelFor(m) {
