@@ -148,7 +148,7 @@ export class FlightMode {
     const jump = moonOfZone(goal.zone) !== moonOfZone(this.zoneId);
     const name = goal.station || ZONES[goal.zone].name.split(' · ').pop();
     const km = travelInfo(this.zoneId, goal.zone).distance;
-    const how = jump ? `Raumsprung nach ${MOONS[moonOfZone(goal.zone)].name}` : 'Fusionsbrand';
+    const how = jump ? `Hyperraumsprung nach ${MOONS[moonOfZone(goal.zone)].name}` : 'Raumsprung';
     const p = this.player;
     this.navTarget = { isObject: true, kind: 'nav', name: `Kurs: ${name}`, faction: 'neutral', alive: true, vel: new THREE.Vector3(), radius: 10,
       get pos() { return p.pos.clone().addScaledVector(dir, 60000); }, info: `${goal.what}<br>[{k:map}] Systemkarte → ${how} „${name}“` };
@@ -611,10 +611,10 @@ export class FlightMode {
     this.player.autopilot = { travel: true };
     const M = MOONS[moonOfZone(zoneId)];
     if (jump) {
-      this.hud.setObjective(`Raumsprung nach ${M.name}`);
+      this.hud.setObjective(`Hyperraumsprung nach ${M.name}`);
       this.say('Bordcomputer', `Sprungtriebwerk lädt. Ziel: ${M.name}-Orbit. Ausrichtung auf den Sprungvektor.`, 'neutral', 3);
     } else {
-      this.hud.setObjective(`Fusionsbrand nach ${ZONES[zoneId].name}`);
+      this.hud.setObjective(`Raumsprung nach ${ZONES[zoneId].name}`);
       this.say('Bordcomputer', `Kurs berechnet. Transferzeit ${this.travel.info.hours.toFixed(1)} Stunden. Ausrichtung läuft.`, 'neutral', 3);
     }
   }
@@ -678,7 +678,7 @@ export class FlightMode {
       p.input.throttle = 0.3;
       return;
     }
-    if (!tr.burn) { tr.burn = true; this.game.audio?.burn(); this.hud.showToast('FUSIONSBRAND', 2); }
+    if (!tr.burn) { tr.burn = true; this.game.audio?.burn(); this.hud.showToast('RAUMSPRUNG', 2); }
     p.input.pitch = p.input.yaw = p.input.roll = 0;
     p.input.throttle = 1; p.input.boost = true; p.energy = p.stats.energy;
     const T = 6.5; // seconds of fly-through

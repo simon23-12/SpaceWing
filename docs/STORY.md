@@ -26,7 +26,7 @@ Der wichtigste Rohstoff ist **Helium‑3**. Ohne He‑3 laufen keine Fusionsantr
 
 ### Die fünf Monde (Level)
 
-Das Spiel ist in fünf Mondsysteme gegliedert. Jedes ist ein Level mit eigener Station, Stimmung und Rolle im Handelskrieg. Man reist per Raumsprung. Dafür braucht das Schiff ein Sprungtriebwerk passender Klasse, und der Mond muss freigeschaltet sein.
+Das Spiel ist in fünf Mondsysteme gegliedert. Jedes ist ein Level mit eigener Station, Stimmung und Rolle im Handelskrieg. Man reist per Hyperraumsprung. Dafür braucht das Schiff ein Sprungtriebwerk passender Klasse, und der Mond muss freigeschaltet sein.
 
 | Mond | Station | Sprungklasse | Freigeschaltet durch | Rolle im Handelskrieg | Stimmung |
 |---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Beim neuen Spiel (überspringbar, `src/game/intro.js`): Saturn im Jahr 2260, Tit
 Der Spieler wacht in seiner Kabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Fliegen kann sie noch, aber am Abzug zittern ihr die Hände.
 
 ### Mission 1 – „Eisfracht“
-Mags fliegt ihren *Eisvogel* per Raumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
+Mags fliegt ihren *Eisvogel* per Hyperraumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
 
 ### Mission 1b – „Flugstunde“
 Tutorial in der Spacewing: Mags fliegt im Eisvogel nebenher und erklärt Lenken, Schub, Rollen, Kamera, Nachbrenner, Laser auf Zieldrohnen, Raketen und das Andocken.

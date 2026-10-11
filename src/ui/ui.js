@@ -471,7 +471,7 @@ export class UI {
       const net = r.ship?.cargo?.schrott || 0;
       const dmg = r.hull0 != null ? Math.max(0, Math.round((r.hull0 - r.hull1) * 100)) : null;
       body.innerHTML = `<div class="debrief">
-        ${tile('MISSIONSZEIT', mmss(r.time), r.jumps ? `${r.jumps} Raumsprung${r.jumps > 1 ? 'e' : ''}` : 'Flugzeit im Cockpit')}
+        ${tile('MISSIONSZEIT', mmss(r.time), r.jumps ? `${r.jumps} Hyperraumsprung${r.jumps > 1 ? 'e' : ''}` : 'Flugzeit im Cockpit')}
         ${tile('VERDIENT', (r.earned > 0 ? '+' : '') + fmt(r.earned) + ' Cr', `Kontostand ${r.net >= 0 ? '+' : '−'}${fmt(Math.abs(r.net))} Cr (inkl. Treibstoff)`, r.earned > 0 ? 'good' : '')}
         ${tile('TRÜMMER', `${r.salvage} t`, net ? `im Netz: ${net} t · ≈ ${fmt(net * salvPrice)} Cr hier` : r.salvage ? 'verkauft' : 'keine eingesammelt', r.salvage ? 'amber' : '')}
         ${tile('ABSCHÜSSE', r.kills, r.kills ? 'bestätigt' : '—')}
@@ -775,7 +775,7 @@ export class UI {
             const borrowed = flight.player.record?.uid?.startsWith('TEMP');   // story ships: the owner pays the fuel
             const pass = jump && storyJumpPass(g) === mid;                       // story patron's beacon pulls the ship over
             const fuelCost = borrowed || pass ? 0 : jump ? Math.round((260 + M.jump * 180) * (g.flags.zoll ? 1.4 : 1)) : Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
-            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Raumsprung' : 'Fusionsbrand'} · ${pass ? 'Sprungfreigabe' : fuelCost + ' Cr'}</button>`);
+            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Hyperraumsprung' : 'Raumsprung'} · ${pass ? 'Sprungfreigabe' : fuelCost + ' Cr'}</button>`);
             const blocked = flight.ships.some(s => s.alive && flight.isHostile(s, flight.player) && s.pos.distanceTo(flight.player.pos) < 2500);
             if (jump && jumpCls < M.jump && !pass) b.disabled = true, b.textContent = `Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig (Werft)`;
             else if (blocked) b.disabled = true, b.textContent = 'Feinde zu nah';

@@ -75,7 +75,7 @@ function cargoJob(g, r, station, to, id, tier) {
   const client = ['Kollektiv-Versorgung', 'Hallström Nachfolge GmbH', 'Ringgilde Clan Abara', 'Konsortiums-Logistik', 'Freie Händler Rhea', 'Dr. Ibe Medizintechnik', 'Inktomi Bergbau AG', 'Depotverwaltung L4'][Math.floor(r() * 8)];
   return { id, kind: 'fracht', from: station, to, com, amount, pay, risk, client,
     title: `Fracht: ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name}`,
-    text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${local ? ` Kein Sprung nötig: Fusionsbrand im ${MOONS[moonOfStation(station)].name}-System.` : jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` };
+    text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${local ? ` Kein Hyperraumsprung nötig: Raumsprung im ${MOONS[moonOfStation(station)].name}-System.` : jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` };
 }
 
 /** Freight inside the current moon system never runs out: the board is topped up whenever it runs low. */

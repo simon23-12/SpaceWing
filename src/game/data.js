@@ -89,7 +89,7 @@ export const UPGRADES = {
   cargo:    { name: 'Frachtraum',     desc: '+20 % Ladekapazität',             base: 1800 },
   reactor:  { name: 'Energiekern',    desc: '+15 % Energie-Regeneration',     base: 2600 },
   salvage:  { name: 'Bergungsnetz',   desc: '+3 t Trümmer einsammeln (Grundausstattung: 2 t)', base: 1400 },
-  jump:     { name: 'Sprungtriebwerk', desc: 'Raumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
+  jump:     { name: 'Sprungtriebwerk', desc: 'Hyperraumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
 };
 export const MAX_UPGRADE = 5;
 export const maxLevel = (key) => UPGRADES[key].max || MAX_UPGRADE;

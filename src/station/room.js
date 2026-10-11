@@ -531,7 +531,9 @@ export class RoomMode {
     const o = src.clone(true);
     o.position.copy(m.pos); o.rotation.set(0, Math.atan2(m.dir.x, m.dir.z), 0);
     this.scene.add(o);
-    this.npcs.push({ id: 'kix', obj: o, base: o.position.clone(), room: m.room, marker: m, robot: true });
+    this.npcs.push({ id: 'kix', obj: o, base: o.position.clone(), room: m.room, marker: m, robot: true, baseYaw: o.rotation.y });
+    // a cool key light on him, so the barkeeper stands out behind the counter
+    this.lightDefs.push({ pos: m.pos.clone().addScaledVector(m.dir, 1.4).add(new THREE.Vector3(0, 2.6, 0)), color: new THREE.Color('#9fdcff'), energy: 90, room: m.room });
   }
 
   async addBand(m) {
@@ -672,7 +674,7 @@ export class RoomMode {
 
   // ------------------------------------------------------------------ update
   update(dt) {
-    this.time += dt;
+    this.time += dt; this._dt = dt;
     const modal = this.game.ui.modalOpen || this.game.ui.dlg;
     if (this.cine) {
       // the intro places the camera; the "player" stands below it so doors, lights and visibility follow the shot
@@ -741,7 +743,16 @@ export class RoomMode {
     for (const n of this.npcs) {
       if (!n.obj.visible) continue;
       if (n.npc) n.npc.update(dt, n.holo ? null : this.camera.position);
-      else n.obj.position.y = n.base.y + Math.sin(this.time * 1.4 + n.base.x) * 0.006;
+      else {
+        n.obj.position.y = n.base.y + Math.sin(this.time * 1.4 + n.base.x) * 0.006;
+        if (n.robot) {
+          // Kix turns to whoever comes to the bar, otherwise he polishes along the counter
+          const near = n.obj.position.distanceTo(this.pos) < 4.5 || n.talking;
+          const want = near ? Math.atan2(this.pos.x - n.obj.position.x, this.pos.z - n.obj.position.z) : n.baseYaw + Math.sin(this.time * 0.35) * 0.6;
+          let da = want - n.obj.rotation.y; da = Math.atan2(Math.sin(da), Math.cos(da));
+          n.obj.rotation.y += da * Math.min(1, (this._dt || 0.016) * 2.5);
+        }
+      }
     }
     if (this.screens) for (const s of this.screens) { s.t += dt; if (s.t > 2) { s.t = 0; this.drawScreen(s); } }
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -838,7 +849,7 @@ export class RoomMode {
       if (d > range) return;
       const dot = to.normalize().dot(fwd);
       if (dot < minDot) return;
-      const score = d * (1.6 - dot);
+      const score = d * (1.6 - dot) * (m.kind === 'npc' || m.kind === 'person' ? 0.3 : 1);   // people win over terminals next to them
       if (!best || score < best.score) best = { m, score };
     };
     for (const m of this.markers) {
@@ -846,7 +857,8 @@ export class RoomMode {
       let p = m.pos.clone(); p.y += m.kind === 'npc' ? (m.seated ? 0.9 : 1.2) : 1.0;
       if (m.kind === 'ship' && this.shipModel) p = this.shipModel.root.getWorldPosition(new THREE.Vector3());
       if (m.kind === 'npc' && !this.npcs.some(n => n.id === m.id)) continue;
-      consider(m, p, m.kind === 'ship' ? 14 : m.kind === 'band' ? 6 : m.kind === 'gadget' ? 1.9 : 2.6, m.kind === 'ship' ? 0.6 : m.kind === 'gadget' ? 0.86 : 0.75);
+      // Kix stands behind the counter: he can be talked to across it
+      consider(m, p, m.kind === 'ship' ? 14 : m.kind === 'band' ? 6 : m.kind === 'gadget' ? 1.9 : m.id === 'kix' ? 4.2 : 2.6, m.kind === 'ship' ? 0.6 : m.kind === 'gadget' ? 0.86 : 0.75);
     }
     for (const n of this.npcs) {
       if (n.holo || n.marker?.kind === 'npc' || !n.obj.visible) continue;
