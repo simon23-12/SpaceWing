@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ShipModel } from './shipModel.js';
+import { fitMods } from '../ui/shipPreview.js';
 import { SHIP_CLASSES, shipStats } from '../game/data.js';
 import { makeShield } from './effects.js';
 
@@ -22,6 +23,7 @@ export class Ship {
     const rec = opts.record || { cls: opts.cls, upgrades: opts.upgrades || {}, paint: opts.paint || null };
     const stats = shipStats(rec);
     const model = await ShipModel.load(rec.cls, { paint: rec.paint, engineColor: stats.engine, plumeRadius: stats.length / 28 });
+    fitMods(model, rec.upgrades);
     return new Ship(model, stats, rec, opts);
   }
 

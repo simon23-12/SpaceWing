@@ -7,6 +7,7 @@ import { K } from '../core/bindings.js';
 import { SkyLayer } from '../space/skyLayer.js';
 import { zoneAnchor } from '../space/universe.js';
 import { ShipModel } from '../space/shipModel.js';
+import { fitMods } from '../ui/shipPreview.js';
 import { NPC } from './npc.js';
 import { DeckDoor, Lift } from './deck.js';
 import { BARKS, PEOPLE } from '../game/story.js';
@@ -324,7 +325,7 @@ export class RoomMode {
     if (pad) {
       const ship = this.game.launchShipRecord();
       const hRot = this.deckMeta.layout.hangar.rotY;
-      if (ship) jobs.push(this.parkShip(ship.cls, ship.paint, this.parts.hangar.toWorld(pad), -Math.PI / 2 + hRot).then(m => { this.shipModel = m; }));
+      if (ship) jobs.push(this.parkShip(ship.cls, ship.paint, this.parts.hangar.toWorld(pad), -Math.PI / 2 + hRot, ship.upgrades).then(m => { this.shipModel = m; }));
       // Teo's old Spacewing waits in a corner until Mags gives it away
       const g = this.game.state;
       if (!g.flags.m1done && ship?.cls !== 'spacewing') jobs.push(this.parkShip('spacewing', null, this.parts.hangar.toWorld([-13, 0, 4]), hRot + 0.15));
@@ -393,9 +394,10 @@ export class RoomMode {
   }
 
   /** A parked ship model in the hangar, with a box collider so nobody walks into it. */
-  async parkShip(cls, paint, pos, rotY) {
+  async parkShip(cls, paint, pos, rotY, upgrades) {
     const model = await ShipModel.load(cls, { paint, engineColor: '#7fb6ff' }).catch(() => null);
     if (!model) return null;
+    fitMods(model, upgrades);
     const box = new THREE.Box3().setFromObject(model.root);
     model.root.position.copy(pos).add(new THREE.Vector3(0, -box.min.y + 0.3, 0));
     model.root.rotation.y = rotY;
@@ -406,6 +408,9 @@ export class RoomMode {
     (this.shipBoxes ||= []).push({ box, inv: model.root.matrixWorld.clone().invert(), m: model.root.matrixWorld.clone() });
     return model;
   }
+
+  /** A mod bought in the workshop shows up on the parked ship right away. */
+  refreshParkedShip() { const s = this.game.launchShipRecord(); if (this.shipModel && s) fitMods(this.shipModel, s.upgrades); }
 
   /** Push a standing capsule out of the parked ships' boxes (in the ship's own frame, horizontally). */
   pushOutShips(np, r) {

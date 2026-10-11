@@ -383,7 +383,7 @@ export class UI {
     const home = station === 'cassini';
     let tab = initialTab || (home ? 'kauf' : 'werft');
     return this.panel(home ? 'Werft & Markt' : 'Werft & Markt', `${STATIONS[station].name}${home ? ' · Lenka Brandvold' : ''}`, (body, rebuild, close, w) => {
-      if (tab !== 'werft') this.disposePreview();
+      if (tab !== 'werft' && tab !== 'hangar') this.disposePreview();
       const old = w.querySelector('.tabs'); if (old) old.remove();
       this.tabs(body, [...(home ? [] : [['werft', 'Mein Schiff']]), ['kauf', 'Schiffe kaufen'], ['hangar', 'Hangar'], ['markt', 'Markt']], tab, (k) => { tab = k; rebuild(); });
       if (tab === 'markt') return this.marketBody(body, rebuild, station);
@@ -549,6 +549,7 @@ export class UI {
       this.pvWrap.innerHTML = '<canvas></canvas><div class="svinfo dim">Mod anklicken für eine Vorschau</div>';
       this.pv = new ShipPreview(this.pvWrap.querySelector('canvas'), ship); this.pvShip = ship.uid; this.pvKey = null;
     }
+    this.pvWrap.classList.remove('big');
     body.querySelector('.svslot').replaceWith(this.pvWrap);
     requestAnimationFrame(() => this.pv?.resize());
     const info = this.pvWrap.querySelector('.svinfo');
@@ -570,6 +571,7 @@ export class UI {
       if (g.credits < p) { this.sfx('error'); return; }
       if (k === 'missiles') delete ship.missiles;   // the two new racks come loaded (undefined = full)
       g.credits -= p; ship.upgrades[k] = lv + 1; logEntry(g, `${UPGRADES[k].name} Stufe ${lv + 1} eingebaut`); this.sfx('coins'); this.game.save();
+      this.pv?.refreshMods(ship.upgrades); this.game.mode?.refreshParkedShip?.();
       this.pvKey = k; this.pv?.showUpgrade(k, lv + 1); rebuild();
     });
     body.querySelectorAll('[data-paint]').forEach(d => {
@@ -610,24 +612,50 @@ export class UI {
     });
   }
 
+  /** Resale value: 55 % of the hull price plus half of what the mods cost. */
+  shipValue(s) {
+    const c = SHIP_CLASSES[s.cls];
+    return Math.round((c.price || 20000) * 0.55 + Object.entries(s.upgrades).reduce((a, [k, l]) => { let v = 0; for (let i = 0; i < l; i++) v += upgradePrice(s.cls, k, i) * 0.5; return a + v; }, 0));
+  }
+
+  /** Hangar: your ships as a list, the selected one turning in 3D with its numbers, resale value and actions. */
   hangarList(body, rebuild) {
     const g = this.g;
-    let html = '<table class="grid"><tr><th>Schiff</th><th>Klasse</th><th class="num">Rumpf</th><th class="num">Wert</th><th></th></tr>';
-    for (const s of g.ships) {
-      const c = SHIP_CLASSES[s.cls];
-      const val = Math.round((c.price || 20000) * 0.55 + Object.entries(s.upgrades).reduce((a, [k, l]) => { let v = 0; for (let i = 0; i < l; i++) v += upgradePrice(s.cls, k, i) * 0.5; return a + v; }, 0));
-      const active = s.uid === g.activeShip;
-      html += `<tr><td>${esc(s.name)} ${active ? '<span class="good">· aktiv</span>' : ''}</td><td>${esc(c.name)}</td><td class="num">${Math.round(s.hull * 100)} %</td><td class="num warm">${fmt(val)}</td>
-        <td class="num">${active ? '' : `<button class="btn small" data-act="${s.uid}">Aktivieren</button> `}${g.ships.length > 1 && cargoUsed(s) === 0 ? `<button class="btn small" data-sell="${s.uid}" data-v="${val}">Verkaufen</button>` : ''}</td></tr>`;
+    if (!g.ships.length) { body.innerHTML = '<p class="dim">Kein Schiff im Hangar.</p>'; return; }
+    const sel = g.ships.find(s => s.uid === this.hangarSel) || g.ships.find(s => s.uid === g.activeShip) || g.ships[0];
+    this.hangarSel = sel.uid;
+    const c = SHIP_CLASSES[sel.cls], st = shipStats(sel), val = this.shipValue(sel), active = sel.uid === g.activeShip;
+    const mods = Object.entries(sel.upgrades).filter(([, l]) => l > 0).map(([k, l]) => `${UPGRADES[k].name} ${k === 'jump' ? JUMP_CLASS[l] : l}`);
+    const last = g.ships.length <= 1, loaded = cargoUsed(sel) > 0;
+    body.innerHTML = `<div class="hangar"><div class="hlist">${g.ships.map(s => `<div class="hship${s === sel ? ' on' : ''}" data-pick="${s.uid}">
+        <b>${esc(s.name)}</b><span>${esc(SHIP_CLASSES[s.cls].name)}</span><span>Rumpf ${Math.round(s.hull * 100)} %${s.uid === g.activeShip ? ' · <em class="good">aktiv</em>' : ''}</span></div>`).join('')}
+        <p class="dim" style="font-size:13px;line-height:1.5;margin-top:10px">Mindestens ein Schiff bleibt immer im Hangar. Neue Schiffe gibt es unter „Schiffe kaufen“.</p></div>
+      <div class="hmain"><div class="svslot"></div>
+        <div class="hinfo"><div><h4>${esc(sel.name)}</h4><div class="dim">${esc(c.name)} · ${esc(c.maker)} · ${esc(c.role)}</div>
+          <div class="hstats"><span>Rumpf <b>${Math.round(sel.hull * 100)} %</b></span><span>Schild <b>${Math.round(st.shield)}</b></span><span>Tempo <b>${Math.round(st.speed)} m/s</b></span><span>Laser <b>${Math.round(st.laserDmg * st.laserRate)} DPS</b></span><span>Fracht <b>${st.cargo}</b></span><span>Raketen <b>${st.missiles}</b></span><span>Sprung <b>${JUMP_CLASS[st.jump]}</b></span></div>
+          <div class="dim" style="font-size:13px;margin-top:6px">${mods.length ? 'Mods: ' + esc(mods.join(' · ')) : 'Keine Mods'}</div></div>
+          <div class="hsell"><label>VERKAUFSWERT</label><b class="warm">${fmt(val)} Cr</b>
+            <div class="drow" style="justify-content:flex-end;margin-top:8px">${active ? '<span class="good" style="align-self:center">Aktives Schiff</span>' : `<button class="btn small warm" data-act="${sel.uid}">Aktivieren</button>`}
+            <button class="btn small" data-sell="${sel.uid}" ${last || loaded ? 'disabled' : ''} title="${last ? 'Dein einziges Schiff kann nicht verkauft werden' : loaded ? 'Erst die Fracht ausladen' : ''}">Verkaufen</button></div>
+            ${last ? '<div class="dim" style="font-size:12px;margin-top:4px">Dein einziges Schiff: unverkäuflich</div>' : loaded ? '<div class="dim" style="font-size:12px;margin-top:4px">Fracht an Bord: erst ausladen</div>' : ''}</div></div></div></div>`;
+    if (!this.pvWrap || this.pvShip !== sel.uid) {
+      this.disposePreview();
+      this.pvWrap = document.createElement('div'); this.pvWrap.className = 'shipview big';
+      this.pvWrap.innerHTML = '<canvas></canvas>';
+      this.pv = new ShipPreview(this.pvWrap.querySelector('canvas'), sel); this.pvShip = sel.uid; this.pvKey = null;
     }
-    html += '</table>';
-    body.innerHTML = html;
-    body.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { g.activeShip = b.dataset.act; this.sfx(); rebuild(); });
+    this.pvWrap.classList.add('big');
+    body.querySelector('.svslot').replaceWith(this.pvWrap);
+    requestAnimationFrame(() => this.pv?.resize());
+    body.querySelectorAll('[data-pick]').forEach(d => d.onclick = () => { this.hangarSel = d.dataset.pick; this.sfx('blip'); rebuild(); });
+    body.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { g.activeShip = b.dataset.act; this.sfx(); this.game.save(); rebuild(); });
     body.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => {
       const s = g.ships.find(x => x.uid === b.dataset.sell);
+      if (!s || g.ships.length <= 1) return;
       if (s.cls === 'spacewing' && !confirm('Teos Spacewing wirklich verkaufen? Mags wird das nicht gefallen.')) return;
-      g.ships = g.ships.filter(x => x !== s); addCredits(g, +b.dataset.v, `${s.name} verkauft`);
-      if (g.activeShip === s.uid) g.activeShip = g.ships[0]?.uid; this.sfx('coins'); rebuild();
+      g.ships = g.ships.filter(x => x !== s); addCredits(g, this.shipValue(s), `${s.name} verkauft`);
+      if (g.activeShip === s.uid) g.activeShip = g.ships[0]?.uid;
+      this.hangarSel = g.activeShip; this.sfx('coins'); this.game.save(); rebuild();
     });
   }
 

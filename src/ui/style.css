@@ -356,3 +356,21 @@ td.nowrap { white-space: nowrap; }
 .donesum label { display: block; color: var(--dim); font-family: var(--f-head); letter-spacing: .16em; font-size: 12px; }
 .donesum b { font-family: var(--f-head); font-size: 24px; }
 .goaltag { color: #1a1206; background: var(--warm); font-family: var(--f-head); font-size: 12px; letter-spacing: .14em; padding: 1px 6px; margin-left: 6px; }
+.hangar { display: grid; grid-template-columns: 260px 1fr; gap: 18px; }
+.hlist { display: flex; flex-direction: column; gap: 8px; }
+.hship { pointer-events: auto; cursor: pointer; border: 1px solid var(--line); padding: 9px 12px; display: flex; flex-direction: column; gap: 2px; background: rgba(127,212,255,.03); }
+.hship b { font-family: var(--f-head); letter-spacing: .08em; font-size: 17px; }
+.hship span { color: var(--dim); font-size: 13px; }
+.hship em { font-style: normal; }
+.hship:hover { border-color: var(--line2); }
+.hship.on { border-color: var(--accent); background: rgba(127,212,255,.1); }
+.shipview.big canvas { height: 360px; }
+.shipview.big .svinfo { display: none; }
+.hinfo { display: flex; gap: 18px; justify-content: space-between; margin-top: 12px; }
+.hinfo h4 { font-family: var(--f-head); font-size: 22px; letter-spacing: .1em; margin: 0 0 2px; }
+.hstats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 14px; color: var(--dim); }
+.hstats b { color: var(--text); font-weight: 600; }
+.hsell { min-width: 230px; text-align: right; }
+.hsell label { display: block; color: var(--dim); font-family: var(--f-head); letter-spacing: .16em; font-size: 12px; }
+.hsell b { font-family: var(--f-head); font-size: 28px; }
+@media (max-width: 760px) { .hangar { grid-template-columns: 1fr; } .hinfo { flex-direction: column; } .hsell { text-align: left; } }

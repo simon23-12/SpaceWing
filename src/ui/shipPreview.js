@@ -77,6 +77,62 @@ function buildPart(key, q, L, mats) {
   return g;
 }
 
+/** Where a module sits on a ship, in the model's own frame (b = its bounding box there, L = length). */
+function modAnchors(m, key, b, L, local) {
+  const s = L / 12.6, top = b.max.y, bottom = b.min.y, mid = (b.min.z + b.max.z) / 2;
+  switch (key) {
+    case 'engine': return (m.exhausts.length ? m.exhausts.map(local) : [new THREE.Vector3(0, 0, b.max.z)]).map(p => p.add(new THREE.Vector3(0, 0, -0.5 * s)));
+    case 'lasers': return (m.guns.length ? m.guns.map(local) : [new THREE.Vector3(0, 0, b.min.z)]).map(p => p.add(new THREE.Vector3(0, 0, 0.9 * s)));
+    case 'shield': return [new THREE.Vector3(0, top - 0.15 * s, mid + L * 0.12)];
+    case 'reactor': return [new THREE.Vector3(0, top - 0.1 * s, mid + L * 0.28)];
+    case 'missiles': return [new THREE.Vector3(0, bottom - 0.05 * s, mid - L * 0.06)];
+    case 'cargo': return [new THREE.Vector3(0, bottom - 0.05 * s, mid + L * 0.2)];
+    case 'salvage': return [new THREE.Vector3(0, bottom + 0.1, b.min.z + L * 0.18)];
+    case 'jump': return [new THREE.Vector3(0, 0, b.max.z - L * 0.12)];
+    default: return [new THREE.Vector3(0, 0, mid)];
+  }
+}
+
+const MOD_KEYS = ['engine', 'lasers', 'shield', 'armor', 'reactor', 'missiles', 'cargo', 'salvage', 'jump'];
+// fitted modules are a little more compact than in the workshop's show-and-tell
+const MOD_SCALE = { engine: 0.78, jump: 0.5, cargo: 0.72, missiles: 0.85, shield: 0.85, reactor: 0.85 };
+
+/**
+ * Installed mods are visible on the hull: every upgrade with a level adds its module (the same parts the
+ * workshop preview fits), a little bigger per level, in bare metal with cyan accents. Used in flight, in the
+ * hangar and in the previews. Returns the group (child of model.root, name 'mods').
+ */
+export function fitMods(model, upgrades = {}) {
+  const root = model.root;
+  root.getObjectByName('mods')?.removeFromParent();
+  const g = new THREE.Group(); g.name = 'mods';
+  const keys = MOD_KEYS.filter(k => (upgrades[k] || 0) > 0);
+  if (!keys.length) { root.add(g); return g; }
+  // measure in the model's own frame
+  const saved = root.matrix.clone(), parent = root.parent;
+  parent?.remove(root);
+  root.position.set(0, 0, 0); root.quaternion.identity(); root.scale.set(1, 1, 1); root.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(root), L = model.length || (b.max.z - b.min.z);
+  const local = (o) => o.getWorldPosition(new THREE.Vector3());
+  const mats = { old: MOD_MAT(), new: MOD_MAT(), glow: new THREE.MeshBasicMaterial({ color: new THREE.Color('#4ad0ff').multiplyScalar(1.6), toneMapped: false }) };
+  for (const k of keys) {
+    const lv = upgrades[k];
+    for (const p of modAnchors(model, k, b, L, local)) {
+      const part = buildPart(k, 1, L, mats);
+      part.position.copy(p); part.scale.setScalar((MOD_SCALE[k] || 1) * (0.92 + 0.05 * Math.min(lv, 5)));
+      part.userData.key = k;
+      part.traverse(o => { if (o.isMesh) { o.castShadow = false; o.userData.mod = true; } });
+      g.add(part);
+    }
+  }
+  root.add(g);
+  saved.decompose(root.position, root.quaternion, root.scale);
+  parent?.add(root);
+  root.updateMatrixWorld(true);
+  return g;
+}
+const MOD_MAT = () => new THREE.MeshStandardMaterial({ color: 0x6c737c, roughness: 0.38, metalness: 0.85 });
+
 export class ShipPreview {
   constructor(canvas, rec) {
     this.canvas = canvas;
@@ -95,6 +151,7 @@ export class ShipPreview {
     this.sparks = new Particles(this.scene, 600, TEX.soft);
     this.mats = { old: OLD(), new: NEW(), glow: GLOW('#4ad0ff') };
     this.t = 0; this.anim = null;
+    this.rec = rec;
     this.ready = this.load(rec);
     this.resize();
     this._onResize = () => this.resize(); addEventListener('resize', this._onResize);
@@ -115,6 +172,7 @@ export class ShipPreview {
     ring.rotation.x = -Math.PI / 2; ring.position.y = this.box.min.y - 0.4; this.scene.add(ring);
     const grid = new THREE.PolarGridHelper(this.L * 0.6, 12, 4, 64, 0x2a4a60, 0x1a2a38); grid.position.y = ring.position.y - 0.01; this.scene.add(grid);
     this.root = root;
+    this.mods = fitMods(this.model, rec.upgrades);
   }
 
   resize() {
@@ -126,21 +184,13 @@ export class ShipPreview {
 
   /** Anchor (in ship space) and orientation for a module. */
   anchorsFor(key) {
-    const m = this.model, b = this.box, inv = new THREE.Matrix4().copy(this.turn.matrixWorld).invert();
-    const local = (o) => o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+    const inv = new THREE.Matrix4().copy(this.turn.matrixWorld).invert();
     this.turn.updateMatrixWorld(true);
-    const top = b.max.y, bottom = b.min.y, mid = (b.min.z + b.max.z) / 2;
-    switch (key) {
-      case 'engine': return (m.exhausts.length ? m.exhausts.map(local) : [new THREE.Vector3(0, 0, b.max.z)]).map(p => p.add(new THREE.Vector3(0, 0, -0.5 * this.L / 12.6)));
-      case 'lasers': return (m.guns.length ? m.guns.map(local) : [new THREE.Vector3(0, 0, b.min.z)]).map(p => p.add(new THREE.Vector3(0, 0, 0.9 * this.L / 12.6)));
-      case 'shield': return [new THREE.Vector3(0, top - 0.15 * this.L / 12.6, mid + this.L * 0.12)];
-      case 'reactor': return [new THREE.Vector3(0, top - 0.1 * this.L / 12.6, mid + this.L * 0.28)];
-      case 'missiles': case 'cargo': return [new THREE.Vector3(0, bottom - 0.05 * this.L / 12.6, mid + this.L * 0.05)];
-      case 'salvage': return [new THREE.Vector3(0, bottom + 0.1, b.min.z + this.L * 0.18)];
-      case 'jump': return [new THREE.Vector3(0, 0, b.max.z - this.L * 0.12)];
-      default: return [new THREE.Vector3(0, 0, mid)];
-    }
+    return modAnchors(this.model, key, this.box, this.L, (o) => o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv));
   }
+
+  /** Re-fit the installed mods (after buying one). */
+  refreshMods(upgrades) { if (this.model) { this.mods = fitMods(this.model, upgrades); this.rec.upgrades = upgrades; } }
 
   /** Play the install sequence for an upgrade (level = the level it would get). */
   async showUpgrade(key, level) {
@@ -155,12 +205,14 @@ export class ShipPreview {
       return { o, n, p: p.clone() };
     });
     this.anim = { key, parts, mats, t: 0, sparked: false };
+    for (const c of this.mods?.children || []) c.visible = c.userData.key !== key;
     this.turnTarget = key === 'engine' || key === 'jump' ? Math.PI * 0.85 : key === 'lasers' || key === 'salvage' ? 0.2 : null;
   }
 
   clearAnim() {
     if (!this.anim) return;
     for (const { o, n } of this.anim.parts) { this.turn.remove(o, n); }
+    for (const c of this.mods?.children || []) c.visible = true;
     for (const m of Object.values(this.anim.mats)) m.dispose();
     this.anim = null; this.turnTarget = null;
   }
