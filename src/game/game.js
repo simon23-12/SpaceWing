@@ -5,7 +5,7 @@ import { input } from '../core/input.js';
 import { assets } from '../core/assets.js';
 import { UI } from '../ui/ui.js';
 import { state, newGame, activeShip, logEntry, addCredits, fmt, addShip } from './state.js';
-import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation, SHIP_CLASSES } from './data.js';
+import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation, SHIP_CLASSES, towFee } from './data.js';
 import { STORY, npcDialogue, finaleChoice, kroneEnding, PEOPLE } from './story.js';
 import { Director, onDockJobs, generateJobs, SIM_SCENARIOS, simMedal, simReward, MEDALS } from './missions.js';
 import { FlightMode } from '../space/flight.js';
@@ -172,6 +172,7 @@ export class Game {
   async enterStation(stationId, opts = {}) {
     const g = this.state;
     g.location = stationId; g.docked = true;
+    for (const s of g.ships) delete s.missiles;   // the hangar crew reloads the missile racks for free (undefined = full)
     this.checkUnlocks();
     if (STATIONS[stationId].walkable) return this.toOverview();
     return this.dockMenu(stationId);
@@ -336,12 +337,14 @@ export class Game {
     this.save();
     // flight report: what changed between undocking and the next docking (shown after landing)
     this.sortie = { time: 0, from: g.location, credits0: g.credits, earned0: g.earned, kills0: g.kills, salvage: 0, rec, hull0: rec.hull ?? 1, temp: !!rec.uid?.startsWith('TEMP') };
+    this.keepPointer = !!this.mode?.isRoom;
     await this.startFlight(zone, 'undock', rec);
   }
 
   async startFlight(zone, spawn, rec, extra = {}) {
     await this.fadeOut(0.5);
     await this.leaveMode();
+    this.keepPointer = false;
     this.ui.clear();
     const ld = this.ui.loading('START · ' + ZONES[zone].name.toUpperCase());
     const director = new Director(this, zone, { spawn });
@@ -491,24 +494,34 @@ export class Game {
 
   async onPlayerDead(flight) {
     const g = this.state;
+    if (this.mode !== flight) return;   // left the flight meanwhile (menu → title)
     this.sortie = null;
     if (flight.opts.sim) return this.endSim(flight, null);
     await this.fadeOut(1.2);
     await this.leaveMode();
     this.ui.clear();
-    const st = STORY[g.story];
     const temp = flight.player.record?.uid?.startsWith('TEMP');
-    let fee = Math.min(g.credits, Math.round(800 + g.earned * 0.02));
-    if (temp) { fee = 0; g.flags.m1stage = 0; }
+    // the salvage tug hauls the wreck back to Cassini: 1000 Cr for the Spacewing, more for bigger hulls
+    const ship = temp ? null : flight.player.record;
+    let fee = ship ? Math.min(g.credits, towFee(ship)) : 0;
+    if (temp) g.flags.m1stage = 0;
     g.credits -= fee;
-    const ship = activeShip(g);
-    if (ship && !temp) ship.hull = 0.3;
-    g.location = 'cassini';
-    logEntry(g, `Abgeschossen. Bergung und Notreparatur: −${fmt(fee)} Cr`);
+    if (ship) ship.hull = Math.min(ship.hull ?? 1, 0.45);   // patched up enough to fly, but it wants a proper repair
+    g.location = 'cassini'; g.docked = true;
+    logEntry(g, temp ? 'Abgeschossen. Rettungskapsel geborgen.' : `Abgeschossen. Abschleppdienst nach Cassini: −${fmt(fee)} Cr`);
     this.mode = { kind: 'cutscene', render3D: false };
+    // the dialogue sits below the fade layer, so show a backdrop and fade back in first (otherwise the screen stays black)
+    const bg = document.createElement('div');
+    bg.className = 'overview';
+    bg.innerHTML = `<div class="img" style="inset:0;background-image:url(${assets.url('assets/ui/hangar.jpg')});filter:brightness(.55) saturate(.8)"></div>`;
+    document.getElementById('ui').appendChild(bg);
+    await this.fadeIn(0.8);
     await this.ui.dialog([
-      { who: temp ? 'mags' : 'comp', text: temp ? 'Rettungskapsel geborgen. Der Eisvogel hat mehr abbekommen, als mir lieb ist. Wir versuchen es noch mal, und diesmal triffst du.' : `Rettungskapsel von einem Bergungsschlepper aufgenommen. Bergung und Notreparatur kosten ${fmt(fee)} Kredits. Willkommen zurück auf Cassini.` },
+      { who: temp ? 'mags' : 'comp', text: temp ? 'Rettungskapsel geborgen. Der Eisvogel hat mehr abbekommen, als mir lieb ist. Wir versuchen es noch mal, und diesmal triffst du.'
+        : `Rettungskapsel von einem Bergungsschlepper aufgenommen. Dein Schiff wurde nach Hangar 7 geschleppt: ${fmt(fee)} Kredits für den Abschleppdienst. Rumpf ${Math.round(ship.hull * 100)} Prozent, bitte bei Yara reparieren lassen.` },
     ]);
+    await this.fadeOut(0.5);
+    bg.remove();
     this.save();
     await this.enterStation('cassini');
   }

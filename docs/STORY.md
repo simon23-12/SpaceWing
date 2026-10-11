@@ -26,7 +26,7 @@ Der wichtigste Rohstoff ist **Helium‑3**. Ohne He‑3 laufen keine Fusionsantr
 
 ### Die fünf Monde (Level)
 
-Das Spiel ist in fünf Mondsysteme gegliedert. Jedes ist ein Level mit eigener Station, Stimmung und Rolle im Handelskrieg. Man reist per Hyperraumsprung. Dafür braucht das Schiff ein Sprungtriebwerk passender Klasse, und der Mond muss freigeschaltet sein.
+Das Spiel ist in fünf Mondsysteme gegliedert. Jedes ist ein Level mit eigener Station, Stimmung und Rolle im Handelskrieg. Man reist per Raumsprung. Dafür braucht das Schiff ein Sprungtriebwerk passender Klasse, und der Mond muss freigeschaltet sein.
 
 | Mond | Station | Sprungklasse | Freigeschaltet durch | Rolle im Handelskrieg | Stimmung |
 |---|---|---|---|---|---|
@@ -88,7 +88,7 @@ Beim neuen Spiel (überspringbar, `src/game/intro.js`): Saturn im Jahr 2260, Tit
 Der Spieler wacht in seiner Kabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Fliegen kann sie noch, aber am Abzug zittern ihr die Hände.
 
 ### Mission 1 – „Eisfracht“
-Mags fliegt ihren *Eisvogel* per Hyperraumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
+Mags fliegt ihren *Eisvogel* per Raumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*
 
 ### Mission 1b – „Flugstunde“
 Tutorial in der Spacewing: Mags fliegt im Eisvogel nebenher und erklärt Lenken, Schub, Rollen, Kamera, Nachbrenner, Laser auf Zieldrohnen, Raketen und das Andocken.
@@ -114,7 +114,7 @@ Mags gesteht: Das Archiv braucht Menschen, die in keiner Statistik vorkommen. Va
 
 **Mission 8 – „Die Kassini‑Teilung“:** Die Liga‑Flotte trifft ein, um „Ordnung herzustellen“. Varga hat das vorhergesehen und will die Liga in den Ringen vernichten, um sich als Retterin krönen zu lassen. In der Cassini‑Teilung, der Lücke zwischen den Ringen, entscheidet sich alles.
 
-**Enden** (abhängig von Ruf und Entscheidungen):
+**Enden** (abhängig von Reputation und Entscheidungen):
 1. **Föderation** – Der Spieler veröffentlicht Vargas Beweise auf allen Kanälen. Die Monde vereinen sich gegen Liga und Konsortium. Vesper erscheint ein letztes Mal: *„Dreißig Jahre. Vielleicht weniger.“*
 2. **Krone** – Der Spieler schweigt gegen Bezahlung. Varga eint das System mit Gewalt. Friede durch Furcht.
 3. **Zoll** – Der Spieler übergibt die Beweise der Liga. Das Saturnsystem wird Kolonie, und der lange Krieg kommt später.
@@ -123,7 +123,7 @@ Mags gesteht: Das Archiv braucht Menschen, die in keiner Statistik vorkommen. Va
 
 ## 4. Spielmechanik und Erzählung
 
-- **Ruf** bei Kollektiv, Konsortium, Ringgilde und Liga verändert Preise, Missionen und Dialoge.
+- **Reputation** bei Kollektiv, Konsortium, Ringgilde und Liga verändert Preise, Missionen und Dialoge.
 - **Marktpreise** folgen den Story‑Ereignissen: Mit dem Zoll steigt He‑3, mit der Blockade wird Wasser auf Titan knapp, mit dem Krieg steigt der Waffenschmuggel.
 - **Schiffe** sind modular: Antrieb, Schilde, Panzerung, Laser, Raketen, Frachtraum, Energiekern, Lackierung.
 - **Die Spacewing** bleibt das emotionale Zentrum. Wer sie bis Stufe 5 aufrüstet, bekommt in Mission 8 einen Dialog mit Saffi Lindqvist über ihren Großvater.

@@ -807,7 +807,7 @@ export class RoomMode {
 
   dispose() {
     this.uiEl?.remove();
-    input.unlock();
+    if (!this.game.keepPointer) input.unlock();   // boarding the ship keeps the mouse captured for the flight
     for (const e of Object.values(this.envs || {})) e.dispose();
     for (const n of this.npcs) n.npc?.dispose();
   }

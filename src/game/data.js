@@ -85,11 +85,11 @@ export const UPGRADES = {
   shield:   { name: 'Schildgenerator', desc: '+15 % Schildkapazität',          base: 2800 },
   armor:    { name: 'Rumpfpanzerung', desc: '+15 % Rumpfstruktur',            base: 2200 },
   lasers:   { name: 'Laserkanonen',   desc: '+12 % Schaden, +5 % Feuerrate',   base: 3200 },
-  missiles: { name: 'Raketenwerfer',  desc: '+2 Raketenschächte, schnellere Zielerfassung (Raketen kauft man dazu)', base: 3000 },
+  missiles: { name: 'Raketenwerfer',  desc: '+2 geladene Raketenschächte, schnellere Zielerfassung · Nachladen beim Andocken kostenlos', base: 3000 },
   cargo:    { name: 'Frachtraum',     desc: '+20 % Ladekapazität',             base: 1800 },
   reactor:  { name: 'Energiekern',    desc: '+15 % Energie-Regeneration',     base: 2600 },
   salvage:  { name: 'Bergungsnetz',   desc: '+3 t Trümmer einsammeln (Grundausstattung: 2 t)', base: 1400 },
-  jump:     { name: 'Sprungtriebwerk', desc: 'Hyperraumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
+  jump:     { name: 'Sprungtriebwerk', desc: 'Raumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
 };
 export const MAX_UPGRADE = 5;
 export const maxLevel = (key) => UPGRADES[key].max || MAX_UPGRADE;
@@ -216,3 +216,9 @@ export const MOON_ORDER = ['rhea', 'enceladus', 'mimas', 'titan', 'iapetus'];
 export const moonOfZone = (zone) => Object.keys(MOONS).find(k => MOONS[k].zones.includes(zone));
 export const moonOfStation = (st) => moonOfZone(STATIONS[st].zone);
 export const JUMP_CLASS = ['–', 'I', 'II', 'III'];
+
+/** Towing the wreck back to Cassini after being shot down: 1000 Cr for the Spacewing, scaled with the hull price for bigger ships. */
+export function towFee(ship) {
+  const c = SHIP_CLASSES[ship.cls];
+  return Math.max(1000, Math.round((c?.price || 22000) * 0.02 / 50) * 50);
+}

@@ -9,8 +9,6 @@ import { ACTIONS, ACTION, AXES, keysFor, keyLabel, bindKey, resetKeys, withKeys,
 import { Streaks } from './streaks.js';
 import { ShipPreview } from './shipPreview.js';
 
-const MISSILE_PRICE = 150;
-
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
@@ -426,7 +424,7 @@ export class UI {
       const net = r.ship?.cargo?.schrott || 0;
       const dmg = r.hull0 != null ? Math.max(0, Math.round((r.hull0 - r.hull1) * 100)) : null;
       body.innerHTML = `<div class="debrief">
-        ${tile('MISSIONSZEIT', mmss(r.time), r.jumps ? `${r.jumps} Hyperraumsprung${r.jumps > 1 ? 'e' : ''}` : 'Flugzeit im Cockpit')}
+        ${tile('MISSIONSZEIT', mmss(r.time), r.jumps ? `${r.jumps} Raumsprung${r.jumps > 1 ? 'e' : ''}` : 'Flugzeit im Cockpit')}
         ${tile('VERDIENT', (r.earned > 0 ? '+' : '') + fmt(r.earned) + ' Cr', `Kontostand ${r.net >= 0 ? '+' : '−'}${fmt(Math.abs(r.net))} Cr (inkl. Treibstoff)`, r.earned > 0 ? 'good' : '')}
         ${tile('TRÜMMER', `${r.salvage} t`, net ? `im Netz: ${net} t · ≈ ${fmt(net * salvPrice)} Cr hier` : r.salvage ? 'verkauft' : 'keine eingesammelt', r.salvage ? 'amber' : '')}
         ${tile('ABSCHÜSSE', r.kills, r.kills ? 'bestätigt' : '—')}
@@ -481,9 +479,10 @@ export class UI {
         <span>Fracht</span><div class="meter"><div style="width:${Math.min(100, st.cargo)}%"></div></div><span>${st.cargo}</span>
       </div>
       ${ship.hull < 0.999 ? `<button class="btn warm" style="margin-top:12px" data-repair="1">Reparieren · ${fmt(repairCost)} Cr</button>` : ''}
-      ${st.missiles > 0 ? `<div class="ammo"><span>RAKETEN ${Math.min(ship.missiles ?? st.missiles, st.missiles)} / ${st.missiles}</span>${(ship.missiles ?? st.missiles) < st.missiles ? `<button class="btn small" data-ammo="1">+1 · ${MISSILE_PRICE} Cr</button><button class="btn small" data-ammo="all">Auffüllen · ${fmt(MISSILE_PRICE * (st.missiles - (ship.missiles ?? st.missiles)))} Cr</button>` : '<span class="good">voll</span>'}</div>`
-        : '<div class="ammo dim">Keine Raketenschächte. Raketenwerfer nachrüsten (rechts), dann Raketen kaufen.</div>'}
+      ${st.missiles > 0 ? `<div class="ammo"><span>RAKETEN ${Math.min(ship.missiles ?? st.missiles, st.missiles)} / ${st.missiles}</span>${(ship.missiles ?? st.missiles) < st.missiles ? '<button class="btn small" data-ammo="all">Nachladen · kostenlos</button>' : '<span class="good">voll</span>'}<span class="dim" style="font-size:12px">Wird bei jedem Andocken kostenlos aufgefüllt.</span></div>`
+        : '<div class="ammo dim">Keine Raketenschächte. Raketenwerfer nachrüsten (rechts): Jede Stufe bringt zwei geladene Raketen.</div>'}
       </div><div>
+      <div class="balance"><span>KONTOSTAND</span><b>${fmt(g.credits)} Cr</b></div>
       <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 10px">UPGRADES</h4><table class="grid">`;
     for (const [k, u] of Object.entries(UPGRADES)) {
       const lv = ship.upgrades[k] || 0;
@@ -514,12 +513,7 @@ export class UI {
       info.classList.remove('dim'); info.innerHTML = this.modDiff(ship, k);
       this.pv.showUpgrade(k, (ship.upgrades[k] || 0) + 1); this.sfx('blip');
     }));
-    body.querySelectorAll('[data-ammo]').forEach(bt => bt.onclick = () => {
-      const have = Math.min(ship.missiles ?? st.missiles, st.missiles), n = bt.dataset.ammo === 'all' ? st.missiles - have : 1;
-      const cost = n * MISSILE_PRICE;
-      if (g.credits < cost) { this.sfx('error'); this.notify('Nicht genug Kredits'); return; }
-      g.credits -= cost; ship.missiles = have + n; this.sfx('coins'); this.game.save(); rebuild();
-    });
+    body.querySelectorAll('[data-ammo]').forEach(bt => bt.onclick = () => { ship.missiles = st.missiles; this.sfx('blip'); this.game.save(); rebuild(); });
     body.querySelector('[data-repair]')?.addEventListener('click', () => {
       if (g.credits < repairCost) { this.sfx('error'); this.notify('Nicht genug Kredits'); return; }
       g.credits -= repairCost; ship.hull = 1; this.sfx('coins'); rebuild();
@@ -527,7 +521,7 @@ export class UI {
     body.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
       const k = b.dataset.up, lv = ship.upgrades[k] || 0, p = upgradePrice(ship.cls, k, lv);
       if (g.credits < p) { this.sfx('error'); return; }
-      if (k === 'missiles') ship.missiles = Math.min(ship.missiles ?? shipStats(ship).missiles, shipStats(ship).missiles) + (lv === 0 && SHIP_CLASSES[ship.cls].missiles === 0 ? 2 : 0);
+      if (k === 'missiles') delete ship.missiles;   // the two new racks come loaded (undefined = full)
       g.credits -= p; ship.upgrades[k] = lv + 1; logEntry(g, `${UPGRADES[k].name} Stufe ${lv + 1} eingebaut`); this.sfx('coins'); this.game.save();
       this.pvKey = k; this.pv?.showUpgrade(k, lv + 1); rebuild();
     });
@@ -556,7 +550,7 @@ export class UI {
       html += `<div class="card"><img src="${assets.url(`assets/ships/${id}/preview.jpg`)}"><h4>${esc(c.name)}</h4><div class="meta">${esc(c.maker)} · ${esc(c.role)}</div>
         <p style="font-size:14px">${esc(c.desc || '')}</p>
         <div class="meta">Rumpf ${c.hull} · Schild ${c.shield} · ${c.speed} m/s · Fracht ${c.cargo} · Raketen ${c.missiles}</div>
-        <div class="row"><span class="warm">${fmt(c.price)} Cr</span>${locked ? '<span class="bad">Nur mit Konsortiums-Ruf</span>' : `<button class="btn small" data-buy="${id}" ${g.credits < c.price ? 'disabled' : ''}>Kaufen</button>`}</div></div>`;
+        <div class="row"><span class="warm">${fmt(c.price)} Cr</span>${locked ? '<span class="bad">Nur mit Konsortiums-Reputation</span>' : `<button class="btn small" data-buy="${id}" ${g.credits < c.price ? 'disabled' : ''}>Kaufen</button>`}</div></div>`;
     }
     html += '</div>';
     body.innerHTML = html;
@@ -599,7 +593,7 @@ export class UI {
         <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">PILOT</h4>
         <div class="statgrid"><span>Rufzeichen</span><b>${esc(g.callsign)}</b><span></span><span>Rang</span><b>${rank(g)}</b><span></span>
         <span>Kredits</span><b class="warm">${fmt(g.credits)}</b><span></span><span>Verdient</span><b>${fmt(g.earned)}</b><span></span><span>Abschüsse</span><b>${g.kills}</b><span></span><span>Tag</span><b>${g.day}</b><span></span></div>
-        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">RUF</h4><div class="statgrid">${reps}</div>
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">REPUTATION</h4><div class="statgrid">${reps}</div>
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn small warm" data-save>Speichern</button><button class="btn small" data-apt>Apartments &amp; Transit</button><button class="btn small" data-story>Story-Bibel</button></div>
         </div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">LOGBUCH</h4>
         <div style="max-height:52vh;overflow:auto;font-size:14px;line-height:1.6">${g.log.map(l => `<div><span class="dim">Tag ${l.day}</span> · ${esc(l.text)}</div>`).join('') || '<span class="dim">Noch leer.</span>'}</div></div></div>`;
@@ -706,7 +700,7 @@ export class UI {
             const borrowed = flight.player.record?.uid?.startsWith('TEMP');   // story ships: the owner pays the fuel
             const pass = jump && storyJumpPass(g) === mid;                       // story patron's beacon pulls the ship over
             const fuelCost = borrowed || pass ? 0 : jump ? Math.round((260 + M.jump * 180) * (g.flags.zoll ? 1.4 : 1)) : Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
-            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Hyperraumsprung' : 'Fusionsbrand'} · ${pass ? 'Sprungfreigabe' : fuelCost + ' Cr'}</button>`);
+            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Raumsprung' : 'Fusionsbrand'} · ${pass ? 'Sprungfreigabe' : fuelCost + ' Cr'}</button>`);
             const blocked = flight.ships.some(s => s.alive && flight.isHostile(s, flight.player) && s.pos.distanceTo(flight.player.pos) < 2500);
             if (jump && jumpCls < M.jump && !pass) b.disabled = true, b.textContent = `Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig (Werft)`;
             else if (blocked) b.disabled = true, b.textContent = 'Feinde zu nah';

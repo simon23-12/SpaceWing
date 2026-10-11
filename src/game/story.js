@@ -180,7 +180,7 @@ export function npcDialogue(game, npc) {
     { q: 'Wie lebt man auf der Station?', a: ['Der Ring dreht sich, deshalb stehen wir. Deck 4 hat den Ringgang, die Bar und die Kabinen. Oben die Kuppel, da sieht man den Saturn, wenn man den Lift nimmt.'] },
   ], 'Schönen Feierabend.');
   if (npc === 'gast_ilse') return tree(npc, 'Kurierpilotin. Ich fliege, was in einen Laderaum passt und schnell sein muss. Du auch?', [
-    { q: 'Wie fühlt sich ein Hyperraumsprung an?', a: ['Erst lädt das Triebwerk, drei Sekunden, die sich anfühlen wie dreißig. Dann wird alles weiß, die Sterne ziehen sich zu Strichen.', 'Und dann bist du da, und der Saturn hängt an einer anderen Stelle im Himmel. Den immer im Blick behalten. Er ist der einzige Fixpunkt hier draußen.'] },
+    { q: 'Wie fühlt sich ein Raumsprung an?', a: ['Erst lädt das Triebwerk, drei Sekunden, die sich anfühlen wie dreißig. Dann wird alles weiß, die Sterne ziehen sich zu Strichen.', 'Und dann bist du da, und der Saturn hängt an einer anderen Stelle im Himmel. Den immer im Blick behalten. Er ist der einzige Fixpunkt hier draußen.'] },
     { q: 'Welcher Mond ist der schönste?', a: ['Enceladus. Weiß wie frischer Schnee, und die Geysire leuchten im Gegenlicht. Titan ist eindrucksvoller, aber man sieht vor lauter Dunst nichts.', 'Iapetus ist unheimlich. Halb schwarz, halb weiß. Da fliege ich nur, wenn ich muss.'] },
     { q: 'Hast du Ärger mit Piraten?', a: ['Die Schakale von Phoebe. Früher Lumpen mit Schrottkanonen, heute fliegen sie mit Waffen, die neu riechen.'] },
   ], 'Guten Flug, Ilse.');
@@ -276,7 +276,7 @@ export const STORY = {
           M('Gleich springen wir nach Enceladus. Beim ersten Sprung wird jedem schlecht. Nicht in meinen Turm kotzen.'),
         ]);
         await c.until(() => p.ai.mode !== 'goto');
-        c.objective('Hyperraumsprung nach Enceladus');
+        c.objective('Raumsprung nach Enceladus');
         jump('enceladus');
       } else if (f.zoneId === 'enceladus' && stage === 0) {
         const st = f.station;
@@ -323,12 +323,12 @@ export const STORY = {
           M('Merk dir das Wappen auf den Wracks. Ein Schakal mit Konsortiums-Kanonen. Jemand bezahlt die.'),
           M('Kurs Rhea. Festhalten.'),
         ]);
-        c.objective('Hyperraumsprung nach Rhea');
+        c.objective('Raumsprung nach Rhea');
         jump('rhea');
       } else if (f.zoneId !== 'rhea' && stage >= 1) {
         await c.wait(2);
         c.say('Mags', 'Ab nach Hause.', 'ringgilde');
-        c.objective('Hyperraumsprung nach Rhea');
+        c.objective('Raumsprung nach Rhea');
         await c.wait(3);
         jump('rhea');
       } else if (f.zoneId === 'rhea' && stage >= 1) {

@@ -17,6 +17,9 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quatern
 const BOLT_SPEED = 900;
 // aim assist: within this cone (rad) of a hostile's lead point the guns snap to it and the bolts home in a little
 const SCRAP_FIELD = 30;   // pieces kept drifting around Cassini (refilled continuously, so it can be farmed for as long as you like)
+// docking beam: only from inside the lit approach lane, so the autopilot has little left to do
+const DOCK_RANGE = 1000;
+const MOUSE_SETTLE = 1.2;   // s after the flight starts in which the mouse does not steer
 export const ASSIST_CONE = 0.12, ASSIST_CONE_TURRET = 0.08, ASSIST_RANGE = 2000;
 
 export class FlightMode {
@@ -315,18 +318,24 @@ export class FlightMode {
     const p = this.player, inp = p.input;
     if (p.autopilot) return;
     const sens = 0.0024 * (this.game.settings?.mouseSens || 1);
-    if (input.locked) {
+    const pad = input.pad;
+    // the first moments after launch ignore the mouse: leftover movement from walking the hangar (or the click on
+    // "Start" in a menu) must not pull the ship anywhere
+    const mouseOk = this.time > MOUSE_SETTLE && !this.game.ui.modalOpen;
+    if (!mouseOk) { this.stick.x = 0; this.stick.y = 0; this.mouseAnchor = null; }
+    else if (input.locked) {
       this.stick.x += input.mouse.dx * sens;
       this.stick.y += input.mouse.dy * sens * (this.game.settings?.invertY ? -1 : 1);
-      if (input.mouse.dx === 0 && input.mouse.dy === 0) { const k = Math.exp(-dt * 0.9); this.stick.x *= k; this.stick.y *= k; }
-    } else if (this.mouseSteer) {
-      // without pointer lock: the cursor position relative to the screen centre is the stick
+      // with a joystick attached the mouse stick recentres quickly, so a nudged mouse does not keep steering
+      if (input.mouse.dx === 0 && input.mouse.dy === 0) { const k = Math.exp(-dt * (pad ? 4 : 0.9)); this.stick.x *= k; this.stick.y *= k; }
+    } else if (this.mouseAnchor) {
+      // without pointer lock: the cursor's offset from where it was when steering began is the stick (never the screen centre)
       const R = Math.min(innerWidth, innerHeight) * 0.32;
-      this.stick.x = (input.mouse.x - innerWidth / 2) / R;
-      this.stick.y = (input.mouse.y - innerHeight / 2) / R * (this.game.settings?.invertY ? -1 : 1);
+      this.stick.x = (input.mouse.x - this.mouseAnchor.x) / R;
+      this.stick.y = (input.mouse.y - this.mouseAnchor.y) / R * (this.game.settings?.invertY ? -1 : 1);
     } else { const k = Math.exp(-dt * 3); this.stick.x *= k; this.stick.y *= k; }
-    if (!this.mouseSteer && (input.mouse.dx || input.mouse.dy) && !input.locked && !this.game.ui.modalOpen) this.mouseSteer = true;
-    const pad = input.pad;
+    if (mouseOk && !input.locked && !this.mouseAnchor && !pad && (input.mouse.dx || input.mouse.dy)) this.mouseAnchor = { x: input.mouse.x - input.mouse.dx, y: input.mouse.y - input.mouse.dy };
+    if (input.locked) this.mouseAnchor = null;
     if (pad?.active && (Math.abs(pad.yaw) + Math.abs(pad.pitch) > 0.02 || !input.locked)) { this.stick.x = pad.yaw; this.stick.y = pad.pitch * (this.game.settings?.invertY ? -1 : 1); }
     const l = Math.hypot(this.stick.x, this.stick.y);
     if (l > 1) { this.stick.x /= l; this.stick.y /= l; }
@@ -444,7 +453,7 @@ export class FlightMode {
     if (this.station) {
       const st = this.station, zs = this.zone.station;
       this._stTgt ||= { isObject: true, kind: 'station', name: st.name || 'Station', faction: st.faction || 'neutral', alive: true, vel: new THREE.Vector3(), radius: 200,
-        get pos() { return st.dock?.pos || st.pos; }, info: this.zone.hostile ? 'Feindliche Station · kein Andocken' : 'Andockbucht · [{k:dock}] unter 3 km', station: zs?.id };
+        get pos() { return st.dock?.pos || st.pos; }, info: this.zone.hostile ? 'Feindliche Station · kein Andocken' : 'Andockbucht · [{k:dock}] unter 1 km', station: zs?.id };
       out.push(this._stTgt);
     }
     for (const sv of this.salvage) {
@@ -490,7 +499,7 @@ export class FlightMode {
 
   canDock() {
     if (!this.station || this.zone.hostile) return false;
-    return this.player.pos.distanceTo(this.station.dock.pos) < 3000;
+    return this.player.pos.distanceTo(this.station.dock.pos) < DOCK_RANGE;
   }
 
   requestDock() {
@@ -499,7 +508,7 @@ export class FlightMode {
     if (this.missionBlocksDock) { this.hud.showToast(this.missionBlocksDock, 2.5); return; }
     if (!this.station) { this.hud.showToast('Keine Station in Reichweite', 2); return; }
     if (this.zone.hostile) { this.hud.showToast('Andocken verweigert', 2); return; }
-    if (!this.canDock()) { this.hud.showToast('Zu weit entfernt – näher als 3 km an die Andockbucht', 2.5); return; }
+    if (!this.canDock()) { this.hud.showToast('Zu weit entfernt – in die beleuchtete Anflugschneise, näher als 1 km an die Andockbucht', 2.5); return; }
     if (!this.allowHotDock && this.ships.some(s => s.alive && this.isHostile(s, this.player) && s.pos.distanceTo(this.player.pos) < 3000)) {
       this.hud.showToast('Andocken unmöglich – Feinde in der Nähe', 2.5); return;
     }
@@ -546,7 +555,7 @@ export class FlightMode {
     this.player.autopilot = { travel: true };
     const M = MOONS[moonOfZone(zoneId)];
     if (jump) {
-      this.hud.setObjective(`Hyperraumsprung nach ${M.name}`);
+      this.hud.setObjective(`Raumsprung nach ${M.name}`);
       this.say('Bordcomputer', `Sprungtriebwerk lädt. Ziel: ${M.name}-Orbit. Ausrichtung auf den Sprungvektor.`, 'neutral', 3);
     } else {
       this.hud.setObjective(`Fusionsbrand nach ${ZONES[zoneId].name}`);
