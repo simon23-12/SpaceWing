@@ -178,7 +178,7 @@ export class Game {
   async enterStation(stationId, opts = {}) {
     const g = this.state;
     g.location = stationId; g.docked = true;
-    for (const s of g.ships) delete s.missiles;   // the hangar crew reloads the missile racks for free (undefined = full)
+    for (const s of g.ships) { delete s.missiles; delete s.attackLeft; }   // the hangar crew reloads missiles and the attack capacitor (undefined = full)
     this.checkUnlocks();
     if (STATIONS[stationId].walkable) return this.toOverview();
     return this.dockMenu(stationId);

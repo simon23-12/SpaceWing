@@ -264,6 +264,41 @@ export class Audio {
     n.connect(nf).connect(ng).connect(this.sfx); n.start(t + 1.6); n.stop(t + 2.9);
   }
   lockTone() { this.beep(1320, 0.12, 0.08); setTimeout(() => this.beep(1320, 0.12, 0.08), 140); }
+  /**
+   * Wings moving into the attack pose (or back): a hydraulic release hiss, a servo motor whining up (down when
+   * closing) for about a second, metal sliding, a heavy lock clunk at the end, and for attack mode a two-tone arming chirp.
+   */
+  wings(open) {
+    if (!this.ctx) return;
+    const C = this.ctx, t = C.currentTime, D = 0.95, out = this.sfx;
+    // hydraulic release
+    const h = this.noiseSource(); const hf = C.createBiquadFilter(); hf.type = 'highpass'; hf.frequency.value = 2500;
+    const hg = C.createGain(); hg.gain.setValueAtTime(0.0001, t); hg.gain.linearRampToValueAtTime(0.16, t + 0.03); hg.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    h.connect(hf).connect(hg).connect(out); h.start(t); h.stop(t + 0.4);
+    // servo: two detuned saws through a resonant band-pass, pitch gliding with the movement
+    const f0 = open ? 140 : 260, f1 = open ? 300 : 120;
+    const bp = C.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 6;
+    bp.frequency.setValueAtTime(f0 * 4, t + 0.08); bp.frequency.linearRampToValueAtTime(f1 * 4, t + D);
+    const sg = C.createGain(); sg.gain.setValueAtTime(0.0001, t + 0.05); sg.gain.linearRampToValueAtTime(0.11, t + 0.2); sg.gain.setValueAtTime(0.11, t + D - 0.1); sg.gain.linearRampToValueAtTime(0.0001, t + D + 0.05);
+    for (const det of [1, 1.012]) {
+      const o = C.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0 * det, t + 0.05); o.frequency.linearRampToValueAtTime(f1 * det, t + D);
+      o.connect(bp); o.start(t + 0.05); o.stop(t + D + 0.1);
+    }
+    bp.connect(sg).connect(out);
+    // metal sliding along the rails
+    const s = this.noiseSource(); const sf = C.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 1700; sf.Q.value = 2.5;
+    const ssg = C.createGain(); ssg.gain.setValueAtTime(0.0001, t + 0.1); ssg.gain.linearRampToValueAtTime(0.05, t + 0.4); ssg.gain.linearRampToValueAtTime(0.0001, t + D);
+    s.connect(sf).connect(ssg).connect(out); s.start(t + 0.1); s.stop(t + D + 0.05);
+    // lock clunk: low thump and a short metallic click, with a bit of room
+    const k = C.createOscillator(); k.type = 'sine'; k.frequency.setValueAtTime(140, t + D); k.frequency.exponentialRampToValueAtTime(45, t + D + 0.18);
+    const kg = C.createGain(); kg.gain.setValueAtTime(0.0001, t + D); kg.gain.linearRampToValueAtTime(0.45, t + D + 0.01); kg.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.3);
+    k.connect(kg).connect(out); kg.connect(this.verb); k.start(t + D); k.stop(t + D + 0.35);
+    const c = this.noiseSource(); const cf = C.createBiquadFilter(); cf.type = 'bandpass'; cf.frequency.value = 4200; cf.Q.value = 4;
+    const cg = C.createGain(); cg.gain.setValueAtTime(0.0001, t + D); cg.gain.linearRampToValueAtTime(0.25, t + D + 0.004); cg.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.06);
+    c.connect(cf).connect(cg).connect(out); c.start(t + D); c.stop(t + D + 0.1);
+    if (open) setTimeout(() => { this.beep(660, 0.08, 0.05, 'square'); setTimeout(() => this.beep(990, 0.12, 0.05, 'square'), 90); }, (D + 0.15) * 1000);
+  }
   blip() { this.beep(880, 0.05, 0.04); }
   click() { this.beep(1400, 0.03, 0.03, 'triangle'); }
   error() { this.beep(220, 0.15, 0.08, 'square'); }

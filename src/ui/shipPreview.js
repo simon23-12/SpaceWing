@@ -288,6 +288,8 @@ export class ShipPreview {
   async showUpgrade(key, level) {
     if (!this.root) await this.ready;
     this.clearAnim();
+    // attack mode: no part to fit, the preview shows the wings going into attack pose and back
+    if (key === 'attack') { this.wingDemo = 0; return; }
     const L = this.L, mats = { old: OLD(), new: NEW(), glow: GLOW('#4ad0ff') };
     const parts = this.anchorsFor(key).map(p => {
       const o = buildPart(key, 0, L, mats), n = buildPart(key, 1, L, mats);
@@ -302,6 +304,7 @@ export class ShipPreview {
   }
 
   clearAnim() {
+    if (this.wingDemo != null) { this.wingDemo = null; if (this.model) this.model.wingTarget = 0; }
     if (!this.anim) return;
     for (const { o, n } of this.anim.parts) { this.turn.remove(o, n); }
     for (const c of this.mods?.children || []) c.visible = true;
@@ -352,6 +355,12 @@ export class ShipPreview {
       }
       if (A.key === 'engine' && t > 2.3) { thr = 1; boost = t < 3.6; }
       if (t > 6) { A.t = 0; A.sparked = false; }        // loop the sequence while the mod stays selected
+    }
+    if (this.wingDemo != null) {
+      const prev = this.model.wingTarget;
+      this.wingDemo += dt;
+      this.model.wingTarget = this.wingDemo % 4 < 2 ? 1 : 0;
+      if (this.model.wings.length && prev !== this.model.wingTarget) this.onWings?.(this.model.wingTarget === 1);
     }
     this.model.update(dt, thr, boost);
     this.sparks.update(dt);

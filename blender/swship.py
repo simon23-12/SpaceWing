@@ -540,8 +540,69 @@ def export_glb(objs, path):
     return path
 
 
-def finalize_ship(ship_id, parts, empties, outdir_rel=('ships',), tex_size=2048, ao_samples=128):
-    """parts: list of objects. Materials decide the group: glow (mat_emit), glass (mat_glass) or hull (baked)."""
+def split_sides(ob):
+    """A mirrored object (both sides of x = 0 in one mesh) -> (left, right) objects; returns [ob] if one-sided."""
+    apply_all(ob)
+    xs = [v.co.x for v in ob.data.vertices]
+    if not xs or min(xs) > -0.01 or max(xs) < 0.01:
+        return [ob]
+    # only true mirror copies: a face across x = 0 (a fuselage) would be lost in both halves
+    if any(min(xs[i] for i in p.vertices) < -0.001 and max(xs[i] for i in p.vertices) > 0.001 for p in ob.data.polygons):
+        return [ob]
+    right = ob.copy(); right.data = ob.data.copy(); bpy.context.scene.collection.objects.link(right)
+    for o, keep_pos in ((ob, False), (right, True)):
+        bm = bmesh.new(); bm.from_mesh(o.data)
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if (v.co.x > 0) != keep_pos], context='VERTS')
+        bm.to_mesh(o.data); bm.free()
+    return [ob, right]
+
+
+def _center(o):
+    if o.type != 'MESH' or not o.data.vertices:
+        return o.matrix_world.translation.copy()
+    s = Vector((0, 0, 0))
+    for v in o.data.vertices:
+        s += o.matrix_world @ v.co
+    return s / len(o.data.vertices)
+
+
+def tag_moving_parts(parts, empties, wings):
+    """wings = {classify(name, centre) -> part or None, hinges: {part: (loc, axis, cruise_deg, attack_deg)}}.
+    Objects that belong to a moving part (wing, fin, canard...) are split into left/right halves and tagged;
+    each hinge becomes an empty 'hinge_<part>' with axis (three.js frame) and the two angles as extras."""
+    import re
+    out = []
+    for o in parts:
+        base = re.sub(r'\.\d+$', '', o.name)
+        if o.type == 'MESH' and o.data.vertices:
+            out += split_sides(o)   # mirrored halves get classified one by one
+        else:
+            out.append(o)
+    bpy.context.view_layer.update()   # apply_all reset the transforms: refresh matrix_world before measuring
+    for o in out:
+        p = wings['classify'](re.sub(r'\.\d+$', '', o.name), _center(o)) if o.type == 'MESH' else None
+        if p:
+            o['part'] = p
+    for e in empties:
+        p = wings['classify'](e.name, e.location.copy())
+        if p:
+            e['part'] = p
+    hinges = []
+    for part, (loc, axis, cruise, attack) in wings['hinges'].items():
+        h = empty('hinge_' + part, loc)
+        h['part'] = part
+        h['axis'] = [round(axis[0], 4), round(axis[2], 4), round(-axis[1], 4)]   # Blender -> three.js (x, z, -y)
+        h['cruise'] = math.radians(cruise); h['attack'] = math.radians(attack)
+        hinges.append(h)
+    return out, empties + hinges
+
+
+def finalize_ship(ship_id, parts, empties, outdir_rel=('ships',), tex_size=2048, ao_samples=128, wings=None):
+    """parts: list of objects. Materials decide the group: glow (mat_emit), glass (mat_glass) or hull (baked).
+    wings: optional moving parts (see tag_moving_parts); they are baked into the same atlas and exported as
+    separate meshes 'hull__<part>' / '<glow>__<part>' so the game can turn them on their hinges."""
+    if wings:
+        parts, empties = tag_moving_parts(parts, empties, wings)
     hull, glass, glow = [], [], []
     for o in parts:
         if o.type != 'MESH':
@@ -553,18 +614,45 @@ def finalize_ship(ship_id, parts, empties, outdir_rel=('ships',), tex_size=2048,
             glass.append(o)
         else:
             hull.append(o)
+    # moving parts: tag every face with its part, bake all in one atlas, split again afterwards
+    names = [''] + sorted({o.get('part') for o in hull if o.get('part')})
+    for o in hull:
+        apply_all(o)
+        me = o.data
+        attr = me.attributes.get('grp') or me.attributes.new('grp', 'INT', 'FACE')
+        gi = names.index(o.get('part') or '')
+        for i in range(len(me.polygons)):
+            attr.data[i].value = gi
     hull_ob = join(hull, 'hull')
     uv_unwrap(hull_ob)
     outdir = swlib.out(*outdir_rel, ship_id, 'x').rsplit(os.sep, 1)[0]
     bake_object(hull_ob, outdir, size=tex_size, ao_samples=ao_samples)
-    final = [hull_ob]
-    # glow parts: keep each glow colour as its own mesh
+    final = []
+    if len(names) > 1:
+        for gi, part in enumerate(names):
+            bm = bmesh.new(); bm.from_mesh(hull_ob.data)
+            lay = bm.faces.layers.int.get('grp')
+            bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[lay] != gi], context='FACES')
+            me = bpy.data.meshes.new('hull' + ('__' + part if part else '')); bm.to_mesh(me); bm.free()
+            ob = bpy.data.objects.new(me.name, me); bpy.context.scene.collection.objects.link(ob)
+            for s in hull_ob.material_slots:
+                me.materials.append(s.material)
+            if part:
+                ob['part'] = part
+            final.append(ob)
+        bpy.data.objects.remove(hull_ob, do_unlink=True)
+        hull_ob = final[0]
+    else:
+        final.append(hull_ob)
+    # glow parts: keep each glow colour (and moving part) as its own mesh
     groups = {}
     for o in glow:
-        groups.setdefault(o.material_slots[0].material.name, []).append(o)
-    for mname, objs in groups.items():
-        j = join(objs, mname)
+        groups.setdefault((o.material_slots[0].material.name, o.get('part') or ''), []).append(o)
+    for (mname, part), objs in groups.items():
+        j = join(objs, mname + ('__' + part if part else ''))
         j['glow_color'] = bpy.data.materials[mname].get('glow_color', '#ffffff')
+        if part:
+            j['part'] = part
         final.append(j)
     if glass:
         final.append(join(glass, 'glass'))

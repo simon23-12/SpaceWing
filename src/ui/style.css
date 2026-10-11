@@ -378,3 +378,11 @@ td.nowrap { white-space: nowrap; }
 .hud-target .tview::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(196,92,255,.06) 0 1px, transparent 1px 3px); pointer-events: none; }
 /* the live view is drawn into the canvas below: keep the panel's tint off that strip */
 .hud-target:has(.tview) { background: linear-gradient(to bottom, rgba(4,10,16,.55) 0 30px, transparent 30px 165px, rgba(4,10,16,.55) 165px); }
+.hud-attack { position: absolute; right: 22px; bottom: 182px; width: 200px; font-family: var(--f-head); letter-spacing: .14em; font-size: 11px; color: #ffcf7a; background: rgba(4,10,16,.5); border-left: 2px solid rgba(255,207,122,.6); padding: 6px 10px; }
+.hud-attack .sl span { color: var(--dim); margin-left: 4px; }
+.hud-attack .bar { height: 5px; background: rgba(255,207,122,.15); margin: 5px 0 3px; }
+.hud-attack .bar i { display: block; height: 100%; background: #ffcf7a; }
+.hud-attack .sv { font-size: 15px; color: #fff; text-align: right; }
+.hud-attack.on { border-left-color: #ff6a3a; color: #ff9a6a; box-shadow: 0 0 14px rgba(255,106,58,.25); }
+.hud-attack.on .bar i { background: linear-gradient(90deg, #ff5a3a, #ffb050); }
+.hud.cockpit .hud-attack { display: none; }

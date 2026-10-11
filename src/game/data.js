@@ -15,7 +15,7 @@ export const FACTIONS = {
 // Base stats. speed m/s, accel m/s², turn rad/s, shield/hull HP, energy units.
 export const SHIP_CLASSES = {
   spacewing: {
-    name: 'SW-2 „Spacewing“', maker: 'Hawker-Lindqvist', role: 'Kurierjäger', price: 22000,
+    name: 'SW-2 „Spacewing“', maker: 'Hawker-Lindqvist', role: 'Kurierjäger', fighter: true, price: 22000,
     hull: 260, shield: 150, speed: 230, boost: 430, accel: 80, turn: 1.7, cargo: 8, guns: 2, missiles: 0,
     energy: 100, regen: 18, laserDmg: 14, laserRate: 7, turret: false, length: 12.6, engine: '#7fb6ff',
     desc: 'Ein 40 Jahre alter Kurierjäger. Wendig, zäh, eigensinnig. Teo Okafor hat ihn geliebt.',
@@ -39,7 +39,7 @@ export const SHIP_CLASSES = {
     desc: 'Das Arbeitstier des Saturnsystems. Langsam, gutmütig, mit viel Platz für Fracht.',
   },
   kestrel: {
-    name: 'Kestrel K-9', maker: 'Okonkwo Defence', role: 'Mehrzweckjäger', price: 145000,
+    name: 'Kestrel K-9', maker: 'Okonkwo Defence', role: 'Mehrzweckjäger', fighter: true, price: 145000,
     hull: 420, shield: 340, speed: 285, boost: 490, accel: 105, turn: 2.0, cargo: 10, guns: 2, missiles: 8,
     energy: 140, regen: 26, laserDmg: 18, laserRate: 8, turret: false, length: 13.8, engine: '#9fd0ff',
     desc: 'Ausgemusterte Milizmaschine mit vorwärts gepfeilten Flügeln. Ein echter Jäger.',
@@ -51,19 +51,19 @@ export const SHIP_CLASSES = {
     desc: 'Gepanzerter Keil mit Rückenturm. Wer eine Corsair fliegt, wird selten angegriffen.',
   },
   lanze: {
-    name: 'Lanze L-1', maker: 'Konsortiums-Werft Kraken-Hafen', role: 'Abfangjäger', price: 260000, needsRep: { konsortium: 40 },
+    name: 'Lanze L-1', maker: 'Konsortiums-Werft Kraken-Hafen', role: 'Abfangjäger', fighter: true, price: 260000, needsRep: { konsortium: 40 },
     hull: 380, shield: 440, speed: 330, boost: 560, accel: 120, turn: 2.25, cargo: 4, guns: 2, missiles: 6,
     energy: 160, regen: 30, laserDmg: 20, laserRate: 9, turret: false, length: 15.4, engine: '#ffd28a',
     desc: 'Weiß und Gold, schnell wie ein Gerücht. Nur für Freunde des Konsortiums.',
   },
   kreuzschnabel: {
-    name: 'XK-4 „Kreuzschnabel“', maker: 'Arkwright & Vos, Ganymed', role: 'Raumüberlegenheitsjäger', price: 190000,
+    name: 'XK-4 „Kreuzschnabel“', maker: 'Arkwright & Vos, Ganymed', role: 'Raumüberlegenheitsjäger', fighter: true, price: 190000,
     hull: 460, shield: 380, speed: 305, boost: 520, accel: 110, turn: 2.05, cargo: 6, guns: 4, missiles: 6,
     energy: 160, regen: 28, laserDmg: 15, laserRate: 9, turret: false, length: 12.8, engine: '#ff9a8a',
     desc: 'Vier Flügel in X-Stellung, an jeder Spitze eine Kanone. Ein Allrounder, der in jeder Staffel eine gute Figur macht.',
   },
   gabelweihe: {
-    name: 'YB-2 „Gabelweihe“', maker: 'Rook-Varga Werften', role: 'Jagdbomber', price: 210000,
+    name: 'YB-2 „Gabelweihe“', maker: 'Rook-Varga Werften', role: 'Jagdbomber', fighter: true, price: 210000,
     hull: 820, shield: 420, speed: 225, boost: 390, accel: 62, turn: 1.2, cargo: 14, guns: 2, missiles: 16,
     energy: 170, regen: 26, laserDmg: 16, laserRate: 6, turret: true, length: 17, engine: '#9fd0ff',
     desc: 'Cockpit mit Ionenturm, offener Rumpfrücken, zwei lange Triebwerksgondeln. Langsam, aber zäh und voller Raketen.',
@@ -89,6 +89,7 @@ export const UPGRADES = {
   cargo:    { name: 'Frachtraum',     desc: '+20 % Ladekapazität',             base: 1800 },
   reactor:  { name: 'Energiekern',    desc: '+15 % Energie-Regeneration',     base: 2600 },
   salvage:  { name: 'Bergungsnetz',   desc: '+3 t Trümmer einsammeln (Grundausstattung: 2 t)', base: 1400 },
+  attack:   { name: 'Angriffsmodus', desc: 'Nur Jäger: +1 Minute Angriffsmodus pro Stufe (Grundausstattung 2 Minuten pro Flug)', fixed: [3000, 7500, 16000], max: 3, fighterOnly: true },
   jump:     { name: 'Sprungtriebwerk', desc: 'Hyperraumsprung zu anderen Monden. I: Enceladus, Mimas · II: Titan · III: Iapetus', fixed: [2500, 8000, 20000], max: 3 },
 };
 export const MAX_UPGRADE = 5;
@@ -113,6 +114,11 @@ export const PAINTS = [
 ];
 export const PAINT_PRICE = 600;
 
+/** Attack mode: more agile and more firepower while the attack budget lasts (fighters only). */
+export function attackStats(s) {
+  return { ...s, turn: s.turn * 1.3, accel: s.accel * 1.15, laserRate: s.laserRate * 1.35, laserDmg: s.laserDmg * 1.1 };
+}
+
 /** Effective ship stats including upgrades. */
 export function shipStats(ship) {
   const c = SHIP_CLASSES[ship.cls];
@@ -127,6 +133,7 @@ export function shipStats(ship) {
     missiles: c.missiles + 2 * L('missiles'), lockTime: 1.6 / (1 + 0.15 * L('missiles')),
     cargo: Math.round(c.cargo * (1 + 0.2 * L('cargo'))), regen: c.regen * (1 + 0.15 * L('reactor')),
     jump: Math.max(c.jump || 0, L('jump')),
+    attackTime: c.fighter ? 120 + 60 * L('attack') : 0,
     salvage: 2 + 3 * L('salvage'),
   };
 }

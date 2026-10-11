@@ -499,6 +499,7 @@ export class UI {
       lasers: [['Laser-DPS', (s) => s.laserDmg * s.laserRate, '']], missiles: [['Raketen', 'missiles', ''], ['Erfassung', 'lockTime', ' s', 2]],
       cargo: [['Fracht', 'cargo', ' t']], reactor: [['Energie/s', 'regen', '', 1]], salvage: [['Bergungsnetz', 'salvage', ' t']],
       jump: [['Sprungklasse', (s) => JUMP_CLASS[s.jump], '']],
+      attack: [['Angriffsmodus', (s) => `${Math.floor(s.attackTime / 60)}:${String(s.attackTime % 60).padStart(2, '0')}`, ' min']],
     }[k] || [];
     const val = (s, f) => typeof f === 'function' ? f(s) : s[f];
     const show = (v, dig) => typeof v === 'number' ? (dig ? v.toFixed(dig) : Math.round(v)) : v;
@@ -532,6 +533,7 @@ export class UI {
       <div class="balance"><span>KONTOSTAND</span><b>${fmt(g.credits)} Cr</b></div>
       <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 10px">UPGRADES</h4><table class="grid">`;
     for (const [k, u] of Object.entries(UPGRADES)) {
+      if (u.fighterOnly && !cls.fighter) continue;
       const lv = ship.upgrades[k] || 0;
       const p = lv < maxLevel(k) ? upgradePrice(ship.cls, k, lv) : null;
       html += `<tr data-pv="${k}" class="pvrow${this.pvKey === k ? ' sel' : ''}"${k === 'jump' ? ' style="background:rgba(255,207,122,.06)"' : ''}><td><b>${u.name}</b>${k === 'jump' ? ` <span class="warm">Klasse ${JUMP_CLASS[lv]}</span>` : ''}<div class="dim" style="font-size:12px">${u.desc}</div></td>
@@ -548,6 +550,7 @@ export class UI {
       this.pvWrap = document.createElement('div'); this.pvWrap.className = 'shipview';
       this.pvWrap.innerHTML = '<canvas></canvas><div class="svinfo dim">Mod anklicken für eine Vorschau</div>';
       this.pv = new ShipPreview(this.pvWrap.querySelector('canvas'), ship); this.pvShip = ship.uid; this.pvKey = null;
+      this.pv.onWings = (open) => this.game.audio?.wings?.(open);
     }
     this.pvWrap.classList.remove('big');
     body.querySelector('.svslot').replaceWith(this.pvWrap);

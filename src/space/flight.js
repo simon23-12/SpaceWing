@@ -10,7 +10,7 @@ import { Station, bakedMaterial } from './station.js';
 import { assets } from '../core/assets.js';
 import { Debris } from './debris.js';
 import { input } from '../core/input.js';
-import { FACTIONS, MOONS, moonOfZone, STATIONS } from '../game/data.js';
+import { FACTIONS, MOONS, moonOfZone, STATIONS, attackStats } from '../game/data.js';
 import { Streaks } from '../ui/streaks.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _ec = new THREE.Color();
@@ -99,6 +99,9 @@ export class FlightMode {
     const rec = this.opts.playerRecord;
     this.player = await Ship.create({ record: rec, faction: 'player', player: true, name: this.game.state.callsign });
     this.addShip(this.player);
+    // attack budget (s): what is left from this sortie, refilled when docking
+    this.player.baseStats = this.player.stats;
+    this.player.attackLeft = Math.min(rec?.attackLeft ?? this.player.stats.attackTime, this.player.stats.attackTime || 0);
     this.placePlayer(this.opts.spawn);
 
     this.hud = new HUD(this.gunner);
@@ -410,6 +413,7 @@ export class FlightMode {
     if (input.actHit('targetPrev')) this.cycleTarget(-1);
     if (input.actHit('targetAim')) this.targetAhead();
     if (input.actHit('targetHostile')) this.targetNearestHostile();
+    if (input.actHit('attackMode')) this.toggleAttack();
     if (input.actHit('camera')) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
     if (input.actHit('help')) this.hud.toggleHelp();
     if ((input.click(2) && input.locked) || input.actHit('missile')) {
@@ -524,6 +528,20 @@ export class FlightMode {
     const i = list.indexOf(p.target);
     p.target = list[i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length];
     this.game.audio?.blip();
+  }
+
+  /** Attack mode (fighters): wings into attack pose, more agility and firepower; uses up the attack budget. */
+  toggleAttack(force) {
+    const p = this.player;
+    if (!p.stats.attackTime) { this.hud.showToast('Kein Angriffsmodus: nur für Jäger', 1.6); return; }
+    const on = force ?? !p.attackOn;
+    if (on && p.attackLeft <= 0.5) { this.hud.showToast('Angriffsmodus erschöpft · beim Andocken neu geladen', 2); return; }
+    if (on === !!p.attackOn) return;
+    p.attackOn = on;
+    p.stats = on ? attackStats(p.baseStats) : p.baseStats;
+    p.model.wingTarget = on ? 1 : 0;
+    this.game.audio?.wings?.(on);
+    this.hud.showToast(on ? 'ANGRIFFSMODUS' : 'Reiseflug', 1.4);
   }
 
   /** Select the closest hostile ship (rebindable key, default B). */
@@ -703,6 +721,13 @@ export class FlightMode {
       if (this.gunner) { if (p.ai) updateAI(p, this, dt); this.controlGunner(dt); }
       else this.controlPlayer(dt);
     }
+    // attack budget, and wings: the player's follow attack mode, AI fighters spread theirs in a dogfight
+    if (p.attackOn) {
+      p.attackLeft = Math.max(0, p.attackLeft - dt);
+      if (p.record?.uid && !p.record.uid.startsWith('TEMP')) p.record.attackLeft = p.attackLeft;
+      if (p.attackLeft <= 0 || this.state !== 'flying') { this.toggleAttack(false); if (p.attackLeft <= 0) this.hud.showToast('ANGRIFFSMODUS ERSCHÖPFT', 2.5); }
+    }
+    for (const s of this.ships) if (!s.isPlayer && s.model.wings.length) s.model.wingTarget = s.ai?.mode === 'attack' && s.target?.alive ? 1 : 0;
     if (this.state === 'docking') this.runAutopilot(dt);
     if (this.state === 'travel') this.updateTravel(dt);
     for (const s of this.ships) if (s.alive && !s.isPlayer) updateAI(s, this, dt);

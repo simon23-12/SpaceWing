@@ -1007,6 +1007,64 @@ def bpy_mat(m):
 
 SHIPS.update({'prop_espresso': prop_espresso})
 
+# ------------------------------------------------------------------------------------------- moving parts
+# Fighters change shape for attack mode: classify(name, centre) picks the objects of each moving part,
+# hinges: part -> (hinge location, axis (Blender frame), cruise angle, attack angle) in degrees, relative to the modelled pose.
+
+def _side(c):
+    return 'r' if c.x > 0 else 'l'
+
+
+def _xk_parts(name, c):
+    import re
+    if re.match(r'(wing|eng|gun_|exhaust_|nav_[lr]$)', name) and abs(c.x) > 0.95:
+        return 'q' + ('u' if c.z > 0.05 else 'd') + _side(c)
+    return None
+
+
+def _sw_parts(name, c):
+    return 'fin' + ('u' if c.z > 0 else 'd') + _side(c) if name.startswith('fin') else None
+
+
+def _ke_parts(name, c):
+    return 'wing' + _side(c) if (name in ('wing', 'gun', 'missile_rail') or name in ('nav_l', 'nav_r') or name.startswith('gun_')) and abs(c.x) > 1.2 else None
+
+
+def _la_parts(name, c):
+    return 'canard' + _side(c) if name == 'canard' else None
+
+
+def _yb_parts(name, c):
+    import re
+    m = re.match(r'nac_vane(\d)', name)
+    return f'vane{_side(c)}{m.group(1)}' if m else None
+
+
+def _yb_hinges():
+    out = {}
+    for sx, side in ((1, 'r'), (-1, 'l')):
+        for j, a in enumerate((45, 135, 225, 315)):
+            ra = math.radians(a)
+            rx, rz = sx * math.cos(ra), math.sin(ra)          # radial direction of this vane (mirrored on the left)
+            loc = (sx * 3.1 + 0.88 * rx, -6.0, 0.05 + 0.88 * rz)
+            out[f'vane{side}{j}'] = (loc, (-rz, 0, rx), 0, 22)   # tangent axis: positive flares the trailing edge outwards
+    return out
+
+
+WINGS = {
+    'kreuzschnabel': dict(classify=_xk_parts, hinges={
+        'qur': ((0, -2.5, 0.3), (0, 1, 0), 13, 0), 'qul': ((0, -2.5, 0.3), (0, 1, 0), -13, 0),
+        'qdr': ((0, -2.5, -0.2), (0, 1, 0), -13, 0), 'qdl': ((0, -2.5, -0.2), (0, 1, 0), 13, 0)}),
+    'spacewing': dict(classify=_sw_parts, hinges={
+        'finur': ((2.75, -4.6, 0), (0, 1, 0), 0, 45), 'finul': ((-2.75, -4.6, 0), (0, 1, 0), 0, -45),
+        'findr': ((2.75, -4.6, 0), (0, 1, 0), 0, -45), 'findl': ((-2.75, -4.6, 0), (0, 1, 0), 0, 45)}),
+    'kestrel': dict(classify=_ke_parts, hinges={
+        'wingr': ((1.1, -2.4, -0.1), (0, 1, 0), 0, 11), 'wingl': ((-1.1, -2.4, -0.1), (0, 1, 0), 0, -11)}),
+    'lanze': dict(classify=_la_parts, hinges={
+        'canardr': ((0.5, 3.9, 0.0), (1, 0, 0), 0, 20), 'canardl': ((-0.5, 3.9, 0.0), (1, 0, 0), 0, 20)}),
+    'gabelweihe': dict(classify=_yb_parts, hinges=_yb_hinges()),
+}
+
 if __name__ != 'ships':  # executed via the bridge (not imported)
     ship_id = BL_ARGS[0]
     flags = BL_ARGS[1:]
@@ -1018,7 +1076,7 @@ if __name__ != 'ships':  # executed via the bridge (not imported)
         swship.studio_preview(prev, cam['center'], cam['dist'], samples=int(os.environ.get('SW_SAMPLES', 96)), cam_dir=cam.get('dir', (1.0, 1.15, 0.55)))
     res = {'preview': prev}
     if '--preview-only' not in flags:
-        path, hull = swship.finalize_ship(ship_id, P, E)
+        path, hull = swship.finalize_ship(ship_id, P, E, wings=WINGS.get(ship_id))
         res['glb'] = path
         res['tris'] = sum(len(p.vertices) - 2 for p in hull.data.polygons)
     result = res

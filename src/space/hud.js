@@ -36,6 +36,7 @@ export class HUD {
     this.hitT = 0; this.lastShield = null;
     this.target = el('div', 'hud-panel hud-target hidden', this.root);
     this.salvageEl = el('div', 'hud-salvage hidden', this.root);
+    this.attackEl = el('div', 'hud-attack hidden', this.root);
     this.radar = el('canvas', 'hud-radar', this.root);
     this.radar.width = RADAR_W * 2; this.radar.height = RADAR_H * 2;
     this.rctx = this.radar.getContext('2d');
@@ -103,9 +104,24 @@ export class HUD {
     drawDrive(this.driveCv, p, this.gunner ? 'GESCHÜTZTURM' : flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER');
 
     this.drawSalvage(flight);
+    this.drawAttack(flight);
     this.draw(flight);
     this.drawRadar(flight);
     this.drawTarget(flight);
+  }
+
+  /** Attack mode budget (fighters only). */
+  drawAttack(flight) {
+    const p = flight.player, cap = p.baseStats?.attackTime || 0;
+    this.attackEl.classList.toggle('hidden', !cap || this.gunner);
+    if (!cap) return;
+    const left = Math.max(0, p.attackLeft || 0), key = Math.ceil(left) + (p.attackOn ? 'a' : 'c');
+    if (this._ak === key) return;
+    this._ak = key;
+    this.attackEl.classList.toggle('on', !!p.attackOn);
+    const mm = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+    this.attackEl.innerHTML = `<div class="sl">${p.attackOn ? 'ANGRIFFSMODUS' : 'ANGRIFF BEREIT'} <span>[${K('attackMode')}]</span></div>
+      <div class="bar"><i style="width:${100 * left / cap}%"></i></div><div class="sv">${mm}</div>`;
   }
 
   /** Salvage net: what is in it, what it is worth, and when it is full. */

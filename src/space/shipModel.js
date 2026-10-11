@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+const _wq = new THREE.Quaternion();
 import { assets } from '../core/assets.js';
 
 const texCache = new Map();
@@ -165,6 +166,27 @@ export class ShipModel {
     this.radius = box.getBoundingSphere(new THREE.Sphere()).radius;
     this.length = box.max.z - box.min.z;
     this.time = 0;
+    // fighters: wings / fins / canards on hinges (empties 'hinge_<part>' from the Blender export). Their meshes,
+    // lights and exhaust/gun points hang under the hinge, which turns between the cruise and the attack pose.
+    this.wings = [];
+    root.updateMatrixWorld(true);
+    const hinges = [];
+    root.traverse(o => { if (o.name.startsWith('hinge_') && o.userData?.part) hinges.push(o); });
+    for (const h of hinges) {
+      const movers = [];
+      root.traverse(o => { if (o !== h && o.userData?.part === h.userData.part && !o.name.startsWith('hinge_')) movers.push(o); });
+      for (const o of movers) h.attach(o);
+      this.wings.push({ pivot: h, axis: new THREE.Vector3(...h.userData.axis).normalize(), q0: h.quaternion.clone(), cruise: h.userData.cruise || 0, attack: h.userData.attack || 0 });
+    }
+    this.wingK = 0; this.wingTarget = 0;
+    this.setWingPose(0);
+  }
+
+  /** 0 = cruise pose, 1 = attack pose (wings spread, fins in X ...). */
+  setWingPose(k) {
+    this.wingK = k;
+    const e = k * k * (3 - 2 * k);
+    for (const w of this.wings) w.pivot.quaternion.copy(w.q0).multiply(_wq.setFromAxisAngle(w.axis, w.cruise + (w.attack - w.cruise) * e));
   }
 
   setPaint(hex) { this.paint.set(hex); this.paintAmount.value = hex ? 0.85 : 0; }
@@ -172,6 +194,10 @@ export class ShipModel {
   /** throttle 0..1, boost bool */
   update(dt, throttle, boost = false) {
     this.time += dt;
+    if (this.wings.length && this.wingK !== this.wingTarget) {
+      const step = dt / 0.9;   // a deliberate ~1 s servo movement
+      this.setWingPose(this.wingTarget > this.wingK ? Math.min(this.wingTarget, this.wingK + step) : Math.max(this.wingTarget, this.wingK - step));
+    }
     const p = Math.min(1, 0.15 + throttle * 0.85) * (boost ? 1.45 : 1);
     this.boostK = (this.boostK || 0) + ((boost ? 1 : 0) - (this.boostK || 0)) * Math.min(1, dt * 4);
     for (const pl of this.plumes) {
