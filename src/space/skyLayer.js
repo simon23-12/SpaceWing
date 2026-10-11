@@ -128,7 +128,7 @@ const plumeVert = `
   #include <logdepthbuf_vertex>
   }`;
 const plumeFrag = `
-  uniform vec3 sunDir; uniform float time, len;
+  uniform vec3 sunDir; uniform float time, len, gain;
   varying vec3 vP; varying vec3 vW; varying vec3 vN;
   #include <logdepthbuf_pars_fragment>
   float hash(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719))) * 43758.5453); }
@@ -145,7 +145,7 @@ const plumeFrag = `
     float n = noise(vP * 0.015 + vec3(0.0, time * 0.04, 0.0));
     float d = soft * pow(clamp(1.0 - h, 0.0, 1.0), 2.2) * (0.3 + 0.7 * streaks) * (0.5 + n);
     float fwd = 0.3 + 2.8 * pow(max(dot(-view, sunDir), 0.0), 4.0);
-    gl_FragColor = vec4(vec3(0.75, 0.85, 1.0) * d * fwd * 0.09, 1.0);
+    gl_FragColor = vec4(vec3(0.75, 0.85, 1.0) * d * fwd * 0.09 * gain, 1.0);
   }`;
 
 function makeSunTexture() {
@@ -247,7 +247,7 @@ export class SkyLayer {
     const enc = this.moons.enceladus;
     if (enc) {
       this.plumeMat = new THREE.ShaderMaterial({ vertexShader: plumeVert, fragmentShader: plumeFrag, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-        uniforms: { sunDir: { value: sunDir }, time: { value: 0 }, len: { value: 900 } } });
+        uniforms: { sunDir: { value: sunDir }, time: { value: 0 }, len: { value: 900 }, gain: { value: 1 } } });
       const geo = new THREE.CylinderGeometry(40, 520, 900, 48, 24, true);
       geo.translate(0, -450 - 240, 0);
       const plume = new THREE.Mesh(geo, this.plumeMat);

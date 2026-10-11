@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import * as acorn from 'acorn';
 import { ancestor } from 'acorn-walk';
 
-const FILES = ['src/game/story.js', 'src/game/missions.js', 'src/game/game.js', 'src/space/flight.js'];
+const FILES = ['src/game/story.js', 'src/game/missions.js', 'src/game/game.js', 'src/game/intro.js', 'src/space/flight.js'];
 const out = new Map();
 
 function product(a, b) {

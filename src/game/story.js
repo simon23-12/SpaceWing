@@ -131,7 +131,7 @@ export function npcDialogue(game, npc) {
       [say(KIX, 'Ich habe vier Arme und kein Mitleid. Was darf’s sein?')],
     ];
     if (g.story === 'prolog') return [
-      say(KIX, 'Neu hier? Du siehst aus wie jemand mit vierzig Kredits und einem leeren Kühlschrank.'),
+      say(KIX, 'Frisch gebackener Pilot, hab ich gehört. Ohne Schiff. Du siehst aus wie jemand mit vierzig Kredits und einem leeren Kühlschrank.'),
       say(KIX, 'Ein Rat, kostenlos, weil ich heute großzügig bin: Die Alte am Fenstertisch sucht einen Piloten. Mags Okafor. Sie beißt nicht. Meistens.', { act: (gm) => { gm.state.story = 'eisfracht'; } }),
     ];
     if (g.flags.m3done && !g.flags['accepted:funkstille']) return [

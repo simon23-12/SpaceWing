@@ -59,7 +59,7 @@ Eine Prognose sagt Massen vorher, keine Einzelnen. Das ist ihre größte Stärke
 
 ## 2. Die Figuren
 
-**Der Spieler** – Rufzeichen frei wählbar (Standard: *Wren*). Ehemaliger Frachtpilot bei Hallström Logistik, die am Saturnzoll pleitegegangen ist. Ohne Schiff, ohne Kredits, mit drei Nächten Kabinenmiete. Ein Niemand, und genau darum geht es.
+**Der Spieler** – Rufzeichen frei wählbar (Standard: *Wren*). Ein einfacher Söldner: jahrelang Begleitschutz im Geschützturm von Hallström-Frachtern, nie am Steuer. Hallström ist am Saturnzoll pleitegegangen, das Geld war schon immer knapp. Einziger Besitz: die abbezahlte Kabine 4-117 auf Cassini. Jeder freie Kredit ging in den Flugschein. Jetzt ist offiziell erlaubt, Raumschiffe zu fliegen, nur fehlt das Raumschiff. Ein Niemand, und genau darum geht es.
 
 **Magdalena „Mags“ Okafor** (61) – Eisfrachterpilotin aus der Ringgilde, flucht in drei Sprachen. Fliegt den *Eisvogel*, einen eisweißen Frachter mit Kugelturm und zwei Eistanks, ihr ganzer Stolz. Ihr verschollener Vater **Teo** flog eine *Hawker‑Lindqvist SW‑2 „Spacewing“*, die seit acht Jahren in ihrer Hangarbucht verrostet. Mags ist ein *Faden*, eine Feldagentin des Archivs. Sie hat den Spieler nicht zufällig angesprochen.
 
@@ -81,8 +81,11 @@ Eine Prognose sagt Massen vorher, keine Einzelnen. Das ist ihre größte Stärke
 
 ## 3. Handlung
 
-### Prolog – „Drei Nächte Miete“
-Der Spieler wacht in einer Sargkabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Fliegen kann sie noch, aber am Abzug zittern ihr die Hände.
+### Intro-Film
+Beim neuen Spiel (überspringbar, `src/game/intro.js`): Saturn im Jahr 2260, Titan und Enceladus als Lieferanten des Systems, Hochstation Cassini, dann Kommandodeck, Bar und Kabine. Pilotenlizenz „bestanden“, Schnitt auf den leeren Startplatz in Hangar 7: *„Jetzt fehlt nur noch eins: ein Raumschiff.“*
+
+### Prolog – „Vierzig Kredits“
+Der Spieler wacht in seiner Kabine auf Cassini auf. Kontostand: 40 Kredits. In der Bar spielt die Roche‑Grenze. Kix empfiehlt, „die Alte am Fenstertisch“ anzusprechen. Mags sucht jemanden mit ruhigen Händen: Fliegen kann sie noch, aber am Abzug zittern ihr die Hände.
 
 ### Mission 1 – „Eisfracht“
 Mags fliegt ihren *Eisvogel* per Hyperraumsprung von Rhea zum Geysirfeld von Enceladus, der Spieler sitzt im Kugelturm und schießt nur. Eiscontainer aufnehmen, dann greifen die Schakale an: drei *Wespen* mit auffällig neuen Waffen. Nach der Rückkehr schenkt Mags dem Spieler die verrostete SW‑2: *„Sie hat Teo gehört. Sie fliegt. Meistens.“*

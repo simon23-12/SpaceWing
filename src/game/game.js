@@ -11,6 +11,7 @@ import { Director, onDockJobs, generateJobs, SIM_SCENARIOS, simMedal, simReward,
 import { FlightMode } from '../space/flight.js';
 import { checkGadgets, GADGETS } from '../station/gadgets.js';
 import { RoomMode } from '../station/room.js';
+import { IntroMode } from './intro.js';
 import { ZONES } from '../space/universe.js';
 
 const SETTINGS_KEY = 'spacewing.settings';
@@ -71,6 +72,10 @@ export class Game {
 
   onKey(e) {
     if (e.code === 'F12') { e.preventDefault(); if (!e.repeat) this.toggleFullscreen(); return; }
+    if (this.mode?.kind === 'intro') {
+      if (['Escape', 'Space', 'Enter', 'NumpadEnter'].includes(e.code)) { e.preventDefault(); this.mode.skip(); }
+      return;
+    }
     if (e.code === 'Escape') {
       this.escT = performance.now();
       if (this.ui.dlg) return;
@@ -105,8 +110,27 @@ export class Game {
     await this.fadeOut(0.6);
     this.ui.clear();
     state.set(newGame(callsign));
-    logEntry(this.state, 'Auf Hochstation Cassini gestrandet. 40 Kredits.');
-    await this.enterRoom('kabine', 'default', { intro: true });
+    logEntry(this.state, 'Flugschein bestanden. 40 Kredits, kein Schiff.');
+    const { room, watched } = await this.playIntro();
+    await this.enterRoom('kabine', 'default', { intro: true, room, watched });
+  }
+
+  /** Opening cinematic (skippable). Returns the deck it loaded, so the game starts without a second loading screen. */
+  async playIntro() {
+    await this.leaveMode();
+    this.ui.clear();
+    const ld = this.ui.loading('HOCHSTATION CASSINI · RHEA-ORBIT');
+    const intro = new IntroMode(this);
+    try { await intro.init(); } catch (e) { console.error(e); ld.done(); intro.dispose(); return { room: null, watched: false }; }
+    ld.done();
+    this.audio.setMusic('menu');
+    this.mode = intro;
+    this.fadeIn(0.3);
+    const watched = await intro.play();
+    await this.fadeOut(watched ? 0.3 : 0.6);
+    const room = intro.takeRoom();
+    await this.leaveMode();
+    return { room, watched };
   }
 
   async continueGame() {
@@ -178,23 +202,29 @@ export class Game {
     await this.fadeOut(0.4);
     await this.leaveMode();
     this.ui.clear();
-    const ld = this.ui.loading('LADE ' + roomId.toUpperCase());
-    const room = new RoomMode(this, roomId, spawn);
-    try { await room.init(); } catch (e) { console.error(e); ld.done(); this.ui.notify('Raum konnte nicht geladen werden.'); return this.toOverview(); }
-    ld.done();
+    let room = opts.room;
+    if (room) room.beginPlay(roomId, spawn);
+    else {
+      const ld = this.ui.loading('LADE ' + roomId.toUpperCase());
+      room = new RoomMode(this, roomId, spawn);
+      try { await room.init(); } catch (e) { console.error(e); ld.done(); this.ui.notify('Raum konnte nicht geladen werden.'); return this.toOverview(); }
+      ld.done();
+    }
     this.mode = room;
     await this.fadeIn(0.6);
-    if (opts.intro) await this.intro();
+    if (opts.intro) await this.intro(opts.watched);
     this.checkStationEvents();
   }
 
-  async intro() {
+  /** Morning briefing in the cabin. After the full cinematic the first line (where and when) is left out. */
+  async intro(watched = false) {
     const g = this.state;
-    await this.ui.dialog([
+    const steps = [
       { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, abbezahlt und mit Fenster zum Saturn.' },
-      { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Die Kabine gehört dir, sonst nicht viel. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.` },
+      { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Flugschein: gültig. Schiff: keins. Arbeitgeber: keiner, seit Hallström Logistik am Zollbeschluss der Liga pleitegegangen ist.` },
       { who: 'comp', text: 'Empfehlung: Arbeit finden. Die Bar „Cassini-Spalt“ liegt am Ende des Ringgangs, links aus deiner Tür. Barkeeper wissen alles.' },
-    ]);
+    ];
+    await this.ui.dialog(watched ? steps.slice(1) : steps);
   }
 
   /** Events that fire when entering a station view (finale choice, notes). */

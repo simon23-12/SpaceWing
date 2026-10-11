@@ -59,9 +59,10 @@ export function holoMaterial(color) {
     uniforms: { color: { value: new THREE.Color(color) }, time: { value: 0 }, flicker: { value: 1 } } });
 }
 
-/** First-person walkable station deck with Blender-baked lighting. roomId = where the player starts. */
+/** First-person walkable station deck with Blender-baked lighting. roomId = where the player starts.
+ *  opts.cine: (room, dt) => void drives the camera instead of the player (intro), see beginPlay(). */
 export class RoomMode {
-  constructor(game, roomId = 'bruecke', spawnKey = 'default') {
+  constructor(game, roomId = 'bruecke', spawnKey = 'default', opts = {}) {
     this.game = game;
     this.roomId = roomId;          // part the player is currently in (updated while walking)
     this.startRoom = roomId;
@@ -79,7 +80,8 @@ export class RoomMode {
     this.doors = [];
     this.parts = {};
     this.time = 0;
-    this.isRoom = true;
+    this.cine = opts.cine || null;
+    this.isRoom = !this.cine;
   }
 
   async init() {
@@ -164,6 +166,20 @@ export class RoomMode {
     this.updateRoom(true);
     this.roomEnvs();
     await this.populate();
+    if (this.cine) return;
+    this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
+    this.ui();
+  }
+
+  /** End of the intro: hand the already loaded deck to the player at a spawn point. */
+  beginPlay(roomId, spawnKey = 'default') {
+    this.cine = null; this.isRoom = true;
+    const sp = this.findSpawn(roomId, spawnKey);
+    this.pos.copy(sp.pos); this.vel.set(0, 0, 0);
+    this.yaw = Math.atan2(-sp.dir.x, -sp.dir.z); this.pitch = 0;
+    this.camera.fov = 72; this.camera.updateProjectionMatrix();
+    this.roomId = null;
+    this.updateRoom(true);
     this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
     this.ui();
   }
@@ -207,6 +223,7 @@ export class RoomMode {
     for (const n of this.npcs) { n.obj.visible = sees.includes(n.room); if (n.extra) n.extra.visible = n.obj.visible; }
     if (this.envs) this.scene.environment = this.envs[id] || this.envs.bruecke;
     if (this.labelEl) this.labelEl.textContent = this.areaName();
+    if (this.cine) return;
     if (id === 'bar') this.game.audio?.setMusic('jazz', { pos: (this.markers.find(m => m.kind === 'band')?.pos || new THREE.Vector3()).toArray() });
     else if (id === 'aussicht') this.game.audio?.setMusic('dome');
     else if (prev === 'bar' || prev === 'aussicht' || prev === null) this.game.audio?.setMusic('station');
@@ -554,10 +571,16 @@ export class RoomMode {
   update(dt) {
     this.time += dt;
     const modal = this.game.ui.modalOpen || this.game.ui.dlg;
-    this.ctp.classList.toggle('hidden', input.locked || !!modal);
-    if (!modal && (input.locked || input.pad?.active)) this.move(dt); else { this.vel.x = 0; this.vel.z = 0; this.move(dt, true); }
-    this.camera.position.set(this.pos.x, this.pos.y + this.height - 0.12 + Math.sin(this.time * 9) * this.bob * 0.025, this.pos.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    if (this.cine) {
+      // the intro places the camera; the "player" stands below it so doors, lights and visibility follow the shot
+      this.cine(this, dt);
+      this.pos.copy(this.camera.position); this.pos.y -= this.height - 0.12;
+    } else {
+      this.ctp.classList.toggle('hidden', input.locked || !!modal);
+      if (!modal && (input.locked || input.pad?.active)) this.move(dt); else { this.vel.x = 0; this.vel.z = 0; this.move(dt, true); }
+      this.camera.position.set(this.pos.x, this.pos.y + this.height - 0.12 + Math.sin(this.time * 9) * this.bob * 0.025, this.pos.z);
+      this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    }
     let sq = this.spaceQ;
     if (this.roomId === 'kabine' && this.spaceQK) {
       const drift = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(this.time * Math.PI * 2 / 150) * 0.28);
@@ -613,8 +636,8 @@ export class RoomMode {
     }
     if (this.screens) for (const s of this.screens) { s.t += dt; if (s.t > 2) { s.t = 0; this.drawScreen(s); } }
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    this.game.audio?.setListener(this.camera.position, fwd, new THREE.Vector3(0, 1, 0));
-    if (!modal) { this.interact(); this.barks(dt); }
+    if (!this.cine) this.game.audio?.setListener(this.camera.position, fwd, new THREE.Vector3(0, 1, 0));
+    if (!modal && !this.cine) { this.interact(); this.barks(dt); }
   }
 
   /** Crew walking a marker path; stops and looks at the player when close. */

@@ -14,6 +14,7 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 
 ## Features
 
+- **Intro-Film beim neuen Spiel:** gut eine Minute, live mit den Spielszenen gerendert: Saturn, Titan und die Geysire von Enceladus, Hochstation Cassini mit anfliegendem Frachter, dann Kommandodeck, Bar, Kabine und der leere Hangar. Erzähltext als Untertitel, Pilotenlizenz mit deinem Rufzeichen, mit Leertaste, Enter oder Esc überspringbar.
 - **Brückenübersicht im Stil von X-Wing Alliance:** ein in Cycles gerendertes Bild des Kommandodecks mit anklickbaren Bereichen (Bar, Hangar, Quartiere, Aussichtsplattform, Söldnerbörse, Werft, Systemkarte).
 - **Begehbare Station in der Ich-Perspektive:** Deck 4 der Hochstation Cassini ist ein zusammenhängendes Level. Vom Kommandodeck läuft man durch Schiebetüren in den Ringgang (Bar „Cassini-Spalt“, Kabinen), durch den Hangar-Zugang zu Hangar 7 und fährt mit dem Glaslift hinauf in die Aussichtskuppel. Die Beleuchtung ist in Blender als Global Illumination gebacken, durch die Fenster sieht man den echten Saturn.
 - **Menschen statt Puppen:** Alle Stationsbewohner sind geriggte MakeHuman-Figuren mit echten Hauttexturen, Kleidung und Frisuren (CC0) und retargeteten Quaternius-Animationen (CC0): Atmen und Gewichtsverlagerung im Stand, natürliches Sitzen, Gesten beim Reden, Trinken, Gehen. Wer in der Nähe ist, dreht den Kopf zum Spieler. Jede Figur hat einen kleinen Dialogbaum.
