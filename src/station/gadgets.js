@@ -88,8 +88,8 @@ export const GADGETS = {
   sprung: { name: 'Sprungkompass', text: 'Ein altes Navigationsinstrument, das Lenka dir beim Einbau des Sprungtriebwerks dazugelegt hat.', when: (g) => g.ships?.some(s => (s.upgrades?.jump || 0) > 0),
     build: () => { const g = new THREE.Group(); plinth(g); const b = M.brass(); g.add(mesh(new THREE.TorusGeometry(0.05, 0.004, 6, 32), b, 0, 0.08, 0)); g.add(mesh(new THREE.TorusGeometry(0.042, 0.004, 6, 32), b, 0, 0.08, 0, Math.PI / 2, 0.5));
       g.add(mesh(new THREE.SphereGeometry(0.012, 12, 8), M.glow('#7fd4ff', 1.5), 0, 0.08, 0)); return g; } },
-  apartment: { name: 'Schlüsselkarte', text: 'Kabine 4-117 gehört jetzt dir. Keine Miete mehr.', when: (g) => g.apartments?.cassini,
-    build: () => { const g = new THREE.Group(); g.add(mesh(new THREE.BoxGeometry(0.085, 0.054, 0.003), new THREE.MeshStandardMaterial({ map: labelTex('4-117', '#7fd4ff', '#10202c'), roughness: 0.4 }), 0, 0.035, 0, -0.3)); g.add(mesh(new THREE.BoxGeometry(0.06, 0.01, 0.04), M.black(), 0, 0.005, -0.01)); return g; } },
+  apartment: { name: 'Schlüsselkarte', text: 'Der Schlüssel zu deinem zweiten Zuhause. Ab jetzt geht es per Transit-Kapsel hin und her.', when: (g) => Object.keys(g.apartments || {}).length >= 2,
+    build: () => { const g = new THREE.Group(); g.add(mesh(new THREE.BoxGeometry(0.085, 0.054, 0.003), new THREE.MeshStandardMaterial({ map: labelTex('TRANSIT', '#7fd4ff', '#10202c'), roughness: 0.4 }), 0, 0.035, 0, -0.3)); g.add(mesh(new THREE.BoxGeometry(0.06, 0.01, 0.04), M.black(), 0, 0.005, -0.01)); return g; } },
 };
 
 /** Award newly earned keepsakes. Returns the list of new ones. */

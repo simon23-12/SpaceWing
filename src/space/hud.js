@@ -3,8 +3,11 @@ import { FACTIONS } from '../game/data.js';
 import { hostile } from './ship.js';
 import { CommScreen, drawStatus, drawDrive } from './hudParts.js';
 import { ASSIST_CONE, ASSIST_CONE_TURRET } from './flight.js';
+import { K, withKeys } from '../core/bindings.js';
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3();
+// the selected target (T / Y) is always purple, so it never blends in with the faction-coloured contacts
+const TGT = '#c45cff', TGT_GLOW = 'rgba(196,92,255,0.85)';
 
 function el(tag, cls, parent, html) {
   const e = document.createElement(tag);
@@ -36,8 +39,8 @@ export class HUD {
     this.radar.width = this.radar.height = 220;
     this.rctx = this.radar.getContext('2d');
     this.help = el('div', 'hud-help', this.root, gunner
-      ? 'Maus: Turm drehen · LMB/Leertaste: Feuer · T: Ziel durchschalten · Y: Ziel voraus · H: Hilfe'
-      : 'Maus: Steuern · W/S: Schub · A/D: Rollen · Q/E: Seitwärts · Shift: Boost · LMB/Leertaste: Laser · RMB/F: Rakete · T: Ziel · C: Kamera · L: Andocken · M: Systemkarte · H: Hilfe');
+      ? `Maus: Turm drehen · LMB/${K('fire')}: Feuer · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('help')}: Hilfe`
+      : `Maus: Steuern · ${K('throttleUp')}/${K('throttleDown')}: Schub · ${K('rollLeft')}/${K('rollRight')}: Rollen · ${K('strafeLeft')}/${K('strafeRight')}: Seitwärts · ${K('boost')}: Boost · LMB/${K('fire')}: Laser · RMB/${K('missile')}: Rakete · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('camera')}: Kamera · ${K('dock')}: Andocken · ${K('map')}: Karte · ${K('help')}: Hilfe`);
     this.help.style.opacity = 0;
     this.commQueue = [];
     this.commT = 0;
@@ -58,12 +61,13 @@ export class HUD {
   toggleHelp() { this.help.style.opacity = this.help.style.opacity === '1' ? 0 : 1; }
 
   setZone(t) { this.zone.textContent = t; }
-  setObjective(t) { this.obj.innerHTML = t ? `<b>ZIEL</b> ${t}` : ''; this.obj.classList.toggle('hidden', !t); }
-  showToast(t, dur = 3) { this.toast.innerHTML = t; this.toast.classList.add('on'); this.toastT = dur; }
-  prompt(t) { this.promptEl.classList.toggle('hidden', !t); if (t) this.promptEl.innerHTML = t; }
+  setObjective(t) { t = withKeys(t); this.obj.innerHTML = t ? `<b>ZIEL</b> ${t}` : ''; this.obj.classList.toggle('hidden', !t); }
+  showToast(t, dur = 3) { this.toast.innerHTML = withKeys(t); this.toast.classList.add('on'); this.toastT = dur; }
+  prompt(t) { this.promptEl.classList.toggle('hidden', !t); if (t) this.promptEl.innerHTML = withKeys(t); }
 
   /** Queue a comm message: speaker, text, faction colour. */
   say(speaker, text, color = '#9fd6ff', dur) {
+    text = withKeys(text);
     this.commQueue.push({ speaker, text, color, dur: dur || Math.max(3.5, text.length / 16) });
   }
   get commBusy() { return this.commT > 0 || this.commQueue.length > 0; }
@@ -127,9 +131,9 @@ export class HUD {
       const key = t.name + '|' + Math.round(d / 10);
       if (this._tk === key) return;
       this._tk = key;
-      this.target.innerHTML = `<div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
+      this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
         <div class="tfac">${t.kind === 'salvage' ? 'Objekt · Trümmer' : 'Objekt · Station · ' + fc.name}</div>
-        <div class="tinfo">${t.info}</div><div class="tdist">${dist}</div>`;
+        <div class="tinfo">${withKeys(t.info)}</div><div class="tdist">${dist}</div>`;
       return;
     }
     const closing = Math.round(-flight.player.vel.clone().sub(t.vel).dot(t.pos.clone().sub(flight.player.pos).normalize()));
@@ -137,7 +141,7 @@ export class HUD {
     if (this._tk === key) return;
     this._tk = key;
     const cls = t.stats?.name ? `${t.stats.name}${t.stats.role ? ' · ' + t.stats.role : ''}` : '';
-    this.target.innerHTML = `<div class="tname" style="color:${fc.color}">${t.name}</div>
+    this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tname" style="color:${fc.color}">${t.name}</div>
       <div class="tfac">${cls}</div>
       <div class="tfac">${fc.name}${t.cargoLabel ? ' · ' + t.cargoLabel : ''}</div>
       <div class="bar"><label>SCHILD</label><div class="track"><div class="fill shield" style="width:${100 * t.shield / t.maxShield}%"></div></div></div>
@@ -186,13 +190,14 @@ export class HUD {
       const col = hostileTo ? '#ff5a4a' : (FACTIONS[s.faction] || FACTIONS.neutral).color;
       const isT = p.target === s;
       if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) {
-        if (isT || hostileTo || s.tags.has('objective')) this.edgeArrow(ctx, sp, col, isT);
+        if (isT) this.targetArrow(ctx, sp);
+        else if (hostileTo || s.tags.has('objective')) this.edgeArrow(ctx, sp, col, false);
         continue;
       }
       const size = Math.max(10, Math.min(60, s.radius * 900 / Math.max(d, 1)));
-      ctx.strokeStyle = col; ctx.lineWidth = isT ? 2 : 1.2;
-      this.bracket(ctx, sp.x, sp.y, size, isT);
-      if (isT || d < 3000) {
+      if (isT) this.targetMark(ctx, sp.x, sp.y, size, s.name, d);
+      else { ctx.strokeStyle = col; ctx.lineWidth = 1.2; this.bracket(ctx, sp.x, sp.y, size, false); }
+      if (!isT && d < 3000) {
         ctx.fillStyle = col;
         ctx.fillText(`${s.name}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + size + 4, sp.y - size + 8);
       }
@@ -209,11 +214,11 @@ export class HUD {
           const aimDir = this.gunner ? cam.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
           const from = this.gunner ? cam.position : p.pos;
           const onT = hostileTo && flight.assistAim(p, aimDir, this.gunner ? ASSIST_CONE_TURRET : ASSIST_CONE, from)?.ship === s;
-          const lc = onT ? '#5aff8a' : col;
+          const lc = onT ? '#5aff8a' : TGT;
           ctx.strokeStyle = lc; ctx.lineWidth = onT ? 2.5 : 1.8;
           ctx.beginPath(); ctx.arc(l.x, l.y, onT ? 11 : 9, 0, Math.PI * 2); ctx.stroke();
           ctx.beginPath(); ctx.arc(l.x, l.y, 2, 0, Math.PI * 2); ctx.fillStyle = lc; ctx.fill();
-          ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(l.x, l.y); ctx.stroke(); ctx.setLineDash([]);
+          ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.strokeStyle = TGT; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(l.x, l.y); ctx.stroke(); ctx.setLineDash([]);
           if (onT) { ctx.fillStyle = '#5aff8a'; ctx.fillText('IM ZIEL', l.x + 14, l.y + 4); }
         }
         if (flight.lock && flight.lock.target === s) {
@@ -228,12 +233,8 @@ export class HUD {
     const tg = p.target;
     if (tg && tg.isObject && tg.alive) {
       const sp = this.project(cam, tg.pos), d = p.pos.distanceTo(tg.pos);
-      const oc = tg.kind === 'salvage' ? '#ffb050' : '#9fe0ff';
-      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) this.edgeArrow(ctx, sp, oc, true);
-      else {
-        ctx.strokeStyle = oc; ctx.lineWidth = 2; this.bracket(ctx, sp.x, sp.y, tg.kind === 'salvage' ? 14 : 30, true);
-        ctx.fillStyle = oc; ctx.fillText(`${tg.name}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 34, sp.y - 20);
-      }
+      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) this.targetArrow(ctx, sp);
+      else this.targetMark(ctx, sp.x, sp.y, tg.kind === 'salvage' ? 14 : 30, tg.name, d);
     }
     // salvage pieces: small amber diamonds
     ctx.fillStyle = '#ffb050'; ctx.strokeStyle = '#ffb050'; ctx.lineWidth = 1;
@@ -268,6 +269,50 @@ export class HUD {
     }
     ctx.stroke();
     if (full) { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.stroke(); }
+  }
+
+  /** The selected target: glowing purple frame, four arrowheads closing in and a labelled tag. */
+  targetMark(ctx, x, y, size, name, d) {
+    const t = performance.now() / 1000, pulse = 0.5 + 0.5 * Math.sin(t * 5);
+    const s = size + 6, gap = s + 7 + pulse * 5;
+    ctx.save();
+    ctx.shadowColor = TGT_GLOW; ctx.shadowBlur = 10;
+    ctx.strokeStyle = TGT; ctx.fillStyle = TGT; ctx.lineWidth = 2.6;
+    this.bracket(ctx, x, y, s, false);
+    ctx.globalAlpha = 0.18; ctx.lineWidth = 1;
+    ctx.strokeRect(x - s, y - s, s * 2, s * 2);
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + Math.PI / 4;
+      const cx = x + Math.cos(a) * gap * 1.12, cy = y + Math.sin(a) * gap * 1.12;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a + Math.PI);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-8, -5); ctx.lineTo(-8, 5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+    // tag above the frame
+    ctx.shadowBlur = 0;
+    ctx.font = '600 12px "Rajdhani", "Segoe UI", sans-serif';
+    const txt = `ZIEL · ${name}  ${d > 2000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}`;
+    const w = ctx.measureText(txt).width + 12, tx = x - w / 2, ty = y - gap * 1.12 - 24;
+    ctx.fillStyle = 'rgba(40,10,60,0.75)'; ctx.fillRect(tx, ty, w, 17);
+    ctx.fillStyle = TGT; ctx.fillRect(tx, ty, 3, 17);
+    ctx.fillStyle = '#f0dcff'; ctx.fillText(txt, tx + 7, ty + 12.5);
+    ctx.restore();
+    ctx.font = '11px "Rajdhani", "Segoe UI", sans-serif';
+  }
+
+  /** Off-screen target: a large pulsing purple arrow at the screen edge. */
+  targetArrow(ctx, sp) {
+    const W = innerWidth, H = innerHeight;
+    let dx = sp.x - W / 2, dy = sp.y - H / 2;
+    if (sp.behind) { dx = -dx; dy = -dy; }
+    const a = Math.atan2(dy, dx), R = Math.min(W, H) * 0.42;
+    const k = 1 + 0.15 * Math.sin(performance.now() / 1000 * 5);
+    ctx.save(); ctx.translate(W / 2 + Math.cos(a) * R, H / 2 + Math.sin(a) * R); ctx.rotate(a); ctx.scale(k, k);
+    ctx.shadowColor = TGT_GLOW; ctx.shadowBlur = 12; ctx.fillStyle = TGT;
+    ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -12); ctx.lineTo(-3, 0); ctx.lineTo(-8, 12); ctx.closePath(); ctx.fill();
+    ctx.restore();
   }
 
   edgeArrow(ctx, sp, col, strong) {
@@ -305,7 +350,7 @@ export class HUD {
       ctx.globalAlpha = d > range ? 0.45 : 1; ctx.fillStyle = col;
       if (sq) ctx.fillRect(x - size, y + elev - size, size * 2, size * 2);
       else { ctx.beginPath(); ctx.arc(x, y + elev, size, 0, Math.PI * 2); ctx.fill(); }
-      if (isT) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y + elev, size + 3, 0, Math.PI * 2); ctx.stroke(); }
+      if (isT) { ctx.globalAlpha = 1; ctx.strokeStyle = TGT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y + elev, size + 4, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
       ctx.globalAlpha = 1;
     };
     for (const s of flight.ships) {
@@ -315,6 +360,7 @@ export class HUD {
     }
     for (const w of flight.waypoints) plot(w.pos, '#ffd36a', 3, false, true);
     if (flight.station) plot(flight.station.pos, '#8fd18f', 4, false, true);
+    if (p.target?.isObject && p.target.alive) plot(p.target.pos, TGT, 3, true, true);
     ctx.fillStyle = '#bff'; ctx.beginPath(); ctx.moveTo(c, c - 6); ctx.lineTo(c + 4, c + 4); ctx.lineTo(c - 4, c + 4); ctx.fill();
   }
 }

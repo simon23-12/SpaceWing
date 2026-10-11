@@ -3,6 +3,7 @@ import { MeshBVH } from 'three-mesh-bvh';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets.js';
 import { input } from '../core/input.js';
+import { K } from '../core/bindings.js';
 import { SkyLayer } from '../space/skyLayer.js';
 import { zoneAnchor } from '../space/universe.js';
 import { ShipModel } from '../space/shipModel.js';
@@ -22,6 +23,9 @@ const EXPOSURE = { kabine: 1.6, bruecke: 1.35, bar: 1.6, hangar: 1.4, aussicht: 
 const ROOM_NAMES = { bruecke: 'Kommandodeck', bar: 'Bar „Cassini-Spalt“', hangar: 'Hangar 7', kabine: 'Kabine 4-117', aussicht: 'Aussichtskuppel' };
 // which parts can be seen from inside a part (the rest is hidden for speed)
 const SEES = { bar: ['bar', 'deck', 'bruecke'], kabine: ['kabine', 'deck'], hangar: ['hangar', 'deck', 'bruecke'], aussicht: ['aussicht', 'deck'] };
+// [id, local position in the dome, point the guide faces]
+// (the gaps between the benches: north, with Saturn behind her, and east)
+const DOME_GUIDES = [['dome_saturn', [0, 0, -6.3], [0.6, 0, 2]], ['dome_rhea', [5.15, 0, -2.95], [0, 0, 2]]];
 const PATRONS = ['gast_kesh', 'gast_rana', 'gast_tomas', 'gast_ilse', 'crew_c', 'crew_e'];
 
 const holoVert = `#include <common>
@@ -255,12 +259,23 @@ export class RoomMode {
     };
     const jobs = [];
     let patron = 0;
+    // two guides in the observation dome, at the glass: one explains Saturn, the other Rhea below us
+    const dome = this.parts.aussicht;
+    if (dome) for (const [id, p, look] of DOME_GUIDES) {
+      const pos = dome.toWorld(p), at = dome.toWorld(look);
+      const dir = at.sub(pos).setY(0).normalize();
+      this.markers.push({ kind: 'npc', id, room: 'aussicht', pos, dir, seated: false });
+      // a small hologram of what they talk about beside them, and a soft light so they stand out in the dark dome
+      const side = new THREE.Vector3(-dir.z, 0, dir.x);
+      this.holoGlobe(pos.clone().addScaledVector(side, -0.85).addScaledVector(dir, 0.25), id === 'dome_saturn');
+      this.lightDefs.push({ pos: pos.clone().addScaledVector(dir, 1.2).add(new THREE.Vector3(0, 2.4, 0)), color: new THREE.Color(id === 'dome_saturn' ? '#ffd8b0' : '#cfe4ff'), energy: 70, room: 'aussicht' });
+    }
     for (const m of this.markers) {
       if (m.kind === 'npc') {
         if (m.id === 'mags' && (g.flags['accepted:eisfracht'] && !g.flags.m1done)) continue;
         if (m.id === 'mags' && g.flags.m3done && !g.flags.m4rescued) continue;
         if (m.id === 'kix') { jobs.push(this.addKix(m)); continue; }
-        jobs.push(add(m.id, m, { clip: m.id === 'oduya' ? 'idle' : m.id === 'haendler' ? 'fold' : undefined }).then(rec => {
+        jobs.push(add(m.id, m, { clip: m.id === 'oduya' || m.id === 'dome_saturn' ? 'idle' : m.id === 'haendler' || m.id === 'dome_rhea' ? 'fold' : undefined }).then(rec => {
           if (rec && m.id === 'mags' && g.flags.m4rescued && !g.flags.m5done) {
             const jm = { ...m, seated: false, pos: m.pos.clone().add(new THREE.Vector3(1.1, 0, 0.4)), dir: m.dir.clone() };
             return add('juno', jm, { clip: 'fold' });
@@ -452,6 +467,40 @@ export class RoomMode {
     this.animated.push({ obj: grp, kind: 'holo', sat, ring, moons, mats: [mat, ring.material, ...moons.map(m => m.material)] });
   }
 
+  /** Pedestal with a small hologram globe: Saturn with its ring, or Rhea with a few bright crater spots. */
+  holoGlobe(pos, saturn) {
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.16, 1.0, 20), new THREE.MeshStandardMaterial({ color: 0x5a5e66, roughness: 0.35, metalness: 0.85 }));
+    pedestal.position.copy(pos).add(new THREE.Vector3(0, 0.5, 0));
+    const emitter = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color(saturn ? '#ffcf7a' : '#9fd6ff').multiplyScalar(1.6), toneMapped: false }));
+    emitter.position.y = 0.5; pedestal.add(emitter);
+    this.scene.add(pedestal);
+    const grp = new THREE.Group();
+    grp.position.copy(pos).add(new THREE.Vector3(0, 1.32, 0));
+    const mat = holoMaterial(saturn ? '#ffcf7a' : '#bfe0ff');
+    const sat = new THREE.Mesh(new THREE.SphereGeometry(0.17, 40, 20), mat);
+    if (saturn) sat.scale.y = 0.9;
+    grp.add(sat);
+    const mats = [mat];
+    let ring = null;
+    const moons = [];
+    if (saturn) {
+      ring = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.4, 80), holoMaterial('#ffe0a0'));
+      ring.rotation.x = -Math.PI / 2 + 0.35;
+      grp.add(ring); mats.push(ring.material);
+    } else {
+      // Inktomi and other fresh craters: bright spots on the surface
+      for (const [la, lo, r] of [[-0.25, 0.6, 0.035], [0.4, -0.9, 0.025], [-0.6, 2.2, 0.03], [0.15, 2.9, 0.02]]) {
+        const c = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6), holoMaterial('#ffffff'));
+        c.position.setFromSphericalCoords(0.17, Math.PI / 2 - la, lo);
+        sat.add(c); mats.push(c.material);
+      }
+    }
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.11, 0.8, 32, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(saturn ? 0.5 : 0.2, saturn ? 0.38 : 0.36, saturn ? 0.18 : 0.55), transparent: true, opacity: 0.025, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = -0.4; grp.add(beam);
+    this.scene.add(grp);
+    this.animated.push({ obj: grp, kind: 'holo', sat, ring, moons, mats });
+  }
+
   setupScreen(o, kind) {
     const c = document.createElement('canvas'); c.width = 1024; c.height = 540;
     const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false;
@@ -467,7 +516,7 @@ export class RoomMode {
     x.fillStyle = '#04121c'; x.fillRect(0, 0, W, H);
     x.strokeStyle = 'rgba(120,200,255,.35)'; x.strokeRect(12, 12, W - 24, H - 24);
     x.fillStyle = '#7fd4ff'; x.font = '600 44px Rajdhani, sans-serif';
-    const title = { boerse: 'SÖLDNERBÖRSE · AKTUELLE AUFTRÄGE', werft: 'WERFT & MARKT · LENKA BRANDVOLD', kabine: 'KABINE 4-117 · ' + (g.apartments?.cassini ? 'EIGENTUM' : 'MIETE BEZAHLT') }[s.kind] || 'CASSINI';
+    const title = { boerse: 'SÖLDNERBÖRSE · AKTUELLE AUFTRÄGE', werft: 'WERFT & MARKT · LENKA BRANDVOLD', kabine: 'KABINE 4-117 · EIGENTUM' }[s.kind] || 'CASSINI';
     x.fillText(title, 36, 70);
     x.font = '30px Barlow, sans-serif'; x.fillStyle = '#d8e6ef';
     let lines = [];
@@ -551,7 +600,7 @@ export class RoomMode {
       }
       else if (a.kind === 'holo') {
         a.mats.forEach(m => m.uniforms.time.value = this.time);
-        a.sat.rotation.y += dt * 0.3; a.ring.rotation.z += dt * 0.05;
+        a.sat.rotation.y += dt * 0.3; if (a.ring) a.ring.rotation.z += dt * 0.05;
         a.moons.forEach(m => { m.userData.a += dt * m.userData.s; m.position.set(Math.cos(m.userData.a) * m.userData.r, Math.sin(m.userData.a) * m.userData.r * 0.34, Math.sin(m.userData.a) * m.userData.r * 0.94); });
       }
     }
@@ -600,12 +649,12 @@ export class RoomMode {
     const r = new THREE.Vector3(-f.z, 0, f.x);
     const wish = new THREE.Vector3();
     if (!frozen) {
-      if (input.down('KeyW')) wish.add(f); if (input.down('KeyS')) wish.sub(f);
-      if (input.down('KeyD')) wish.add(r); if (input.down('KeyA')) wish.sub(r);
+      if (input.act('walkFwd')) wish.add(f); if (input.act('walkBack')) wish.sub(f);
+      if (input.act('walkRight')) wish.add(r); if (input.act('walkLeft')) wish.sub(r);
       const pad = input.pad;
       if (pad?.active) { wish.addScaledVector(f, -pad.pitch).addScaledVector(r, pad.yaw); }
     }
-    const speed = input.down('ShiftLeft') || input.pad?.boost ? 6.0 : 3.4;
+    const speed = input.act('run') ? 6.0 : 3.4;
     { const l = wish.length(); if (l > 0) wish.multiplyScalar(speed / Math.max(1, l)); }
     const k = this.onGround ? 12 : 2;
     this.vel.x += (wish.x - this.vel.x) * Math.min(1, k * dt);
@@ -679,12 +728,12 @@ export class RoomMode {
     const m = best?.m;
     const label = m ? this.labelFor(m) : '';
     this.promptEl.classList.toggle('hidden', !label);
-    if (label) this.promptEl.innerHTML = `<b>[E]</b> ${label}`;
-    if (m && (input.hit('KeyE') || input.pad?.use)) {
+    if (label) this.promptEl.innerHTML = `<b>[${K('use')}]</b> ${label}`;
+    if (m && input.actHit('use')) {
       if (m.kind === 'lift') this.lift.call(m.level);
       else this.game.onInteract(this, m);
     }
-    if (input.hit('Tab')) this.game.toOverview();
+    if (input.actHit('deckplan')) this.game.toOverview();
   }
 
   /** People say something when you stop right in front of them and look at them. */
@@ -724,7 +773,7 @@ export class RoomMode {
   }
 
   labelFor(m) {
-    const names = { mags: 'Mit Mags sprechen', oduya: 'Mit Femi Oduya sprechen', haendler: 'Mit Lenka sprechen', juno: 'Mit Juno sprechen', kix: 'Mit Kix sprechen' };
+    const names = { mags: 'Mit Mags sprechen', oduya: 'Mit Femi Oduya sprechen', haendler: 'Mit Lenka sprechen', juno: 'Mit Juno sprechen', kix: 'Mit Kix sprechen', dome_saturn: 'Mit Dr. Albers über Saturn sprechen', dome_rhea: 'Mit Tarek über Rhea sprechen' };
     if (m.kind === 'npc') return names[m.id] || 'Sprechen';
     if (m.kind === 'person') return 'Ansprechen';
     if (m.kind === 'lift') return m.label;

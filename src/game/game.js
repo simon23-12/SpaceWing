@@ -28,6 +28,7 @@ export class Game {
     if (import.meta.env.DEV) window.__S = { state, newGame, addShip };
     addEventListener('keydown', (e) => this.onKey(e));
     // Esc while the mouse is captured never reaches the page: the lost pointer lock opens the menu instead
+    input.onPadConnected = (gp, name) => this.ui.notify(`<b style="color:var(--accent)">${gp.mapping === 'standard' ? 'GAMEPAD' : 'JOYSTICK'} ERKANNT</b><br>${name.replace(/[<>&]/g, '')}<br><span class="dim">Belegung: Menü (Esc) → Tastenbelegung → Joystick</span>`);
     input.onLockLost = () => setTimeout(() => {
       if (performance.now() - (this.escT || 0) < 300 || this.ui.modalOpen) return;
       if (this.mode?.isRoom || (this.mode?.isFlight && this.mode.state === 'flying')) this.ui.pause();
@@ -53,7 +54,8 @@ export class Game {
   frame() {
     const dt = Math.min(0.1, this.clock.getDelta());
     input.pollPad();
-    if (input.pad?.menu && this.mode?.isRoom) this.ui.pause();
+    if (input.pad?.hit('menu') && (this.mode?.isRoom || this.mode?.isFlight) && !this.ui.modalOpen) this.ui.pause();
+    else if (input.actHit('menu') && !this.ui.modalOpen && (this.mode?.isRoom || this.mode?.isFlight)) this.ui.pause();
     if (this.mode && !this.paused && this.mode.update) this.mode.update(dt);
     if (this.mode && this.mode.render3D !== false) this.renderer.render(dt);
     input.endFrame();
@@ -189,8 +191,8 @@ export class Game {
   async intro() {
     const g = this.state;
     await this.ui.dialog([
-      { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, gemietet, aber mit Fenster zum Saturn.' },
-      { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Bezahlte Miete: noch drei Nächte. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.` },
+      { who: 'comp', text: 'Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, abbezahlt und mit Fenster zum Saturn.' },
+      { who: 'comp', text: `Guten Morgen, ${g.callsign}. Kontostand: 40 Kredits. Die Kabine gehört dir, sonst nicht viel. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.` },
       { who: 'comp', text: 'Empfehlung: Arbeit finden. Die Bar „Cassini-Spalt“ liegt am Ende des Ringgangs, links aus deiner Tür. Barkeeper wissen alles.' },
     ]);
   }
@@ -279,12 +281,9 @@ export class Game {
     const g = this.state;
     await this.fadeOut(1.0);
     g.day++;
-    // rent once the first three nights are over
-    const rentDue = g.day > 3 && !g.apartments?.[g.location];
-    if (rentDue) { const rent = 25; g.credits -= rent; logEntry(g, `Kabinenmiete −${rent} Cr`); }
     for (const s of g.ships) s.hull = Math.min(1, s.hull + 0.02);
     this.save();
-    this.ui.notify(`Tag ${g.day}. ${rentDue ? 'Kabinenmiete abgebucht.' : 'Du fühlst dich ausgeruht.'}`);
+    this.ui.notify(`Tag ${g.day}. Du fühlst dich ausgeruht.`);
     this.ui.refreshTopbar();
     await this.fadeIn(1.0);
   }

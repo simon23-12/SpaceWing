@@ -21,17 +21,25 @@ export function newGame(callsign = 'Wren') {
     prices: {},              // station -> commodity -> current factor
     kills: 0,
     log: [],
+    apartments: { cassini: true }, // cabin 4-117 is yours from the start
   };
 }
 
 let current = null;
+
+/** Older saves: cabin 4-117 used to be rented; it belongs to the player now. */
+function migrate(g) {
+  g.apartments = { ...g.apartments, cassini: true };
+  if (Object.keys(g.apartments).length < 2 && g.gadgets) g.gadgets = g.gadgets.filter(id => id !== 'apartment');
+  return g;
+}
 
 export const state = {
   get g() { return current; },
   set(g) { current = g; },
   save() { try { localStorage.setItem(KEY, JSON.stringify(current)); } catch { } },
   load() {
-    try { const s = localStorage.getItem(KEY); if (s) { current = JSON.parse(s); return current; } } catch { }
+    try { const s = localStorage.getItem(KEY); if (s) { current = migrate(JSON.parse(s)); return current; } } catch { }
     return null;
   },
   hasSave() { try { return !!localStorage.getItem(KEY); } catch { return false; } },
@@ -48,7 +56,7 @@ export const state = {
     try { d = JSON.parse(text); } catch { throw new Error('Die Datei ist kein gültiges JSON.'); }
     const g = d && d.game === 'spacewing-saturn' ? d.state : d;
     if (!g || typeof g !== 'object' || !g.callsign || !Array.isArray(g.ships) || !g.flags || typeof g.credits !== 'number') throw new Error('Das ist kein SpaceWing-Spielstand.');
-    return { ...newGame(g.callsign), ...g };
+    return migrate({ ...newGame(g.callsign), ...g });
   },
   wipe() { try { localStorage.removeItem(KEY); } catch { } },
 };

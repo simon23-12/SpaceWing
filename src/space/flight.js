@@ -146,7 +146,8 @@ export class FlightMode {
         x.drawImage(this.hud.radar, 50, 10, 220, 220);
       } else if (m.name === 'screen_c') {
         const t = p.target;
-        x.fillText('ZIEL', 12, 26);
+        if (t && t.alive) { x.fillStyle = '#c45cff'; x.fillRect(0, 0, 6, 240); x.strokeStyle = '#c45cff'; x.lineWidth = 3; x.strokeRect(1.5, 1.5, 317, 237); }
+        x.fillStyle = t && t.alive ? '#d9a6ff' : '#7fd4ff'; x.fillText('ZIEL', 14, 26);
         if (t && t.alive) {
           x.fillStyle = '#fff'; x.fillText(t.name.slice(0, 22), 12, 60);
           if (t.isObject) { x.fillStyle = '#ffb050'; x.font = '600 16px Rajdhani, sans-serif'; x.fillText(t.info.slice(0, 32), 12, 100); x.font = '600 20px Rajdhani, sans-serif'; }
@@ -332,47 +333,36 @@ export class FlightMode {
     const dz = (v) => Math.abs(v) < 0.04 ? 0 : (v - Math.sign(v) * 0.04) / 0.96;
     inp.yaw = -dz(this.stick.x) * 1.0;
     inp.pitch = -dz(this.stick.y);
-    // keyboard pitch/yaw fallback (arrows)
-    if (input.down('ArrowLeft')) inp.yaw = 1; if (input.down('ArrowRight')) inp.yaw = -1;
-    if (input.down('ArrowUp')) inp.pitch = -1; if (input.down('ArrowDown')) inp.pitch = 1;
-    inp.roll = (input.down('KeyA') ? 1 : 0) - (input.down('KeyD') ? 1 : 0);
-    inp.strafeX = (input.down('KeyE') ? 1 : 0) - (input.down('KeyQ') ? 1 : 0);
-    inp.strafeY = (input.down('KeyR') ? 1 : 0) - (input.down('KeyV') ? 1 : 0);
-    if (input.down('KeyW')) inp.throttle = Math.min(1, inp.throttle + dt * 0.7);
-    if (input.down('KeyS')) inp.throttle = Math.max(0, inp.throttle - dt * 0.7);
-    if (input.hit('KeyX') || input.hit('Backspace')) inp.throttle = 0;
+    // keyboard pitch/yaw (arrows by default)
+    if (input.act('yawLeft')) inp.yaw = 1; if (input.act('yawRight')) inp.yaw = -1;
+    if (input.act('pitchDown')) inp.pitch = -1; if (input.act('pitchUp')) inp.pitch = 1;
+    inp.roll = (input.act('rollLeft') ? 1 : 0) - (input.act('rollRight') ? 1 : 0);
+    inp.strafeX = (input.act('strafeRight') ? 1 : 0) - (input.act('strafeLeft') ? 1 : 0);
+    inp.strafeY = (input.act('strafeUp') ? 1 : 0) - (input.act('strafeDown') ? 1 : 0);
+    if (input.act('throttleUp')) inp.throttle = Math.min(1, inp.throttle + dt * 0.7);
+    if (input.act('throttleDown')) inp.throttle = Math.max(0, inp.throttle - dt * 0.7);
+    if (input.actHit('throttleStop')) inp.throttle = 0;
     if (input.hit('Digit1')) inp.throttle = 0.25; if (input.hit('Digit2')) inp.throttle = 0.5;
     if (input.hit('Digit3')) inp.throttle = 0.75; if (input.hit('Digit4')) inp.throttle = 1;
     if (input.mouse.wheel) inp.throttle = THREE.MathUtils.clamp(inp.throttle - input.mouse.wheel * 0.08, 0, 1);
-    inp.boost = input.down('ShiftLeft') || input.down('ShiftRight');
+    inp.boost = input.act('boost');
     if (pad?.active) {
       if (Math.abs(pad.roll) > 0.02) inp.roll = -pad.roll;
-      if (pad.throttle != null) inp.throttle = pad.throttle;
-      else if (pad.throttleDelta) inp.throttle = THREE.MathUtils.clamp(inp.throttle + pad.throttleDelta * dt * 0.7, 0, 1);
-      if (pad.boost) inp.boost = true;
-      if (pad.fire) this.fireGuns(p);
-      if (pad.target) this.cycleTarget(true);
-      if (pad.ahead) this.targetAhead();
-      if (pad.cam) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
-      if (pad.dock) this.requestDock();
-      if (pad.map && !this.opts.sim) this.game.ui.openMap(this);
-      if (pad.missile) {
-        if (this.lock && this.lock.t >= p.stats.lockTime) { this.fireMissile(p, this.lock.target); this.lock.t = 0; }
-        else this.hud.showToast('Keine Zielerfassung', 1.2);
-      }
+      if (pad.throttle != null && Math.abs(pad.throttle - (this.padThrottle ?? -1)) > 0.015) { inp.throttle = pad.throttle; this.padThrottle = pad.throttle; }   // the lever only overrides the keys when it moves
     }
-    if (input.hit('KeyZ')) { p.flightAssist = !p.flightAssist; this.hud.showToast(p.flightAssist ? 'Flughilfe AN' : 'Flughilfe AUS – Newton pur', 2); }
-    if ((input.button(0) && input.locked) || input.down('Space')) this.fireGuns(p);
-    if (input.hit('KeyT')) this.cycleTarget(true);
-    if (input.hit('KeyY')) this.targetAhead();
-    if (input.hit('KeyC')) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
-    if (input.hit('KeyH')) this.hud.toggleHelp();
-    if ((input.click(2) && input.locked) || input.hit('KeyF')) {
+    if (input.actHit('assist')) { p.flightAssist = !p.flightAssist; this.hud.showToast(p.flightAssist ? 'Flughilfe AN' : 'Flughilfe AUS – Newton pur', 2); }
+    if ((input.button(0) && input.locked) || input.act('fire')) this.fireGuns(p);
+    if (input.actHit('targetNext')) this.cycleTarget(1);
+    if (input.actHit('targetPrev')) this.cycleTarget(-1);
+    if (input.actHit('targetAim')) this.targetAhead();
+    if (input.actHit('camera')) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
+    if (input.actHit('help')) this.hud.toggleHelp();
+    if ((input.click(2) && input.locked) || input.actHit('missile')) {
       if (this.lock && this.lock.t >= p.stats.lockTime) { this.fireMissile(p, this.lock.target); this.lock.t = 0; }
       else this.hud.showToast('Keine Zielerfassung', 1.2);
     }
-    if (input.hit('KeyL')) this.requestDock();
-    if (input.hit('KeyM')) { if (this.opts.sim) this.hud.showToast('Im Simulator gibt es keine Systemkarte', 2); else this.game.ui.openMap(this); }
+    if (input.actHit('dock')) this.requestDock();
+    if (input.actHit('map')) { if (this.opts.sim) this.hud.showToast('Im Simulator gibt es keine Systemkarte', 2); else this.game.ui.openMap(this); }
     if (input.hit('KeyN') && p.target) this.hud.showToast(`${p.target.name}: ${(FACTIONS[p.target.faction] || {}).name || ''}`, 1.5);
     if (p.turretAuto !== false && p.stats.turret) this.turretFire(p, dt, 0.65);
     // missile lock
@@ -402,13 +392,14 @@ export class FlightMode {
     a.yaw -= input.mouse.dx * sens;
     a.pitch -= input.mouse.dy * sens * (S.invertY ? -1 : 1);
     const pad = input.pad;
-    if (pad?.active) { a.yaw -= pad.yaw * dt * 1.6; a.pitch -= pad.pitch * dt * 1.2 * (S.invertY ? -1 : 1); if (pad.fire) this.fireTurret(p); if (pad.target) this.cycleTarget(true); }
+    if (pad?.active) { a.yaw -= pad.yaw * dt * 1.6; a.pitch -= pad.pitch * dt * 1.2 * (S.invertY ? -1 : 1); }
     a.pitch = THREE.MathUtils.clamp(a.pitch, -0.22, 1.35);
     a.yaw = Math.atan2(Math.sin(a.yaw), Math.cos(a.yaw));
-    if (input.button(0) || input.down('Space')) this.fireTurret(p);
-    if (input.hit('KeyT')) this.cycleTarget(true);
-    if (input.hit('KeyY')) this.targetAhead();
-    if (input.hit('KeyH')) this.hud.toggleHelp();
+    if (input.button(0) || input.act('fire')) this.fireTurret(p);
+    if (input.actHit('targetNext')) this.cycleTarget(1);
+    if (input.actHit('targetPrev')) this.cycleTarget(-1);
+    if (input.actHit('targetAim')) this.targetAhead();
+    if (input.actHit('help')) this.hud.toggleHelp();
   }
 
   fireTurret(p) {
@@ -453,7 +444,7 @@ export class FlightMode {
     if (this.station) {
       const st = this.station, zs = this.zone.station;
       this._stTgt ||= { isObject: true, kind: 'station', name: st.name || 'Station', faction: st.faction || 'neutral', alive: true, vel: new THREE.Vector3(), radius: 200,
-        get pos() { return st.dock?.pos || st.pos; }, info: this.zone.hostile ? 'Feindliche Station · kein Andocken' : 'Andockbucht · [L] unter 3 km', station: zs?.id };
+        get pos() { return st.dock?.pos || st.pos; }, info: this.zone.hostile ? 'Feindliche Station · kein Andocken' : 'Andockbucht · [{k:dock}] unter 3 km', station: zs?.id };
       out.push(this._stTgt);
     }
     for (const sv of this.salvage) {
@@ -465,26 +456,34 @@ export class FlightMode {
     return out;
   }
 
-  cycleTarget(hostileFirst) {
+  /** T / R: step forwards (1) or backwards (-1) through the contacts, hostiles first, then nearest. */
+  cycleTarget(step = 1) {
     const p = this.player;
     const objs = this.gunner ? [] : this.targetObjects();
     const list = [...this.ships.filter(s => s !== p && s.alive && s.pos.distanceTo(p.pos) < 12000), ...objs]
       .sort((a, b) => (this.isHostile(b, p) - this.isHostile(a, p)) || (!!a.isObject - !!b.isObject) || a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos));
     if (!list.length) { p.target = null; return; }
     const i = list.indexOf(p.target);
-    p.target = list[(i + 1) % list.length];
+    p.target = list[i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length];
     this.game.audio?.blip();
   }
 
+  /** Lock whatever sits closest to the crosshair (ships count a little more than objects, distance a little). */
   targetAhead() {
     const p = this.player, f = this.gunner ? this.camera.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
-    let best = null, ba = 0.5;
+    const from = this.gunner ? this.camera.position : p.pos;
+    let best = null, bs = Infinity;
     for (const s of [...this.ships, ...(this.gunner ? [] : this.targetObjects())]) {
       if (s === p || !s.alive) continue;
-      const a = _v.copy(s.pos).sub(p.pos).normalize().angleTo(f);
-      if (a < ba) { ba = a; best = s; }
+      const d = s.pos.distanceTo(from);
+      if (d > 12000) continue;
+      const a = _v.copy(s.pos).sub(from).normalize().angleTo(f);
+      if (a > 0.6) continue;
+      const score = a + (s.isObject ? 0.04 : 0) + d / 400000;
+      if (score < bs) { bs = score; best = s; }
     }
     if (best) { p.target = best; this.game.audio?.blip(); }
+    else this.hud.showToast('Nichts am Fadenkreuz', 1);
   }
 
   // ------------------------------------------------------------------ docking & travel
@@ -664,7 +663,7 @@ export class FlightMode {
     // docking prompt
     if (this.state === 'flying' && !this.gunner) {
       const justLeft = this.opts.spawn === 'undock' && this.time < 12;
-      const prompt = this.opts.sim ? '<b>[L]</b> Simulation beenden' : this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[L]</b> Andocken an ${this.station.name}` : '';
+      const prompt = this.opts.sim ? '<b>[{k:dock}]</b> Simulation beenden' : this.canDock() && !this.missionBlocksDock && !justLeft ? `<b>[{k:dock}]</b> Andocken an ${this.station.name}` : '';
       this.hud.prompt(prompt);
     } else this.hud.prompt('');
     this.game.audio?.engine(p.throttle, p.input.boost);

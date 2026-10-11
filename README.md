@@ -60,7 +60,9 @@ python3 tools/bl.py blender/ships.py spacewing
 
 **Im Kugelturm (Mission 1):** Maus zielen · Linksklick/Leertaste feuern · T Ziel
 
-**Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T Ziel · C Kamera · L andocken · M Systemkarte · Esc Menü
+**Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T/R Ziel vor/zurück · G Ziel am Fadenkreuz · C Kamera · L andocken · M Systemkarte · Esc Menü
+
+**Alle Tasten sind frei belegbar** (Menü → Tastenbelegung). Joysticks und Gamepads werden erkannt; Achsen und Knöpfe (auch Coolie-Hat) lassen sich mit Live-Anzeige zuweisen, getrennt pro Gerät gespeichert.
 
 **Auf der Station:** WASD gehen · Shift laufen · Maus umsehen · E benutzen/sprechen · Tab Deckplan
 

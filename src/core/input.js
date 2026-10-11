@@ -1,4 +1,7 @@
-// Keyboard / mouse / pointer-lock input with per-frame edge detection.
+// Keyboard / mouse / pointer-lock input with per-frame edge detection, rebindable actions and joysticks.
+import { keysFor, profileFor, padName } from './bindings.js';
+
+const THREE_clamp = (v) => Math.max(0, Math.min(1, v));
 class Input {
   constructor() {
     this.keys = new Set();
@@ -7,10 +10,12 @@ class Input {
     this.clicked = new Set();
     this.locked = false;
     this.enabled = true;
+    this.padRest = {}; this.padMoved = {};
+    addEventListener('gamepadconnected', (e) => { this.padRest[e.gamepad.id] = null; this.onPadConnected?.(e.gamepad, padName(e.gamepad.id)); });
     addEventListener('keydown', e => {
       if (e.repeat) return;
       if (!this.enabled) return;
-      if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+      if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Backspace'].includes(e.code) && !/INPUT|TEXTAREA/.test(e.target?.tagName)) e.preventDefault();
       this.keys.add(e.code); this.pressed.add(e.code);
     });
     addEventListener('keyup', e => this.keys.delete(e.code));
@@ -44,39 +49,52 @@ class Input {
   }
   unlock() { if (document.pointerLockElement) { this.selfUnlock = performance.now(); document.exitPointerLock(); } }
 
+  /** Action held (rebindable key or joystick/gamepad button). */
+  act(id) {
+    if (!this.enabled) return false;
+    for (const k of keysFor(id)) if (this.keys.has(k)) return true;
+    return !!this.pad?.down(id);
+  }
+  /** Action went down this frame. */
+  actHit(id) {
+    if (!this.enabled) return false;
+    for (const k of keysFor(id)) if (this.pressed.has(k)) return true;
+    return !!this.pad?.hit(id);
+  }
+
+  /** The connected joystick / gamepad that is used (the last one that moved, else the first). */
+  gamepads() { return navigator.getGamepads ? [...navigator.getGamepads()].filter(g => g && g.connected && g.axes.length >= 2) : []; }
+
   /**
-   * Gamepad / joystick (Gamepad API), polled once per frame.
-   * Standard mapping (Xbox/PlayStation): left stick = pitch/yaw, right stick X = roll, RT = fire, LT = missile.
-   * Flight sticks (non-standard): axis 0/1 = yaw/pitch, twist = roll, throttle lever = throttle, trigger = fire.
+   * Gamepad / joystick (Gamepad API), polled once per frame through the device's profile (bindings.js):
+   * flight axes pitch/yaw/roll/throttle and buttons, hat directions or axis positions bound to actions.
    */
   pollPad() {
-    const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
-    const gp = pads.find(p => p.connected && p.axes.length >= 2);
-    if (!gp) { this.pad = null; return; }
-    const dz = (v, d = 0.12) => Math.abs(v || 0) < d ? 0 : (v - Math.sign(v) * d) / (1 - d);
+    const pads = this.gamepads();
+    if (!pads.length) { this.pad = null; return; }
+    const gp = pads.find(p => p.id === this.lastPadId) || pads[0];
+    const prof = profileFor(gp);
+    const dz = (v, d) => Math.abs(v || 0) < d ? 0 : (v - Math.sign(v) * d) / (1 - d);
     const std = gp.mapping === 'standard';
-    const down = gp.buttons.map(b => !!b?.pressed);
-    const prev = this.padPrev || [];
-    const pad = { id: gp.id, std, down, hit: (i) => down[i] && !prev[i], val: (i) => gp.buttons[i]?.value || 0 };
-    if (std) {
-      pad.yaw = dz(gp.axes[0]); pad.pitch = dz(gp.axes[1]); pad.roll = dz(gp.axes[2]); pad.look = dz(gp.axes[3]);
-      pad.fire = pad.val(7) > 0.3; pad.missile = pad.hit(6); pad.boost = down[0] || down[10];
-      pad.throttleDelta = (down[5] || down[12] ? 1 : 0) - (down[4] || down[13] ? 1 : 0);
-      pad.target = pad.hit(1); pad.ahead = pad.hit(2); pad.cam = pad.hit(3); pad.map = pad.hit(9); pad.dock = pad.hit(8);
-      pad.use = pad.hit(0); pad.menu = pad.hit(9);
-    } else {
-      // flight stick: twist is usually axis 5 (or 2), the throttle lever axis 6 / 3 / 2
-      const twistIdx = gp.axes.length > 5 ? 5 : 2;
-      const thrIdx = gp.axes.length > 6 ? 6 : gp.axes.length > 3 ? 3 : -1;
-      pad.yaw = dz(gp.axes[0], 0.06); pad.pitch = dz(gp.axes[1], 0.06); pad.roll = dz(gp.axes[twistIdx], 0.15);
-      if (thrIdx >= 0 && thrIdx !== twistIdx) pad.throttle = (1 - gp.axes[thrIdx]) / 2;
-      pad.fire = down[0]; pad.missile = pad.hit(1); pad.boost = down[2]; pad.target = pad.hit(3); pad.ahead = pad.hit(4); pad.cam = pad.hit(5);
-      pad.map = pad.hit(6); pad.dock = pad.hit(7); pad.use = pad.hit(1);
-      pad.throttleDelta = 0;
-    }
-    this.padPrev = down;
+    const ax = gp.axes, btn = gp.buttons;
+    // an axis only counts once it has moved: unused axes of some sticks sit at 0 or ±1 and would pin the throttle
+    const rest = this.padRest[gp.id] ||= ax.slice();
+    const moved = this.padMoved[gp.id] ||= new Set();
+    ax.forEach((v, i) => { if (Math.abs(v - rest[i]) > 0.25) moved.add(i); });
+    const isOn = (bd) => bd.b != null ? !!(btn[bd.b]?.pressed || (btn[bd.b]?.value || 0) > 0.3) : Math.abs((ax[bd.a] ?? 9) - bd.v) < (bd.hat ? 0.1 : 0.35);
+    const now = {};
+    for (const [id, list] of Object.entries(prof.buttons || {})) now[id] = (list || []).some(isOn);
+    const prev = this.padPrevAct || {};
+    const axis = (k, d) => { const A = prof.axes?.[k]; if (!A || ax[A.i] == null || !moved.has(A.i)) return 0; const v = dz(ax[A.i], d); return A.inv ? -v : v; };
+    const dzs = prof.deadzone ?? (std ? 0.12 : 0.06);
+    const pad = { id: gp.id, std, gp, prof, down: (id) => !!now[id], hit: (id) => !!now[id] && !prev[id] };
+    pad.yaw = axis('yaw', dzs); pad.pitch = axis('pitch', dzs); pad.roll = axis('roll', Math.max(dzs, 0.1));
+    pad.look = std && prof.look != null ? dz(ax[prof.look], 0.12) : 0;
+    const T = prof.axes?.throttle;
+    if (T && ax[T.i] != null && moved.has(T.i)) pad.throttle = THREE_clamp((T.inv ? 1 + ax[T.i] : 1 - ax[T.i]) / 2);
+    this.padPrevAct = now;
     // the pad counts as "in use" once a stick moves or a button is pressed
-    if (Math.abs(pad.yaw) + Math.abs(pad.pitch) + Math.abs(pad.roll) > 0.05 || down.some(Boolean)) this.padActive = performance.now();
+    if (Math.abs(pad.yaw) + Math.abs(pad.pitch) + Math.abs(pad.roll) > 0.05 || btn.some(b => b?.pressed)) { this.padActive = performance.now(); this.lastPadId = gp.id; }
     pad.active = this.padActive && performance.now() - this.padActive < 4000;
     this.pad = pad;
   }

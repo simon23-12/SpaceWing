@@ -35,6 +35,8 @@ export const PEOPLE = {
   crew_c: { name: 'Ama Quist', role: 'Eisfrachterin aus Enceladus', color: '#bfe6ff', ini: 'AQ' },
   crew_d: { name: 'Yara Benedek', role: 'Mechanikerin · Werkstatt Hangar 7', color: '#ffd36a', ini: 'YB' },
   crew_e: { name: 'Jun Takeda', role: 'Liga-Zollbeamter (außer Dienst)', color: '#9fb4ff', ini: 'JT' },
+  dome_saturn: { name: 'Dr. Henrike Albers', role: 'Planetologin · Aussichtskuppel', color: '#ffcf9a', ini: 'HA' },
+  dome_rhea:   { name: 'Tarek Ohanian', role: 'Eisgeologe · Bergbauposten Inktomi', color: '#b8d4e8', ini: 'TO' },
   self:   { name: 'Du', role: '', color: '#7fd4ff', ini: '··' },
   comp:   { name: 'Bordcomputer', role: '', color: '#9fd6ff', ini: '>_' },
 };
@@ -81,6 +83,8 @@ export const BARKS = {
   crew_c: ['Bald geht es zurück nach Enceladus.', 'Kalt hier, oder? Bei uns ist es kälter.', 'Hallo, Pilot.'],
   crew_d: ['Willkommen in meiner Werkstatt. Was soll ich schrauben?', 'Pass auf, der Boden ist ölig.', 'Na? Lust auf ein paar Mods?'],
   crew_e: ['Ich bin nicht im Dienst.', 'Abend.', 'Liga? Heute nicht.'],
+  dome_saturn: ['Schau nach oben. Daran gewöhnt man sich nie.', 'Saturn würde in einer Badewanne schwimmen. Wirklich.', 'Siehst du die dunkle Lücke im Ring? Das ist die Cassini-Teilung.'],
+  dome_rhea: ['Alle starren auf Saturn. Dabei liegt das Beste direkt unter uns.', 'Minus hundertsiebzig Grad da unten. An guten Tagen.', 'Inktomi. Das sauberste Eis im ganzen System.'],
 };
 
 export function npcDialogue(game, npc) {
@@ -126,7 +130,7 @@ export function npcDialogue(game, npc) {
       [say(KIX, 'Ich habe vier Arme und kein Mitleid. Was darf’s sein?')],
     ];
     if (g.story === 'prolog') return [
-      say(KIX, 'Neu hier? Du siehst aus wie jemand mit vierzig Kredits und drei Nächten Kabinenmiete.'),
+      say(KIX, 'Neu hier? Du siehst aus wie jemand mit vierzig Kredits und einem leeren Kühlschrank.'),
       say(KIX, 'Ein Rat, kostenlos, weil ich heute großzügig bin: Die Alte am Fenstertisch sucht einen Piloten. Mags Okafor. Sie beißt nicht. Meistens.', { act: (gm) => { gm.state.story = 'eisfracht'; } }),
     ];
     if (g.flags.m3done && !g.flags['accepted:funkstille']) return [
@@ -151,7 +155,7 @@ export function npcDialogue(game, npc) {
   if (npc === 'haendler') return tree('haendler', 'Lenka Brandvold, Werft und Markt. Schiffe, Teile, Fracht. Ehrliche Preise, mehr oder weniger.', [
     { q: 'Zeig mir Schiffe und Waren.', a: ['Leg los. Umbauen und Lackieren macht übrigens Yara, unten in ihrer Werkstatt in Hangar 7.'], act: (gm) => gm.ui.openWerft(), close: true },
     { q: 'Was kann ein Sprungtriebwerk?', a: [jumpHint.replace('Lenka baut dir eins ein.', 'Ich baue es dir ein.'), 'Ohne Sprung brauchst du für den Weg nach Titan zwei Wochen Fusionsbrand. Mit Sprung einen Herzschlag und einen Kater.'] },
-    { q: 'Lohnt sich ein Apartment?', a: ['Wenn du auf zwei Stationen eins besitzt, reist du per Transit-Kapsel hin und her, ohne zu fliegen. Dein Schiff kommt mit dem Frachtdienst nach.', 'Kabine 4-117 kannst du hier am Terminal in deiner Kabine kaufen. Dann ist auch Schluss mit der Miete.'] },
+    { q: 'Lohnt sich ein Apartment?', a: ['Wenn du auf zwei Stationen eins besitzt, reist du per Transit-Kapsel hin und her, ohne zu fliegen. Dein Schiff kommt mit dem Frachtdienst nach.', 'Kabine 4-117 gehört dir ja schon. Ein zweites Apartment kaufst du am Terminal in deiner Kabine oder direkt auf der anderen Station.'] },
     { q: 'Welches Schiff als Nächstes?', a: ['Die Kestrel ist ein echter Jäger. Die Mule fährt Fracht, viel Fracht. Wer Geld hat, nimmt die Corsair und wird in Ruhe gelassen.'] },
   ], 'Bis später, Lenka.');
   if (npc === JUNO) return tree(JUNO, 'Du bist also der Pilot, von dem Mags erzählt. Juno Vesper, Archiv von Iapetus.', [
@@ -202,6 +206,19 @@ export function npcDialogue(game, npc) {
     { q: 'Was will die Liga hier draußen?', a: ['Ordnung. So sagen sie es jedenfalls. Die Inneren Welten brauchen Helium-3 für ihre Reaktoren. Der Saturn hat es. Den Rest kannst du dir denken.'] },
     { q: 'Bist du für den Zoll?', a: ['Ich bin für meinen Feierabend. Aber unter uns: Ein Zoll ohne Rückhalt ist nur eine Einladung für Schmuggler.'] },
   ], 'Schönen Abend noch.');
+  // ------------------------------------------------------------------ guides in the observation dome
+  if (npc === 'dome_saturn') return tree(npc, 'Henrike Albers, Planetologin. Ich erkläre Besuchern, was sie da draußen sehen. Und am liebsten erkläre ich Saturn.', [
+    { q: 'Wie groß ist Saturn eigentlich?', a: ['Fünfundneunzig Erdmassen, und trotzdem leichter als Wasser. Hätte man eine Badewanne, die groß genug ist, würde Saturn darin schwimmen.', 'Er besteht fast nur aus Wasserstoff und Helium. Festen Boden gibt es nicht. Wer hineinfliegt, sinkt immer tiefer, bis der Druck ihn zerquetscht.'] },
+    { q: 'Woraus bestehen die Ringe?', a: ['Fast nur aus Wassereis. Brocken so klein wie Staubkörner und so groß wie Häuser. Von Rand zu Rand fast dreihunderttausend Kilometer, aber meist nur zehn bis hundert Meter dick.', 'Die dunkle Lücke ist die Cassini-Teilung, fast fünftausend Kilometer breit. Die Bar unten hat ihren Namen von ihr.', 'Und die Ringe vergehen. Das Eis regnet langsam auf Saturn herab. In ein paar hundert Millionen Jahren ist nichts mehr übrig. Wir sind genau zur richtigen Zeit hier.'] },
+    { q: 'Was ist das Sechseck am Nordpol?', a: ['Ein Sturm mit sechs geraden Seiten, jede länger als der Durchmesser der Erde. Er dreht sich seit Jahrhunderten, und so richtig verstanden hat ihn bis heute niemand.', 'Die Winde dort schaffen fast zweitausend Kilometer pro Stunde. Gegen Saturn ist jeder Orkan eine laue Brise.'] },
+    { q: 'Wie lang ist ein Tag auf Saturn?', a: ['Gut zehneinhalb Stunden. Er dreht sich so schnell, dass er an den Polen abgeplattet ist. Schau genau hin, er ist kein runder Ball.', 'Ein Saturnjahr dagegen dauert fast dreißig Erdjahre. Wer hier geboren wird, feiert seinen ersten Saturngeburtstag als Erwachsener.'] },
+  ], 'Danke für die Führung.');
+  if (npc === 'dome_rhea') return tree(npc, 'Tarek Ohanian, Eisgeologe. Alle starren auf Saturn. Ich schaue lieber nach unten, auf Rhea. Da verdiene ich mein Geld.', [
+    { q: 'Was ist Rhea für ein Mond?', a: ['Der zweitgrößte Mond des Saturn, gut fünfzehnhundert Kilometer Durchmesser. Ein Klumpen aus Wassereis mit etwas Gestein darin, bei dieser Kälte hart wie Granit.', 'Am Tag minus hundertsiebzig Grad, nachts noch viel kälter. Das Eis da unten bricht man nicht, man sprengt es.'] },
+    { q: 'Was ist Inktomi?', a: ['Ein Krater, achtundvierzig Kilometer breit und für Rhea blutjung. Der Einschlag hat frisches, helles Eis in langen Strahlen über die Oberfläche geworfen.', 'Frisches Eis ist sauberes Eis. Deshalb steht dort unser Bergbauposten. Ein guter Teil des Wassers auf dieser Station kommt von da.'] },
+    { q: 'Gibt es auf Rhea Luft?', a: ['Zum Atmen nicht, aber da ist etwas. Eine hauchdünne Hülle aus Sauerstoff und Kohlendioxid. Die alte Cassini-Sonde hat sie schon im Jahr zweitausendzehn gemessen.', 'Die Schwerkraft ist ein Witz, keine drei Prozent der Erde. Wer da unten kräftig abspringt, ist über zwanzig Sekunden in der Luft.'] },
+    { q: 'Warum heißt die Station Cassini?', a: ['Giovanni Cassini hat Rhea entdeckt, im Jahr sechzehnhundertzweiundsiebzig, mit einem Fernrohr, über das heute jedes Kind lachen würde. Die Lücke im Ring hat er auch gefunden.', 'Rhea zeigt Saturn immer dieselbe Seite. Wer auf der richtigen Hälfte steht, hat ihn ein Leben lang über sich, fünfundzwanzigmal so groß wie der Mond am Himmel der Erde.'] },
+  ], 'Danke, Tarek.');
   return [say(npc, '…')];
 }
 
@@ -225,7 +242,7 @@ function completeStory(game, id, reward, next, text) {
 // ============================================================================ missions
 
 export const STORY = {
-  prolog: { title: 'Drei Nächte Miete', brief: 'Sprich in der Bar mit dem Barkeeper.' },
+  prolog: { title: 'Vierzig Kredits', brief: 'Sprich in der Bar mit dem Barkeeper.' },
 
   // ------------------------------------------------------------------------ M1 (gunner: Mags flies, the player shoots)
   eisfracht: {
@@ -366,20 +383,20 @@ export const STORY = {
       c.objective('Mit der Maus lenken: zur Markierung fliegen');
       await ring(ahead(1100, 500, 260), 'Markierung');
       await c.talk([M('Gut. W gibt Schub, S nimmt ihn weg. Mit 1 bis 4 setzt du feste Stufen, X stoppt sofort.')]);
-      c.objective('Auf über 180 m/s beschleunigen [W]');
+      c.objective('Auf über 180 m/s beschleunigen [{k:throttleUp}]');
       await c.until(() => p.speed() > 180);
-      c.objective('Abbremsen auf unter 30 m/s [S] oder [X]');
+      c.objective('Abbremsen auf unter 30 m/s [{k:throttleDown}] oder [{k:throttleStop}]');
       await c.until(() => p.speed() < 30);
       await c.talk([M('A und D rollen das Schiff um die Längsachse. Q und E schieben dich seitwärts. Damit weichst du aus, ohne die Nase vom Ziel zu nehmen.')]);
-      c.objective('Einmal um die eigene Achse rollen [A] / [D]');
+      c.objective('Einmal um die eigene Achse rollen [{k:rollLeft}] / [{k:rollRight}]');
       let roll = 0;
       await c.until(dt => { roll += Math.abs(p.angVel.z) * dt; return roll > Math.PI * 1.8; });
       await c.talk([M('C wechselt zwischen Außenkamera und Cockpit. Probier beides, nimm, was dir liegt.')]);
-      c.objective('Kamera wechseln [C]');
+      c.objective('Kamera wechseln [{k:camera}]');
       const cam0 = f.camMode;
       await c.until(() => f.camMode !== cam0);
       await c.talk([M('Shift ist der Nachbrenner. Schnell, aber er frisst Energie, und ohne Energie schießt du nicht.')]);
-      c.objective('Nachbrenner 3 Sekunden halten [Shift]');
+      c.objective('Nachbrenner 3 Sekunden halten [{k:boost}]');
       let boost = 0;
       await c.until(dt => { if (p.input.boost && p.energy > 5) boost += dt; return boost > 3; });
       c.objective('Zur nächsten Markierung fliegen');
@@ -394,7 +411,7 @@ export const STORY = {
         M('Ich habe drei Zieldrohnen ausgesetzt. Die schießen nicht zurück, also keine Ausreden.'),
         M('T schaltet die Ziele durch. Der kleine Kreis vor dem Ziel ist der Vorhaltepunkt. Linksklick oder Leertaste feuert.'),
       ]);
-      c.objective('Die drei Zieldrohnen abschießen [T] · [Linksklick]');
+      c.objective('Die drei Zieldrohnen abschießen [{k:targetNext}] · [Linksklick]');
       await c.until(() => c.alive(drones).length === 0);
       const last = await f.spawn({ cls: 'wespe', faction: 'neutral', name: 'Zieldrohne „Hartnäckig“', paint: '#e8e8e8', pos: ahead(1300, 200, 100), tags: ['noFriendlyFire', 'objective'],
         ai: { mode: 'patrol', center: ahead(1300), radius: 400, aggressive: false } });
@@ -402,14 +419,14 @@ export const STORY = {
       p.target = last;
       if (p.missiles < 2) { p.missiles = 2; p.trainingMissiles = true; }
       await c.talk([M('Ich hab dir zwei Übungsraketen eingehängt, einen Werfer hat die Spacewing noch nicht. Den baut dir später Yara ein.'), M('Die da ist zäher. Halt sie im Visier, bis der Kreis rot wird, dann Rechtsklick oder F. Rakete raus.')]);
-      c.objective('Die zähe Drohne mit einer Rakete treffen [Rechtsklick] / [F]');
+      c.objective('Die zähe Drohne mit einer Rakete treffen [Rechtsklick] / [{k:missile}]');
       await c.until(() => !last.alive);
       await c.talk([
         M('Sauber. M öffnet die Systemkarte. Da siehst du die Monde. Für die anderen brauchst du ein Sprungtriebwerk von Lenka.'),
         M('Und jetzt nach Hause. Flieg auf unter drei Kilometer an die Andockbucht und drück L. Den Rest macht der Leitstrahl.'),
       ]);
       g.flags.m1bflown = true;
-      c.objective('An der Hochstation Cassini andocken [L]');
+      c.objective('An der Hochstation Cassini andocken [{k:dock}]');
       mags.ai = { mode: 'goto', point: st.dock.pos.clone().addScaledVector(st.dock.dir, 600).add(new THREE.Vector3(150, 80, 0)), throttle: 0.6, arrive: 100 };
     },
     onDock(game, station) {
@@ -476,7 +493,7 @@ export const STORY = {
           ['Tropfen 7', 'Danke. Die Hälfte unserer Ladung ist weg, aber wir leben. Das Kollektiv wird sich das merken. Beides.', 'kollektiv'],
           ['Tropfen 7', 'Ist dir aufgefallen, wie genau die Schakale wussten, wann die Liga abzieht?', 'kollektiv'],
         ]);
-        c.objective('Tanker in Sicherheit – an der Cassini andocken [L]');
+        c.objective('Tanker in Sicherheit – an der Cassini andocken [{k:dock}]');
       }
       g.flags.m2flown = true;
       await c.until(() => !tanker.alive || tanker.ai.mode !== 'goto');
@@ -522,7 +539,7 @@ export const STORY = {
         ['Kapitän Morrow', 'Sauber. Sie fliegen besser, als Ihr Schiff aussieht. Docken Sie an, die Konsulin wartet nicht gern.', 'konsortium'],
         ['Kapitän Morrow', 'Seltsam, nicht? Die Schakale wussten genau, wann wir kommen.', 'konsortium'],
       ]);
-      c.objective('In Kraken-Hafen andocken [L]');
+      c.objective('In Kraken-Hafen andocken [{k:dock}]');
       g.flags.m3flown = true;
     },
     onDock(game, station) {
@@ -638,7 +655,7 @@ export const STORY = {
       f.setHostile('konsortium', 'player', false);
       f.missionBlocksDock = null;
       g.flags.m5flown = true;
-      c.objective('Am Gewölbe andocken [L]');
+      c.objective('Am Gewölbe andocken [{k:dock}]');
     },
     onDock(game, station) {
       const g = game.state;
@@ -685,7 +702,7 @@ export const STORY = {
         ['Goldwacht', 'Unbekanntes Schiff, Enceladus steht unter Embargo des Titan-Konsortiums. Drehen Sie ab oder Sie werden beschossen.', 'konsortium'],
         ['Noor Haddad-Lund', g.callsign + ', hier Noor, Sprecherin des Kollektivs. Wir haben Kinder mit Strahlenkrankheit. Bitte. Durchbrechen, Andocken mit L geht auch unter Beschuss.', 'kollektiv'],
       ]);
-      c.objective('Durch die Blockade brechen und an der Quelle andocken [L]');
+      c.objective('Durch die Blockade brechen und an der Quelle andocken [{k:dock}]');
       g.flags.m6flown = true;
     },
     onDock(game, station) {

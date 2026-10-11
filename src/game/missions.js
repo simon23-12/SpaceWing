@@ -264,20 +264,20 @@ export const SIM_TIERS = [
 ];
 export const SIM_SCENARIOS = {
   drohnen: { tier: 0, name: 'Zieldrohnen', kind: 'clear', gold: 45, silver: 80, desc: 'Sechs Drohnen, die nicht zurückschießen. Zum Üben von Zielen und Vorhalten.',
-    tip: 'Mit T aufschalten und den Vorhaltekreis vor dem Ziel ins Fadenkreuz nehmen. Wird er grün („IM ZIEL“), sitzen die Schüsse.', waves: [{ n: 6, drone: true }] },
+    tip: 'Mit {k:targetNext} aufschalten oder {k:targetAim} für das Ziel am Fadenkreuz und den Vorhaltekreis vor dem Ziel ins Fadenkreuz nehmen. Wird er grün („IM ZIEL“), sitzen die Schüsse.', waves: [{ n: 6, drone: true }] },
   rotte: { tier: 0, name: 'Schakal-Rotte', kind: 'clear', gold: 60, silver: 110, desc: 'Drei Wespen, wie bei einem Überfall im Rhea-System.',
-    tip: 'Nicht frontal aufeinander zu. Schub kurz wegnehmen (S), eng kurven, dann von hinten angreifen.', waves: [{ n: 3, skill: 0.45 }] },
+    tip: 'Nicht frontal aufeinander zu. Schub kurz wegnehmen ({k:throttleDown}), eng kurven, dann von hinten angreifen.', waves: [{ n: 3, skill: 0.45 }] },
   ausweichen: { tier: 0, name: 'Unter Beschuss', kind: 'survive', survive: 60, desc: 'Vier Wespen jagen dich. Du musst nichts abschießen: 60 Sekunden überleben.',
-    tip: 'Nie lange geradeaus fliegen. Nachbrenner (Shift), Seitwärtsschub (Q/E) und Rollen (A/D) mischen. Schilde laden nach, wenn du nicht getroffen wirst.', waves: [{ n: 4, skill: 0.5 }] },
+    tip: 'Nie lange geradeaus fliegen. Nachbrenner ({k:boost}), Seitwärtsschub ({k:strafeLeft}/{k:strafeRight}) und Rollen ({k:rollLeft}/{k:rollRight}) mischen. Schilde laden nach, wenn du nicht getroffen wirst.', waves: [{ n: 4, skill: 0.5 }] },
   geleit: { tier: 0, name: 'Geleitschutz', kind: 'escort', desc: 'Ein Simulator-Frachter wird von zwei Wellen angegriffen. Er muss durchhalten.',
-    tip: 'Die Wespen zielen auf den Frachter, nicht auf dich. Bleib in seiner Nähe und nimm dir die Angreifer einzeln vor (T schaltet durch).', waves: [{ n: 2, skill: 0.45 }, { n: 3, skill: 0.5 }] },
+    tip: 'Die Wespen zielen auf den Frachter, nicht auf dich. Bleib in seiner Nähe und nimm dir die Angreifer einzeln vor ({k:targetNext} und {k:targetPrev} schalten durch).', waves: [{ n: 2, skill: 0.45 }, { n: 3, skill: 0.5 }] },
   staffel: { tier: 0, name: 'Staffelangriff', kind: 'clear', gold: 130, silver: 210, desc: 'Zwei Wellen Wespen, die zweite besser bewaffnet.',
     tip: 'Mit der Spacewing ohne Upgrades knapp. Energie im Blick behalten: Dauerfeuer leert den Kern und dann fehlt der Nachbrenner.', waves: [{ n: 3, skill: 0.5 }, { n: 4, skill: 0.6, upgrades: { lasers: 2 } }] },
 
   lanzen: { tier: 1, name: 'Lanzen-Duell', kind: 'clear', gold: 90, silver: 160, needs: 'missiles', desc: 'Zwei Abfangjäger vom Typ Lanze. Schnell, wendig, schwer zu treffen.',
     tip: 'Mit Lasern allein ein zähes Ringen. Zwei Raketen pro Lanze entscheiden das Duell.', waves: [{ n: 2, cls: 'lanze', name: 'Sim-Lanze', skill: 0.8, upgrades: { lasers: 2 } }] },
   raketen: { tier: 1, name: 'Raketenstand', kind: 'clear', gold: 50, silver: 90, needs: 'missiles', desc: 'Vier sehr schnelle Drohnen. Für Laser fast zu flink, ideal für Raketen.',
-    tip: 'Ziel im Visier halten, bis „ERFASST“ erscheint, dann F oder rechte Maustaste. Ohne Raketenwerfer: Geduld und Vorhalten.', waves: [{ n: 4, drone: true, fast: true }] },
+    tip: 'Ziel im Visier halten, bis „ERFASST“ erscheint, dann {k:missile} oder rechte Maustaste. Ohne Raketenwerfer: Geduld und Vorhalten.', waves: [{ n: 4, drone: true, fast: true }] },
   schwarm: { tier: 1, name: 'Schwarm', kind: 'clear', gold: 170, silver: 260, desc: 'Drei Wellen mit je vier Wespen. Ausdauer zählt.',
     tip: 'Zwischen den Wellen Abstand gewinnen, damit sich Schild und Energie erholen.', waves: [{ n: 4, skill: 0.5 }, { n: 4, skill: 0.55 }, { n: 4, skill: 0.65, upgrades: { lasers: 1 } }] },
 
@@ -322,7 +322,7 @@ async function simScript(c, game, id) {
     game.endSim(f, result);
   };
   await c.wait(1.5);
-  c.say('Simulator', `Simulation „${S.name}“ startet. Keine echten Schäden, keine Kosten. Abbrechen mit L.`, 'cassini');
+  c.say('Simulator', `Simulation „${S.name}“ startet. Keine echten Schäden, keine Kosten. Abbrechen mit {k:dock}.`, 'cassini');
   if (S.tip) { await c.wait(2); f.hud.say('Ausbilder', S.tip, '#8fd18f', Math.max(6, S.tip.length / 14)); }
   if (S.needs === 'missiles' && p.stats.missiles <= 0) f.hud.showToast('Dein Schiff hat keine Raketen · das wird schwer', 3.5);
 
@@ -410,7 +410,7 @@ async function ambushScript(c, game, n) {
   c.say(wave[0].name, ['Hübsche Fracht hast du da. Wäre schade drum.', 'Schakale grüßen! Ladung abwerfen oder sterben.', 'Halt still, das tut nur kurz weh.'][Math.floor(Math.random() * 3)], 'schakale');
   if (escapable) {
     c.say('Bordcomputer', 'Warnung: Schakale auf Abfangkurs. Die Wespen sind langsamer als unser Nachbrenner. Ausweichen ist möglich.', 'neutral');
-    c.objective('Überfall! Mit dem Nachbrenner entkommen [Shift] oder kämpfen (Prämie und Trümmer)');
+    c.objective('Überfall! Mit dem Nachbrenner entkommen [{k:boost}] oder kämpfen (Prämie und Trümmer)');
   }
   let far = 0, engaged = false;
   const fled = await c.until(dt => {

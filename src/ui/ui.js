@@ -5,6 +5,7 @@ import { generateJobs, acceptJob, abandonJob, jobBlocker, SIM_SCENARIOS, SIM_TIE
 import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
+import { ACTIONS, ACTION, AXES, keysFor, keyLabel, bindKey, resetKeys, withKeys, profileFor, saveProfile, resetProfile, defaultProfile, padLabel, padName } from '../core/bindings.js';
 import { Streaks } from './streaks.js';
 import { ShipPreview } from './shipPreview.js';
 
@@ -18,7 +19,7 @@ const TIPS = [
   'Enceladus schleudert jede Sekunde rund 200 Kilogramm Wasser ins All.',
   'Titan ist der einzige Mond mit einer dichten Atmosphäre. Auf seinen Seen regnet es Methan.',
   'Iapetus hat eine schwarze und eine weiße Seite. Niemand weiß genau, warum.',
-  'Mit T schaltest du das nächste Ziel auf, mit Y das Ziel vor deiner Nase.',
+  'Mit T schaltest du das nächste Ziel auf, mit R das vorherige und mit G das Ziel am Fadenkreuz. Alles frei belegbar im Menü.',
   'Raketen brauchen eine Zielerfassung: Halte das Ziel im Visier, bis der Kreis sich schließt.',
   'Upgrades in der Werft bleiben beim Schiff. Ein verkauftes Schiff nimmt sie mit.',
   'Die Preise hängen von der Politik ab. Achte auf Zoll und Embargo.',
@@ -199,7 +200,7 @@ export class UI {
     const g = this.g;
     const st = STORY[g.story];
     if (!st || g.story === 'ende') return g.flags.endingShown ? '<b>FREIES SPIEL</b><br>Die Geschichte ist erzählt. Das Saturnsystem bleibt offen für Aufträge, Handel und Kopfgelder.' : '';
-    if (g.story === 'prolog') return '<b>PROLOG · DREI NÄCHTE MIETE</b><br>40 Kredits auf dem Konto, kein Schiff. Geh in die Bar und hör dich um.';
+    if (g.story === 'prolog') return '<b>PROLOG · VIERZIG KREDITS</b><br>40 Kredits auf dem Konto, kein Schiff. Geh in die Bar und hör dich um.';
     if (g.story === 'eisfracht' && !g.flags['accepted:eisfracht']) return '<b>EISFRACHT</b><br>Kix meinte, die Alte am Fenstertisch der Bar sucht einen Piloten.';
     if (g.flags['accepted:' + g.story]) return `<b>${esc(st.title.toUpperCase())}</b><br>${esc(st.brief)}${this.jumpNeed(st.zone)}`;
     if (g.story === 'funkstille') return '<b>FUNKSTILLE</b><br>Von Mags fehlt jede Spur. Vielleicht weiß Kix in der Bar mehr.';
@@ -374,7 +375,7 @@ export class UI {
           const next = m < 3 ? Math.round(simReward(S, m + 1) - simReward(S, m)) : 0;
           html += `<div class="card simcard${open ? '' : ' blocked'}"><div class="medals">${medalIcons(m)}</div><h4>${esc(S.name)}</h4>
             <p style="font-size:14px;line-height:1.45">${esc(S.desc)}</p>
-            <p class="tip"><b>Tipp</b> ${esc(S.tip)}</p>
+            <p class="tip"><b>Tipp</b> ${esc(withKeys(S.tip))}</p>
             ${warn ? '<div class="lockline">Empfohlen: Raketenwerfer. Ohne Raketen sehr schwer.</div>' : ''}
             <div class="meta">${goal}${g.simBest?.[id] ? ` · Bestzeit ${g.simBest[id]} s` : ''}</div>
             <div class="row"><span class="warm">${m >= 3 ? '<span class="good">Gold geholt</span>' : `${MEDALS[m + 1]}: +${fmt(next)} Cr`}</span><button class="btn small warm" data-sim="${id}" ${open ? '' : 'disabled'}>Starten</button></div></div>`;
@@ -403,7 +404,7 @@ export class UI {
             ${S.kind === 'escort' ? `<div class="dtile"><label>FRACHTER</label><b>${Math.round((r.ally || 0) * 100)} %</b><span>Gold ab 80 %, Silber ab 50 %</span></div>` : ''}
             <div class="dtile ${reward ? 'good' : ''}"><label>PRÄMIE</label><b>${reward ? '+' + fmt(reward) + ' Cr' : '—'}</b><span>${reward ? 'Ausbildungsfonds der Station' : 'nur für neue Medaillen'}</span></div>
           </div>
-          ${failed || medal < 3 ? `<p class="tip" style="margin-top:12px"><b>Tipp</b> ${esc(S.tip)}</p>` : ''}
+          ${failed || medal < 3 ? `<p class="tip" style="margin-top:12px"><b>Tipp</b> ${esc(withKeys(S.tip))}</p>` : ''}
         </div></div>
         <div class="drow"><button class="btn warm" data-a="again">Nochmal</button><button class="btn" data-a="list">Andere Simulation</button><button class="btn" data-a="ok">Schließen</button></div>`;
       body.querySelector('[data-a="again"]').onclick = () => { this.sfx(); close(); this.game.startSim(x.id, x.shipKey); };
@@ -797,19 +798,148 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ pause & help
-  controlsPanel() {
-    this.panel('Tastenbelegung', 'Tastatur, Maus, Gamepad und Joystick', (body) => {
-      body.innerHTML = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">IM ALL</h4><table class="grid">
-        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['F12', 'Vollbild an/aus'], ['Esc', 'Menü: Speichern, Tastenbelegung, JSON'], ['Gamepad', 'Stick lenken · RT Laser · LT Rakete · A Nachbrenner · LB/RB Schub'], ['Joystick', 'Knüppel lenken · Drehachse rollen · Schubhebel · Abzug Laser']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
-        </table></div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">AUF DER STATION</h4><table class="grid">
-        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild an/aus'], ['Esc', 'Menü: Speichern, Tastenbelegung, JSON'], ['Gamepad', 'Stick gehen/umsehen · A benutzen']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
-        </table><p class="dim" style="margin-top:14px">Maus-Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
-        <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren</label>
-        <p class="dim" style="margin-top:10px">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div></div>`;
-      body.querySelector('[data-sens]').oninput = (e) => { this.game.settings.mouseSens = +e.target.value; this.game.saveSettings(); };
-      body.querySelector('[data-inv]').onchange = (e) => { this.game.settings.invertY = e.target.checked; this.game.saveSettings(); };
-      body.querySelector('[data-vol]').oninput = (e) => { this.game.settings.volume = +e.target.value; this.game.applyVolume(); this.game.saveSettings(); };
-    });
+  /** Controls: rebind keys, configure a joystick / gamepad (live view of axes and buttons), mouse and sound options. */
+  controlsPanel(initialTab = 'tasten') {
+    let tab = initialTab;
+    const H = (t) => `<h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">${t}</h4>`;
+    this.panel('Tastenbelegung', 'Tastatur, Joystick, Gamepad · alle Belegungen frei wählbar', (body, rebuild, close, w) => {
+      w.querySelector('.tabs')?.remove();
+      this.tabs(body, [['tasten', 'Tastatur'], ['joystick', 'Joystick / Gamepad'], ['optionen', 'Maus & Ton']], tab, (k) => { tab = k; rebuild(); });
+      if (tab === 'joystick') return this.padConfig(body, rebuild);
+      if (tab === 'optionen') {
+        body.innerHTML = `<div style="max-width:520px">${H('MAUS')}<p class="dim">Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
+          <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren (Maus und Stick)</label>
+          ${H('<br>TON')}<p class="dim">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div>`;
+        body.querySelector('[data-sens]').oninput = (e) => { this.game.settings.mouseSens = +e.target.value; this.game.saveSettings(); };
+        body.querySelector('[data-inv]').onchange = (e) => { this.game.settings.invertY = e.target.checked; this.game.saveSettings(); };
+        body.querySelector('[data-vol]').oninput = (e) => { this.game.settings.volume = +e.target.value; this.game.applyVolume(); this.game.saveSettings(); };
+        return;
+      }
+      // keyboard: two slots per action, click a slot and press a key
+      const row = (id) => {
+        const ks = keysFor(id);
+        return `<tr><td>${esc(ACTION[id].label)}</td>${[0, 1].map(i => `<td><button class="keycap${ks[i] ? '' : ' empty'}" data-bind="${id}" data-slot="${i}" title="Klicken und neue Taste drücken · Rechtsklick löscht">${ks[i] ? esc(keyLabel(ks[i])) : '+'}</button></td>`).join('')}</tr>`;
+      };
+      const group = (ctx) => ACTIONS.filter(a => a[2] === ctx).map(a => row(a[0])).join('');
+      body.innerHTML = `<div class="split keys"><div>${H('IM ALL')}<table class="grid kb">${group('flug')}</table></div>
+        <div>${H('AUF DER STATION')}<table class="grid kb">${group('station')}${group('beide')}</table>
+        ${H('<br>FEST')}<table class="grid kb fixed">${[['Maus', 'Lenken / Umsehen · links Laser · rechts Rakete'], ['Mausrad', 'Schub'], ['1–4', 'Schubstufen 25–100 %'], ['F12', 'Vollbild an/aus'], ['Esc', 'Menü'], ['1–4', 'Antwort im Gespräch'], ['Leertaste / E', 'Gespräch weiter']].map(([k, v]) => `<tr><td>${v}</td><td><span class="keycap static">${k}</span></td></tr>`).join('')}</table>
+        <div class="drow" style="justify-content:flex-start"><button class="btn small" data-reset>Standardbelegung</button></div>
+        <p class="dim" style="font-size:13px;line-height:1.5">Tasten werden nach ihrer Position auf der Tastatur gespeichert. Angezeigt wird die Beschriftung deines Layouts (auf deutschen Tastaturen sind Y und Z vertauscht).</p></div></div>`;
+      body.querySelectorAll('[data-bind]').forEach(btn => {
+        btn.onclick = () => {
+          if (this.capture) return;
+          btn.textContent = 'Taste …'; btn.classList.add('wait');
+          input.enabled = false;
+          const done = (code) => {
+            removeEventListener('keydown', onKey, true); this.capture = null; input.enabled = true;
+            if (code) { const stolen = bindKey(btn.dataset.bind, +btn.dataset.slot, code); if (stolen.length) this.notify(`${esc(keyLabel(code))} war belegt mit: ${esc(stolen.join(', '))} (dort entfernt)`); this.sfx('blip'); }
+            rebuild();
+          };
+          const onKey = (e) => {
+            e.preventDefault(); e.stopImmediatePropagation();
+            if (e.code === 'Escape') return done(null);
+            if (e.code === 'F12') return;
+            done(e.code);
+          };
+          this.capture = onKey;
+          addEventListener('keydown', onKey, true);
+        };
+        btn.oncontextmenu = (e) => { e.preventDefault(); bindKey(btn.dataset.bind, +btn.dataset.slot, null); this.sfx(); rebuild(); };
+      });
+      body.querySelector('[data-reset]').onclick = () => { resetKeys(); this.sfx(); rebuild(); };
+    }, { onClose: () => { if (this.capture) { removeEventListener('keydown', this.capture, true); this.capture = null; input.enabled = true; } } });
+  }
+
+  /** Joystick / gamepad tab: device, live axes and buttons, flight axes and button bindings. */
+  padConfig(body, rebuild) {
+    const pads = input.gamepads();
+    if (!pads.length) {
+      body.innerHTML = `<div class="padnone"><b>Kein Joystick oder Gamepad erkannt.</b><p>Gerät anschließen und einmal einen Knopf drücken: Browser melden Joysticks erst nach dem ersten Tastendruck. Diese Seite aktualisiert sich dann von selbst.</p>
+        <p class="dim">Unterstützt werden alle Geräte, die der Browser als Gamepad meldet: Xbox- und PlayStation-Controller, Flugsticks wie Thrustmaster TCA Sidestick, T.16000M oder Logitech Extreme 3D.</p></div>`;
+      const wait = () => { if (!body.isConnected) return; if (input.gamepads().length) rebuild(); else requestAnimationFrame(wait); };
+      requestAnimationFrame(wait);
+      return;
+    }
+    let gp = pads.find(p => p.id === this.padSel) || pads.find(p => p.id === input.lastPadId) || pads[0];
+    this.padSel = gp.id;
+    const prof = JSON.parse(JSON.stringify(profileFor(gp)));
+    const commit = () => { saveProfile(gp, prof); };
+    const nA = gp.axes.length, nB = gp.buttons.length;
+    const HAT = ['oben', 'oben rechts', 'rechts', 'unten rechts', 'unten', 'unten links', 'links', 'oben links'];
+    const flightAxes = () => new Set(Object.values(prof.axes || {}).filter(Boolean).map(A => A.i));
+    const padActs = ACTIONS.filter(a => !['pitchDown', 'pitchUp', 'yawLeft', 'yawRight', 'walkFwd', 'walkBack', 'walkLeft', 'walkRight'].includes(a[0]));
+    body.innerHTML = `<div class="padcfg">
+      <div class="padhead">${pads.length > 1 ? `<select data-dev>${pads.map(p => `<option value="${esc(p.id)}" ${p === gp ? 'selected' : ''}>${esc(padName(p.id))}</option>`).join('')}</select>` : ''}
+        <div><b>${esc(padName(gp.id))}</b><span class="dim"> · ${gp.mapping === 'standard' ? 'Gamepad (Standardbelegung)' : 'Joystick'} · ${nA} Achsen · ${nB} Knöpfe</span></div>
+        <button class="btn small" data-reset>Standard für dieses Gerät</button></div>
+      <div class="split"><div>
+        <h4>ACHSEN <span class="dim">live</span></h4><div class="axmon">${gp.axes.map((_, i) => `<div class="ax" data-ax="${i}"><label>${i + 1}</label><div class="tr"><i></i></div><span></span></div>`).join('')}</div>
+        <h4>KNÖPFE <span class="dim">live</span></h4><div class="btmon">${gp.buttons.map((_, i) => `<i data-bt="${i}">${i + 1}</i>`).join('')}</div>
+        <h4>FLUGACHSEN</h4><table class="grid kb">${AXES.map(([k, l]) => { const A = prof.axes?.[k]; return `<tr><td>${l}</td>
+          <td><select data-axis="${k}"><option value="">keine</option>${gp.axes.map((_, i) => `<option value="${i}" ${A && A.i === i ? 'selected' : ''}>Achse ${i + 1}</option>`).join('')}</select></td>
+          <td><label class="dim"><input type="checkbox" data-inv="${k}" ${A?.inv ? 'checked' : ''}> umkehren</label></td>
+          <td><button class="btn small" data-learn="${k}">bewegen…</button></td></tr>`; }).join('')}</table>
+        <p class="dim" style="margin:8px 0 2px">Totzone</p><input type="range" min="0" max="0.3" step="0.01" value="${prof.deadzone ?? (gp.mapping === 'standard' ? 0.12 : 0.06)}" data-dz style="width:100%">
+        <p class="dim" style="font-size:13px;line-height:1.5">Ein Schubhebel zählt erst, wenn er einmal bewegt wurde. Die Tastatur-Schubtasten bleiben nutzbar, bis der Hebel sich wieder bewegt.</p>
+      </div><div>
+        <h4>KNÖPFE BELEGEN</h4><table class="grid kb padacts">${padActs.map(a => `<tr><td>${esc(a[1])}</td><td class="chips">${(prof.buttons?.[a[0]] || []).map(bd => `<span class="keycap static">${esc(padLabel(bd))}</span>`).join('')}</td>
+          <td class="num nowrap"><button class="mini" data-pb="${a[0]}" title="Klicken, dann Knopf oder Coolie-Hat am Gerät drücken">+ Knopf</button>${(prof.buttons?.[a[0]] || []).length ? `<button class="mini" data-pclr="${a[0]}" title="Belegung löschen">✕</button>` : ''}</td></tr>`).join('')}</table>
+      </div></div></div>`;
+    body.querySelector('[data-dev]')?.addEventListener('change', (e) => { this.padSel = e.target.value; rebuild(); });
+    body.querySelector('[data-reset]').onclick = () => { resetProfile(gp); this.sfx(); rebuild(); };
+    body.querySelectorAll('[data-axis]').forEach(sel => sel.onchange = () => { prof.axes ||= {}; prof.axes[sel.dataset.axis] = sel.value === '' ? null : { i: +sel.value, inv: !!prof.axes[sel.dataset.axis]?.inv }; commit(); rebuild(); });
+    body.querySelectorAll('[data-inv]').forEach(cb => cb.onchange = () => { const A = prof.axes?.[cb.dataset.inv]; if (A) { A.inv = cb.checked; commit(); } });
+    body.querySelector('[data-dz]').oninput = (e) => { prof.deadzone = +e.target.value; commit(); };
+    body.querySelectorAll('[data-pclr]').forEach(b => b.onclick = () => { delete prof.buttons[b.dataset.pclr]; commit(); this.sfx(); rebuild(); });
+    // learning: the next axis / button that moves is taken
+    let learn = null;
+    const startLearn = (btn, kind, key) => {
+      const g0 = input.gamepads().find(p => p.id === gp.id) || gp;
+      learn = { kind, key, rest: g0.axes.slice(), pressed: g0.buttons.map(b => b.pressed), btn };
+      btn.textContent = kind === 'axis' ? 'jetzt bewegen…' : 'drücken…'; btn.classList.add('wait');
+    };
+    body.querySelectorAll('[data-learn]').forEach(b => b.onclick = () => startLearn(b, 'axis', b.dataset.learn));
+    body.querySelectorAll('[data-pb]').forEach(b => b.onclick = () => startLearn(b, 'button', b.dataset.pb));
+    const axEls = [...body.querySelectorAll('[data-ax]')], btEls = [...body.querySelectorAll('[data-bt]')];
+    const tick = () => {
+      if (!body.isConnected) return;
+      const g = input.gamepads().find(p => p.id === gp.id);
+      if (!g) { rebuild(); return; }
+      const used = flightAxes();
+      g.axes.forEach((v, i) => {
+        const e = axEls[i]; if (!e) return;
+        const hat = Math.abs(v) > 1.05 || (learn && Math.abs(learn.rest[i]) > 1.05);
+        e.querySelector('i').style.cssText = hat ? `left:${Math.abs(v) > 1.05 ? 50 : (v + 1) * 50}%;width:4px` : `left:${Math.min(50, (v + 1) * 50)}%;width:${Math.abs(v) * 50}%`;
+        e.querySelector('span').textContent = Math.abs(v) > 1.05 ? 'Hat ·' : v.toFixed(2);
+        e.classList.toggle('used', used.has(i));
+      });
+      g.buttons.forEach((b, i) => btEls[i]?.classList.toggle('on', b.pressed));
+      if (learn) {
+        if (learn.kind === 'axis') {
+          let bi = -1, bd = 0.5;
+          g.axes.forEach((v, i) => { if (Math.abs(learn.rest[i]) > 1.05) return; const d = Math.abs(v - learn.rest[i]); if (d > bd) { bd = d; bi = i; } });
+          if (bi >= 0) { prof.axes ||= {}; prof.axes[learn.key] = { i: bi, inv: !!prof.axes[learn.key]?.inv }; commit(); learn = null; this.sfx('blip'); rebuild(); return; }
+        } else {
+          let bd = null;
+          const bi = g.buttons.findIndex((b, i) => b.pressed && !learn.pressed[i]);
+          if (bi >= 0) bd = { b: bi };
+          else g.axes.forEach((v, i) => {
+            if (bd || used.has(i)) return;
+            const r = learn.rest[i];
+            if (Math.abs(r) > 1.05 && Math.abs(v) <= 1.05) { const k = Math.round((v + 1) * 3.5); bd = { a: i, v: -1 + k * 2 / 7, hat: HAT[(k + 8) % 8] }; }   // POV hat (Chrome reports it on one axis)
+            else if (Math.abs(r) <= 1.05 && Math.abs(v - r) > 0.7) bd = { a: i, v: Math.sign(v - r) };
+          });
+          if (bd) {
+            const list = prof.buttons[learn.key] ||= [];
+            if (!list.some(x => JSON.stringify(x) === JSON.stringify(bd))) list.push(bd);
+            commit(); learn = null; this.sfx('blip'); rebuild(); return;
+          }
+        }
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   pause() {
