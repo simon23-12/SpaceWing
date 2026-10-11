@@ -220,6 +220,36 @@
   "radio": false
  },
  {
+  "speaker": "dome_saturn",
+  "text": "Schau nach oben. Daran gewöhnt man sich nie.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Saturn würde in einer Badewanne schwimmen. Wirklich.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Siehst du die dunkle Lücke im Ring? Das ist die Cassini-Teilung.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Alle starren auf Saturn. Dabei liegt das Beste direkt unter uns.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Minus hundertsiebzig Grad da unten. An guten Tagen.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Inktomi. Das sauberste Eis im ganzen System.",
+  "radio": false
+ },
+ {
   "speaker": "mags",
   "text": "Du bist von Hallström, oder? Die Firma, die pleitegegangen ist. Setz dich.",
   "radio": false
@@ -351,7 +381,7 @@
  },
  {
   "speaker": "kix",
-  "text": "Neu hier? Du siehst aus wie jemand mit vierzig Kredits und drei Nächten Kabinenmiete.",
+  "text": "Neu hier? Du siehst aus wie jemand mit vierzig Kredits und einem leeren Kühlschrank.",
   "radio": false
  },
  {
@@ -471,7 +501,7 @@
  },
  {
   "speaker": "haendler",
-  "text": "Kabine 4-117 kannst du hier am Terminal in deiner Kabine kaufen. Dann ist auch Schluss mit der Miete.",
+  "text": "Kabine 4-117 gehört dir ja schon. Ein zweites Apartment kaufst du am Terminal in deiner Kabine oder direkt auf der anderen Station.",
   "radio": false
  },
  {
@@ -712,6 +742,101 @@
  {
   "speaker": "crew_e",
   "text": "Ich bin für meinen Feierabend. Aber unter uns: Ein Zoll ohne Rückhalt ist nur eine Einladung für Schmuggler.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Henrike Albers, Planetologin. Ich erkläre Besuchern, was sie da draußen sehen. Und am liebsten erkläre ich Saturn.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Fünfundneunzig Erdmassen, und trotzdem leichter als Wasser. Hätte man eine Badewanne, die groß genug ist, würde Saturn darin schwimmen.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Er besteht fast nur aus Wasserstoff und Helium. Festen Boden gibt es nicht. Wer hineinfliegt, sinkt immer tiefer, bis der Druck ihn zerquetscht.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Fast nur aus Wassereis. Brocken so klein wie Staubkörner und so groß wie Häuser. Von Rand zu Rand fast dreihunderttausend Kilometer, aber meist nur zehn bis hundert Meter dick.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Die dunkle Lücke ist die Cassini-Teilung, fast fünftausend Kilometer breit. Die Bar unten hat ihren Namen von ihr.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Und die Ringe vergehen. Das Eis regnet langsam auf Saturn herab. In ein paar hundert Millionen Jahren ist nichts mehr übrig. Wir sind genau zur richtigen Zeit hier.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Ein Sturm mit sechs geraden Seiten, jede länger als der Durchmesser der Erde. Er dreht sich seit Jahrhunderten, und so richtig verstanden hat ihn bis heute niemand.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Die Winde dort schaffen fast zweitausend Kilometer pro Stunde. Gegen Saturn ist jeder Orkan eine laue Brise.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Gut zehneinhalb Stunden. Er dreht sich so schnell, dass er an den Polen abgeplattet ist. Schau genau hin, er ist kein runder Ball.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_saturn",
+  "text": "Ein Saturnjahr dagegen dauert fast dreißig Erdjahre. Wer hier geboren wird, feiert seinen ersten Saturngeburtstag als Erwachsener.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Tarek Ohanian, Eisgeologe. Alle starren auf Saturn. Ich schaue lieber nach unten, auf Rhea. Da verdiene ich mein Geld.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Der zweitgrößte Mond des Saturn, gut fünfzehnhundert Kilometer Durchmesser. Ein Klumpen aus Wassereis mit etwas Gestein darin, bei dieser Kälte hart wie Granit.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Am Tag minus hundertsiebzig Grad, nachts noch viel kälter. Das Eis da unten bricht man nicht, man sprengt es.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Ein Krater, achtundvierzig Kilometer breit und für Rhea blutjung. Der Einschlag hat frisches, helles Eis in langen Strahlen über die Oberfläche geworfen.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Frisches Eis ist sauberes Eis. Deshalb steht dort unser Bergbauposten. Ein guter Teil des Wassers auf dieser Station kommt von da.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Zum Atmen nicht, aber da ist etwas. Eine hauchdünne Hülle aus Sauerstoff und Kohlendioxid. Die alte Cassini-Sonde hat sie schon im Jahr zweitausendzehn gemessen.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Die Schwerkraft ist ein Witz, keine drei Prozent der Erde. Wer da unten kräftig abspringt, ist über zwanzig Sekunden in der Luft.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Giovanni Cassini hat Rhea entdeckt, im Jahr sechzehnhundertzweiundsiebzig, mit einem Fernrohr, über das heute jedes Kind lachen würde. Die Lücke im Ring hat er auch gefunden.",
+  "radio": false
+ },
+ {
+  "speaker": "dome_rhea",
+  "text": "Rhea zeigt Saturn immer dieselbe Seite. Wer auf der richtigen Hälfte steht, hat ihn ein Leben lang über sich, fünfundzwanzigmal so groß wie der Mond am Himmel der Erde.",
   "radio": false
  },
  {
@@ -1036,7 +1161,7 @@
  },
  {
   "speaker": "Bordcomputer",
-  "text": "Schwaches Transpondersignal empfangen: SANKT ROSTIG. Keine Triebwerksaktivität.",
+  "text": "Schwaches Transpondersignal empfangen: EISVOGEL. Keine Triebwerksaktivität.",
   "radio": true
  },
  {
@@ -1385,11 +1510,6 @@
   "radio": false
  },
  {
-  "speaker": "Simulator",
-  "text": "Simulation abgeschlossen. Beende die Übung.",
-  "radio": true
- },
- {
   "speaker": "Söldnerbörse",
   "text": "Abschüsse bestätigt. Die Prämie wird beim nächsten Andocken ausgezahlt.",
   "radio": true
@@ -1436,12 +1556,12 @@
  },
  {
   "speaker": "comp",
-  "text": "Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, gemietet, aber mit Fenster zum Saturn.",
+  "text": "Hochstation Cassini, Rhea-Orbit. 2260. Kabine 4-117: klein, abbezahlt und mit Fenster zum Saturn.",
   "radio": false
  },
  {
   "speaker": "comp",
-  "text": "Guten Morgen, {name}. Kontostand: 40 Kredits. Bezahlte Miete: noch drei Nächte. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.",
+  "text": "Guten Morgen, {name}. Kontostand: 40 Kredits. Die Kabine gehört dir, sonst nicht viel. Arbeitgeber: Hallström Logistik, insolvent seit dem Zollbeschluss der Liga.",
   "radio": false
  },
  {
