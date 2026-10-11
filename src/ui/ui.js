@@ -1,7 +1,7 @@
 import { assets } from '../core/assets.js';
 import { SHIP_CLASSES, UPGRADES, MAX_UPGRADE, maxLevel, upgradePrice, PAINTS, PAINT_PRICE, shipStats, COMMODITIES, STATIONS, FACTIONS, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from '../game/data.js';
-import { activeShip, cargoUsed, cargoFree, addCredits, fmt, rank, price, availableAt, logEntry, addShip } from '../game/state.js';
-import { generateJobs, acceptJob, abandonJob, SIM_SCENARIOS } from '../game/missions.js';
+import { state, activeShip, cargoUsed, cargoFree, addCredits, fmt, rank, price, availableAt, logEntry, addShip } from '../game/state.js';
+import { generateJobs, acceptJob, abandonJob, jobBlocker, SIM_SCENARIOS, SIM_TIERS, MEDALS, simReward } from '../game/missions.js';
 import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
@@ -59,6 +59,7 @@ export class UI {
       <div class="menu">
         ${hasSave ? '<button class="btn warm" data-a="cont">Fortsetzen</button>' : ''}
         <button class="btn" data-a="new">Neues Spiel</button>
+        <button class="btn" data-a="load">Spielstand laden (JSON)</button>
         <button class="btn" data-a="help">Steuerung</button>
       </div>
       <div class="credit">Von Simon</div>
@@ -94,6 +95,7 @@ export class UI {
     };
     const c = el.querySelector('[data-a="cont"]'); if (c) c.onclick = () => { this.sfx(); streaks.dispose(); onContinue(); };
     el.querySelector('[data-a="help"]').onclick = () => { this.sfx(); this.controlsPanel(); };
+    el.querySelector('[data-a="load"]').onclick = () => { this.sfx(); this.importSave(); };
     this.root.appendChild(el);
     this.titleEl = el;
     return el;
@@ -207,8 +209,8 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ modal panel scaffold
-  panel(title, sub, build, { onClose, wide } = {}) {
-    const wrap = $(`<div class="modal"><div class="panel"><header><h3>${title}</h3><div class="sub">${sub || ''}</div><div class="x">✕</div></header><div class="body"></div></div></div>`);
+  panel(title, sub, build, { onClose, wide, narrow } = {}) {
+    const wrap = $(`<div class="modal"><div class="panel${narrow ? ' narrow' : ''}"><header><h3>${title}</h3><div class="sub">${sub || ''}</div><div class="x">✕</div></header><div class="body"></div></div></div>`);
     const body = wrap.querySelector('.body');
     const close = () => { wrap.remove(); this.modalStack = this.modalStack.filter(m => m !== wrap); onClose && onClose(); this.game.onModalClosed?.(); };
     wrap.querySelector('.x').onclick = () => { this.sfx(); close(); };
@@ -242,16 +244,20 @@ export class UI {
       const st = STORY[g.story];
       let html = '<div class="cards">';
       if (st && st.available && st.available(g) && !g.flags['accepted:' + g.story] && st.giver !== 'kix' && st.giver !== 'juno') {
-        html += `<div class="card story"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p>${this.jumpNeed(st.zone)}<div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1">Annehmen</button></div></div>`;
+        const need = this.jumpNeed(st.zone);
+        html += `<div class="card story${need ? ' blocked' : ''}"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p>${need}<div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1" ${need ? 'disabled' : ''}>Annehmen</button></div></div>`;
       }
       if (g.story === 'kassini' && !g.flags.ending && g.flags['done:schakalnest']) {
         html += `<div class="card story"><div class="meta">STORY</div><h4>Die Kassini-Teilung</h4><p>Mags und Juno warten in der Bar auf deine Entscheidung.</p></div>`;
       }
-      for (const j of jobs) {
-        html += `<div class="card"><div class="meta">${j.kind === 'fracht' ? 'FRACHTAUFTRAG' : j.kind === 'kopfgeld' ? 'KOPFGELD' : 'ESKORTE'} · ${esc(j.client)}</div>
+      // jobs the active ship cannot fly yet (jump class, locked moon, cargo space) stay visible but greyed out, at the end
+      const listed = jobs.map(j => ({ j, block: jobBlocker(g, j) })).sort((a, b) => !!a.block - !!b.block);
+      for (const { j, block } of listed) {
+        html += `<div class="card${block ? ' blocked' : ''}"><div class="meta">${j.kind === 'fracht' ? 'FRACHTAUFTRAG' : j.kind === 'kopfgeld' ? 'KOPFGELD' : 'ESKORTE'} · ${esc(j.client)}</div>
           <h4>${esc(j.title)}</h4><p>${esc(j.text)}</p>
           ${j.kind === 'fracht' ? `<div class="meta">Ziel: ${STATIONS[j.to].name} · Reise ${travelInfo(STATIONS[station].zone, STATIONS[j.to].zone).hours.toFixed(1)} h${j.risk ? ' · <span class="bad">Risiko ' + '▲'.repeat(j.risk) + '</span>' : ''}</div>` : ''}
-          <div class="row"><span class="warm">${fmt(j.pay)} Cr</span><button class="btn small" data-job="${j.id}">Annehmen</button></div></div>`;
+          ${block ? `<div class="lockline">🔒 ${esc(block)}</div>` : ''}
+          <div class="row"><span class="warm">${fmt(j.pay)} Cr</span><button class="btn small" data-job="${j.id}" ${block ? 'disabled' : ''}>Annehmen</button></div></div>`;
       }
       html += '</div>';
       if (g.jobs.length) {
@@ -340,18 +346,100 @@ export class UI {
     }, { wide: true, onClose: () => this.disposePreview() });
   }
 
-  /** Combat simulator on the Kommandodeck. */
+  /** Combat simulator on the Kommandodeck: pick a ship, then a scenario; medals per scenario. */
   openSim() {
     const g = this.g;
-    return this.panel('Gefechtssimulator', 'Kommandodeck · Übungsflüge mit deinem eigenen Schiff, ohne echten Schaden', (body) => {
-      body.innerHTML = '<div class="cards">' + Object.entries(SIM_SCENARIOS).map(([id, S], i) => `<div class="card simcard"><h4>${i + 1}. ${esc(S.name)}</h4>
-        <p style="font-size:14px;line-height:1.45">${esc(S.desc)}</p>
-        <div class="row"><span class="dim">${g.simBest?.[id] ? 'Bestzeit ' + g.simBest[id] + ' s' : 'noch nicht geflogen'}</span><button class="btn small warm" data-sim="${id}">Starten</button></div></div>`).join('') + '</div>';
-      body.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { this.sfx(); this.closeTop(); this.game.startSim(b.dataset.sim); });
+    const medalIcons = (m) => [1, 2, 3].map(k => `<i class="medal m${k}${m >= k ? '' : ' off'}" title="${MEDALS[k]}"></i>`).join('');
+    return this.panel('Gefechtssimulator', 'Kommandodeck · Übungsflüge ohne echten Schaden · Medaillen bringen einmalig Kredits', (body, rebuild) => {
+      const ships = this.game.simShips();
+      const sel = ships.find(s => s.key === g.simShip) || ships.find(s => s.key === g.activeShip) || ships[0];
+      if (!sel) { body.innerHTML = '<p class="dim">Ohne eigenes Schiff gibt es keine Simulation.</p>'; return; }
+      const st = shipStats(sel.rec), missiles = st.missiles;
+      const total = Object.keys(SIM_SCENARIOS).length, golds = Object.values(g.simMedals || {}).filter(m => m === 3).length;
+      let html = `<div class="simtop"><div><div class="sl">SCHIFF FÜR DIE SIMULATION</div><div class="simships">${ships.map(s => {
+        const ss = shipStats(s.rec);
+        return `<div class="simship${s === sel ? ' on' : ''}" data-ship="${s.key}"><b>${esc(s.own ? s.rec.name : 'Probeflug')}</b><span>${esc(SHIP_CLASSES[s.rec.cls].name)}${s.own ? '' : ' · Werkszustand'}</span><span>${Math.round(ss.laserDmg * ss.laserRate)} DPS · ${ss.missiles ? ss.missiles + ' Raketen' : '<em>keine Raketen</em>'}</span></div>`;
+      }).join('')}</div></div>
+        <div class="simsum"><div class="sl">MEDAILLEN</div><b>${golds}</b> / ${total} Gold</div></div>
+        <div class="simhint">${missiles ? `Die ${esc(sel.rec.name)} hat ${missiles} Raketen an Bord. Im Simulator sind die Schächte immer voll.`
+          : `<b>Keine Raketen.</b> Mit ${sel.own && sel.rec.cls === 'spacewing' ? 'der alten Spacewing' : 'diesem Schiff'} ist am Anfang wenig zu holen: Die Grundausbildung ist machbar, alles darüber wird zäh. Bei Yara Laser und Schild aufrüsten und einen Raketenwerfer einbauen, dann wird es deutlich leichter.`}</div>`;
+      SIM_TIERS.forEach((T, ti) => {
+        const list = Object.entries(SIM_SCENARIOS).filter(([, S]) => S.tier === ti);
+        const open = MOONS[T.moon].unlock(g);
+        html += `<div class="simtier${open ? '' : ' locked'}"><h4>${esc(T.name)} <span>${esc(T.sub)}</span></h4>${open ? '' : `<div class="lockline">🔒 Wird mit dem Mondsystem ${MOONS[T.moon].name} freigeschaltet · ${esc(MOONS[T.moon].why)}</div>`}<div class="cards">`;
+        for (const [id, S] of list) {
+          const m = g.simMedals?.[id] || 0;
+          const warn = S.needs === 'missiles' && !missiles;
+          const goal = S.kind === 'survive' ? `Gold: ≥ 70 % Rumpf übrig` : S.kind === 'escort' ? 'Gold: Frachter ≥ 80 % heil' : `Gold ≤ ${S.gold} s · Silber ≤ ${S.silver} s`;
+          const next = m < 3 ? Math.round(simReward(S, m + 1) - simReward(S, m)) : 0;
+          html += `<div class="card simcard${open ? '' : ' blocked'}"><div class="medals">${medalIcons(m)}</div><h4>${esc(S.name)}</h4>
+            <p style="font-size:14px;line-height:1.45">${esc(S.desc)}</p>
+            <p class="tip"><b>Tipp</b> ${esc(S.tip)}</p>
+            ${warn ? '<div class="lockline">Empfohlen: Raketenwerfer. Ohne Raketen sehr schwer.</div>' : ''}
+            <div class="meta">${goal}${g.simBest?.[id] ? ` · Bestzeit ${g.simBest[id]} s` : ''}</div>
+            <div class="row"><span class="warm">${m >= 3 ? '<span class="good">Gold geholt</span>' : `${MEDALS[m + 1]}: +${fmt(next)} Cr`}</span><button class="btn small warm" data-sim="${id}" ${open ? '' : 'disabled'}>Starten</button></div></div>`;
+        }
+        html += '</div></div>';
+      });
+      body.innerHTML = html;
+      body.querySelectorAll('[data-ship]').forEach(d => d.onclick = () => { g.simShip = d.dataset.ship; this.sfx('blip'); rebuild(); });
+      body.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => { this.sfx(); this.closeTop(); this.game.startSim(b.dataset.sim, sel.key); });
+    }, { wide: true });
+  }
+
+  /** Result screen after a simulator run. */
+  simReport(x) {
+    const { S, r, medal, before, reward } = x;
+    const failed = !r.won;
+    this.panel('Simulation beendet', `${esc(S.name)} · ${esc(x.shipName || '')}`, (body, rebuild, close) => {
+      const line = failed ? (x.aborted ? 'Abgebrochen.' : S.kind === 'escort' && r.ally === 0 ? 'Der Frachter wurde zerstört.' : 'Abgeschossen. Im Ernstfall wäre das teuer geworden.')
+        : medal > before ? `Neue Medaille: <b class="mtxt m${medal}">${MEDALS[medal]}</b>` : `${MEDALS[medal]} erreicht (Bestwert: ${MEDALS[before]})`;
+      body.innerHTML = `<div class="simres">
+        <div class="bigmedal ${failed ? 'fail' : 'm' + medal}"><span>${failed ? '✕' : MEDALS[medal].toUpperCase()}</span></div>
+        <div><div class="line">${line}</div>
+          <div class="debrief" style="margin-top:12px">
+            <div class="dtile"><label>ZEIT</label><b>${r.sec} s</b><span>${S.kind === 'clear' && !failed ? `Gold ≤ ${S.gold} s · Silber ≤ ${S.silver} s${x.newBest ? ' · neue Bestzeit' : ''}` : S.kind === 'survive' ? `Ziel: ${S.survive} s` : ''}</span></div>
+            <div class="dtile"><label>RUMPF</label><b>${Math.round((r.hull || 0) * 100)} %</b><span>${S.kind === 'survive' ? 'Gold ab 70 %, Silber ab 35 %' : ''}</span></div>
+            ${S.kind === 'escort' ? `<div class="dtile"><label>FRACHTER</label><b>${Math.round((r.ally || 0) * 100)} %</b><span>Gold ab 80 %, Silber ab 50 %</span></div>` : ''}
+            <div class="dtile ${reward ? 'good' : ''}"><label>PRÄMIE</label><b>${reward ? '+' + fmt(reward) + ' Cr' : '—'}</b><span>${reward ? 'Ausbildungsfonds der Station' : 'nur für neue Medaillen'}</span></div>
+          </div>
+          ${failed || medal < 3 ? `<p class="tip" style="margin-top:12px"><b>Tipp</b> ${esc(S.tip)}</p>` : ''}
+        </div></div>
+        <div class="drow"><button class="btn warm" data-a="again">Nochmal</button><button class="btn" data-a="list">Andere Simulation</button><button class="btn" data-a="ok">Schließen</button></div>`;
+      body.querySelector('[data-a="again"]').onclick = () => { this.sfx(); close(); this.game.startSim(x.id, x.shipKey); };
+      body.querySelector('[data-a="list"]').onclick = () => { this.sfx(); close(); this.openSim(); };
+      body.querySelector('[data-a="ok"]').onclick = () => { this.sfx(); close(); };
     });
+    this.sfx(medal > before ? 'coins' : 'blip');
   }
 
   disposePreview() { this.pv?.dispose(); this.pv = null; this.pvWrap = null; }
+
+  // ------------------------------------------------------------------ flight report after docking
+  debrief(r) {
+    const g = this.g, mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    const tile = (label, value, sub = '', cls = '') => `<div class="dtile ${cls}"><label>${label}</label><b>${value}</b><span>${sub}</span></div>`;
+    const salvPrice = price(g, r.station, 'schrott', 'sell');
+    this.panel('Flugbericht', `${esc(STATIONS[r.from]?.name || '')} → ${esc(STATIONS[r.station].name)}${r.ship?.name ? ' · ' + esc(r.ship.name) : ''}`, (body, rebuild, close) => {
+      const net = r.ship?.cargo?.schrott || 0;
+      const dmg = r.hull0 != null ? Math.max(0, Math.round((r.hull0 - r.hull1) * 100)) : null;
+      body.innerHTML = `<div class="debrief">
+        ${tile('MISSIONSZEIT', mmss(r.time), r.jumps ? `${r.jumps} Hyperraumsprung${r.jumps > 1 ? 'e' : ''}` : 'Flugzeit im Cockpit')}
+        ${tile('VERDIENT', (r.earned > 0 ? '+' : '') + fmt(r.earned) + ' Cr', `Kontostand ${r.net >= 0 ? '+' : '−'}${fmt(Math.abs(r.net))} Cr (inkl. Treibstoff)`, r.earned > 0 ? 'good' : '')}
+        ${tile('TRÜMMER', `${r.salvage} t`, net ? `im Netz: ${net} t · ≈ ${fmt(net * salvPrice)} Cr hier` : r.salvage ? 'verkauft' : 'keine eingesammelt', r.salvage ? 'amber' : '')}
+        ${tile('ABSCHÜSSE', r.kills, r.kills ? 'bestätigt' : '—')}
+        ${dmg != null ? tile('SCHADEN', dmg ? `−${dmg} %` : 'keiner', dmg ? `Rumpf ${Math.round(r.hull1 * 100)} % · Reparatur ≈ ${fmt(r.repair)} Cr` : `Rumpf ${Math.round(r.hull1 * 100)} %`, dmg > 25 ? 'bad' : dmg ? 'warn' : 'good') : tile('SCHIFF', 'geliehen', 'Schäden zahlt der Eigner')}
+        ${tile('KONTO', fmt(g.credits) + ' Cr', '')}
+      </div>
+      <div class="drow">${net ? `<button class="btn warm" data-sell>Schrott verkaufen · +${fmt(net * salvPrice)} Cr</button>` : ''}<button class="btn" data-ok>Weiter</button></div>`;
+      body.querySelector('[data-sell]')?.addEventListener('click', () => {
+        const n = r.ship.cargo.schrott || 0; delete r.ship.cargo.schrott;
+        addCredits(g, n * salvPrice, `${n} t Bergungsschrott verkauft`); this.sfx('coins'); this.game.save(); rebuild();
+      });
+      body.querySelector('[data-ok]').onclick = () => { this.sfx(); close(); };
+    });
+    this.sfx('blip');
+  }
 
   /** Before/after numbers for a mod, shown next to the 3D preview. */
   modDiff(ship, k) {
@@ -710,11 +798,11 @@ export class UI {
 
   // ------------------------------------------------------------------ pause & help
   controlsPanel() {
-    this.panel('Steuerung', '', (body) => {
+    this.panel('Tastenbelegung', 'Tastatur, Maus, Gamepad und Joystick', (body) => {
       body.innerHTML = `<div class="split"><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">IM ALL</h4><table class="grid">
-        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['Esc', 'Pause'], ['Gamepad', 'Stick lenken · RT Laser · LT Rakete · A Nachbrenner · LB/RB Schub'], ['Joystick', 'Knüppel lenken · Drehachse rollen · Schubhebel · Abzug Laser']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['Maus', 'Virtueller Steuerknüppel (Nicken/Gieren)'], ['W / S', 'Schub erhöhen / verringern (1–4: Stufen, X: Stopp)'], ['A / D', 'Rollen'], ['Q / E · R / V', 'Seitwärts · hoch/runter'], ['Shift', 'Nachbrenner'], ['Linke Maus / Leertaste', 'Laser'], ['Rechte Maus / F', 'Rakete (nach Zielerfassung)'], ['T / Y', 'Nächstes Ziel / Ziel voraus'], ['C', 'Cockpit / Verfolgerkamera'], ['Z', 'Flughilfe an/aus'], ['L', 'Andocken anfragen'], ['M', 'Systemkarte: Hyperraumsprung / Fusionsbrand'], ['F12', 'Vollbild an/aus'], ['Esc', 'Menü: Speichern, Tastenbelegung, JSON'], ['Gamepad', 'Stick lenken · RT Laser · LT Rakete · A Nachbrenner · LB/RB Schub'], ['Joystick', 'Knüppel lenken · Drehachse rollen · Schubhebel · Abzug Laser']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table></div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em">AUF DER STATION</h4><table class="grid">
-        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild'], ['Esc', 'Pause'], ['Gamepad', 'Stick gehen/umsehen · A benutzen']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
+        ${[['WASD', 'Gehen'], ['Shift', 'Rennen'], ['Maus', 'Umsehen'], ['E', 'Benutzen / Sprechen / Lift'], ['1–4', 'Antwort im Gespräch wählen'], ['Tab', 'Deckplan (Übersicht)'], ['F12', 'Vollbild an/aus'], ['Esc', 'Menü: Speichern, Tastenbelegung, JSON'], ['Gamepad', 'Stick gehen/umsehen · A benutzen']].map(([k, v]) => `<tr><td><b>${k}</b></td><td>${v}</td></tr>`).join('')}
         </table><p class="dim" style="margin-top:14px">Maus-Empfindlichkeit</p><input type="range" min="0.3" max="2.5" step="0.1" value="${this.game.settings.mouseSens}" data-sens style="width:100%">
         <label style="display:block;margin-top:10px"><input type="checkbox" data-inv ${this.game.settings.invertY ? 'checked' : ''}> Y-Achse invertieren</label>
         <p class="dim" style="margin-top:10px">Lautstärke</p><input type="range" min="0" max="1" step="0.05" value="${this.game.settings.volume}" data-vol style="width:100%"></div></div>`;
@@ -727,18 +815,62 @@ export class UI {
   pause() {
     if (this.pauseEl) return;
     this.game.setPaused(true);
-    const wrap = this.panel('Pause', `${esc(this.g.callsign)} · Tag ${this.g.day}`, (body) => {
-      body.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px;max-width:420px">
-        <button class="btn warm" data-a="resume">Weiter</button><button class="btn" data-a="controls">Steuerung &amp; Optionen</button>
-        <button class="btn" data-a="save" ${this.game.mode?.isFlight ? 'disabled title="Nur angedockt"' : ''}>Speichern</button>
-        <button class="btn" data-a="title">Hauptmenü</button></div>`;
+    const inFlight = !!this.game.mode?.isFlight;
+    const wrap = this.panel('Menü', `${esc(this.g.callsign)} · Tag ${this.g.day} · ${fmt(this.g.credits)} Cr`, (body) => {
+      body.innerHTML = `<div class="pausemenu">
+        <button class="btn warm" data-a="resume">Weiter <small>Esc</small></button>
+        <button class="btn" data-a="controls">Tastenbelegung &amp; Optionen</button>
+        <button class="btn" data-a="save" ${inFlight ? 'disabled' : ''}>Spiel speichern${inFlight ? ' <small>nur angedockt</small>' : ''}</button>
+        <div class="pmrow"><button class="btn small" data-a="export">Spielstand als JSON herunterladen</button><button class="btn small" data-a="import">JSON-Spielstand laden</button></div>
+        <button class="btn" data-a="full">Vollbild an/aus <small>F12</small></button>
+        <button class="btn" data-a="title">Hauptmenü</button>
+        <p class="dim">Das Spiel speichert automatisch im Browser (beim Andocken und nach wichtigen Ereignissen). Die JSON-Datei ist deine Sicherung, auch für einen anderen Rechner.${inFlight ? ' Im Flug enthält sie den Stand beim Abflug.' : ''}</p></div>`;
       body.querySelector('[data-a="resume"]').onclick = () => wrap._close();
       body.querySelector('[data-a="controls"]').onclick = () => this.controlsPanel();
-      body.querySelector('[data-a="save"]').onclick = () => { this.game.save(); this.notify('Gespeichert'); };
-      body.querySelector('[data-a="title"]').onclick = () => { wrap._close(); this.game.toTitle(); };
-    }, { onClose: () => { this.pauseEl = null; this.game.setPaused(false); } });
+      body.querySelector('[data-a="save"]').onclick = () => { this.game.save(); this.notify('Gespeichert'); this.sfx('coins'); };
+      body.querySelector('[data-a="export"]').onclick = () => { if (!inFlight) this.game.save(); this.exportSave(); };
+      body.querySelector('[data-a="import"]').onclick = () => this.importSave();
+      body.querySelector('[data-a="full"]').onclick = () => this.game.toggleFullscreen();
+      body.querySelector('[data-a="title"]').onclick = () => {
+        if (inFlight && !confirm('Zurück ins Hauptmenü? Der Flug seit dem letzten Andocken geht verloren.')) return;
+        wrap._close(); this.game.toTitle();
+      };
+    }, { narrow: true, onClose: () => { this.pauseEl = null; this.game.setPaused(false); } });
     this.pauseEl = wrap;
   }
+
+  /** Download the save as a JSON file. */
+  exportSave() {
+    const json = state.exportJSON();
+    if (!json) { this.notify('Noch kein Spielstand vorhanden.'); return; }
+    const g = JSON.parse(json).state;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = `spacewing-${String(g.callsign).replace(/[^\w-]+/g, '_')}-tag${g.day}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    this.notify('Spielstand als JSON gespeichert'); this.sfx('coins');
+  }
+
+  /** Pick a JSON save file and continue from it (replaces the browser save). */
+  importSave() {
+    const f = document.createElement('input');
+    f.type = 'file'; f.accept = '.json,application/json';
+    f.onchange = async () => {
+      const file = f.files?.[0]; if (!file) return;
+      try {
+        const g = state.parseJSON(await file.text());
+        if (state.hasSave() && !confirm(`Spielstand „${g.callsign}“ (Tag ${g.day}, ${fmt(g.credits)} Cr) laden? Der aktuelle Stand im Browser wird ersetzt.`)) return;
+        state.set(g); state.save();
+        this.closeAllModals(); this.pauseEl = null; this.game.setPaused(false);
+        this.notify(`Spielstand geladen: ${esc(g.callsign)}, Tag ${g.day}`);
+        this.game.continueGame();
+      } catch (e) { this.sfx('error'); this.notify(esc(e.message)); }
+    };
+    f.click();
+  }
+
+  closeAllModals() { while (this.closeTop()); }
 
   cockpit() {}
 }

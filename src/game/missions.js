@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { STATIONS, COMMODITIES, SHIP_CLASSES, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from './data.js';
+import { STATIONS, COMMODITIES, SHIP_CLASSES, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS, shipStats } from './data.js';
 import { ZONES, travelInfo } from '../space/universe.js';
 import { addCredits, logEntry, fmt, activeShip, cargoFree } from './state.js';
 import { STORY } from './story.js';
@@ -46,7 +46,7 @@ export function scriptContext(flight) {
       for (let i = 0; i < n; i++) {
         defs.push({ cls: opts.cls || 'wespe', faction: opts.faction || 'schakale', name: opts.name ? `${opts.name} ${i + 1}` : `Schakal ${['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Fox', 'Golf', 'Hotel'][i % 8]}`,
           pos: ctx.around(center, opts.dist || 2600, 400), lookAt: flight.player.pos,
-          ai: { mode: 'attack', skill: opts.skill ?? 0.5, aggroRange: 9000, fleeAt: opts.fleeAt }, tags: ['hostileGroup'], upgrades: opts.upgrades });
+          ai: { mode: 'attack', skill: opts.skill ?? 0.5, aggroRange: 9000, fleeAt: opts.fleeAt }, tags: ['hostileGroup'], upgrades: opts.upgrades, paint: opts.paint });
       }
       return ctx.spawnWave(defs).then(list => { for (const s of list) s.target = opts.target || flight.player; return list; });
     },
@@ -124,9 +124,26 @@ export function generateJobs(g, station) {
   return g.jobBoard[station].jobs;
 }
 
+/** Why the active ship cannot fly a job right now ('' if it can): locked moon, jump class, cargo space. */
+export function jobBlocker(g, job) {
+  const ship = activeShip(g);
+  if (!ship) return 'Kein eigenes Schiff';
+  const zone = job.kind === 'fracht' ? STATIONS[job.to].zone : job.zone;
+  const mid = moonOfZone(zone);
+  if (mid && mid !== moonOfStation(g.location)) {
+    if (!MOONS[mid].unlock(g)) return `${MOONS[mid].name} ist noch gesperrt`;
+    const need = MOONS[mid].jump;
+    if (shipStats(ship).jump < need) return `Sprungtriebwerk Klasse ${JUMP_CLASS[need]} nötig`;
+  }
+  if (job.kind === 'fracht' && cargoFree(ship) < job.amount) return `Frachtraum zu klein (${cargoFree(ship)} von ${job.amount} frei)`;
+  return '';
+}
+
 export function acceptJob(game, job) {
   const g = game.state;
   if (g.jobs.length >= 4) return 'Du hast schon vier offene Aufträge.';
+  const block = jobBlocker(g, job);
+  if (block) return block + '.';
   if (job.kind === 'fracht') {
     const ship = activeShip(g);
     if (!ship) return 'Du hast kein Schiff.';
@@ -233,42 +250,139 @@ export class Director {
 
 // ============================================================================ combat simulator
 
+/*
+ * Combat simulator. Scenarios come in tiers that open with the moon systems (the game's levels).
+ * kind: 'clear' (destroy every wave, medal by time), 'survive' (stay alive for `survive` s, medal by hull left),
+ * 'escort' (keep the sim freighter alive, medal by its hull). Medals: 1 bronze, 2 silver, 3 gold.
+ */
+export const SIM_TIERS = [
+  { moon: 'rhea', name: 'Grundausbildung', sub: 'Rhea · machbar mit der alten Spacewing' },
+  { moon: 'enceladus', name: 'Fortgeschritten', sub: 'Enceladus · Laser-Upgrades und Raketen helfen sehr' },
+  { moon: 'mimas', name: 'Schwarzmarkt-Taktiken', sub: 'Mimas · Kanonenboote und Hinterhalte' },
+  { moon: 'titan', name: 'Konsortiums-Prüfung', sub: 'Titan · Elite-Jäger' },
+  { moon: 'iapetus', name: 'Archiv-Szenarien', sub: 'Iapetus · nur für Veteranen' },
+];
 export const SIM_SCENARIOS = {
-  drohnen: { name: 'Zieldrohnen', desc: 'Sechs Drohnen, die nicht zurückschießen. Zum Üben von Zielen und Vorhalten.', waves: [{ n: 6, drone: true }] },
-  rotte: { name: 'Schakal-Rotte', desc: 'Drei Wespen, wie bei einem Überfall im Rhea-System.', waves: [{ n: 3, skill: 0.45 }] },
-  staffel: { name: 'Staffelangriff', desc: 'Zwei Wellen Wespen, die zweite besser bewaffnet.', waves: [{ n: 3, skill: 0.5 }, { n: 4, skill: 0.6, upgrades: { lasers: 2 } }] },
-  lanzen: { name: 'Lanzen-Duell', desc: 'Zwei Abfangjäger vom Typ Lanze. Schnell, wendig, schwer zu treffen.', waves: [{ n: 2, cls: 'lanze', name: 'Sim-Lanze', skill: 0.8, upgrades: { lasers: 2 } }] },
-  korsar: { name: 'Kanonenboot', desc: 'Eine schwer gepanzerte Corsair mit Rückenturm und zwei Begleitjägern. Raketen helfen.', waves: [{ n: 2, skill: 0.55 }, { n: 1, cls: 'corsair', name: 'Sim-Corsair', skill: 0.7 }] },
+  drohnen: { tier: 0, name: 'Zieldrohnen', kind: 'clear', gold: 45, silver: 80, desc: 'Sechs Drohnen, die nicht zurückschießen. Zum Üben von Zielen und Vorhalten.',
+    tip: 'Mit T aufschalten und den Vorhaltekreis vor dem Ziel ins Fadenkreuz nehmen. Wird er grün („IM ZIEL“), sitzen die Schüsse.', waves: [{ n: 6, drone: true }] },
+  rotte: { tier: 0, name: 'Schakal-Rotte', kind: 'clear', gold: 60, silver: 110, desc: 'Drei Wespen, wie bei einem Überfall im Rhea-System.',
+    tip: 'Nicht frontal aufeinander zu. Schub kurz wegnehmen (S), eng kurven, dann von hinten angreifen.', waves: [{ n: 3, skill: 0.45 }] },
+  ausweichen: { tier: 0, name: 'Unter Beschuss', kind: 'survive', survive: 60, desc: 'Vier Wespen jagen dich. Du musst nichts abschießen: 60 Sekunden überleben.',
+    tip: 'Nie lange geradeaus fliegen. Nachbrenner (Shift), Seitwärtsschub (Q/E) und Rollen (A/D) mischen. Schilde laden nach, wenn du nicht getroffen wirst.', waves: [{ n: 4, skill: 0.5 }] },
+  geleit: { tier: 0, name: 'Geleitschutz', kind: 'escort', desc: 'Ein Simulator-Frachter wird von zwei Wellen angegriffen. Er muss durchhalten.',
+    tip: 'Die Wespen zielen auf den Frachter, nicht auf dich. Bleib in seiner Nähe und nimm dir die Angreifer einzeln vor (T schaltet durch).', waves: [{ n: 2, skill: 0.45 }, { n: 3, skill: 0.5 }] },
+  staffel: { tier: 0, name: 'Staffelangriff', kind: 'clear', gold: 130, silver: 210, desc: 'Zwei Wellen Wespen, die zweite besser bewaffnet.',
+    tip: 'Mit der Spacewing ohne Upgrades knapp. Energie im Blick behalten: Dauerfeuer leert den Kern und dann fehlt der Nachbrenner.', waves: [{ n: 3, skill: 0.5 }, { n: 4, skill: 0.6, upgrades: { lasers: 2 } }] },
+
+  lanzen: { tier: 1, name: 'Lanzen-Duell', kind: 'clear', gold: 90, silver: 160, needs: 'missiles', desc: 'Zwei Abfangjäger vom Typ Lanze. Schnell, wendig, schwer zu treffen.',
+    tip: 'Mit Lasern allein ein zähes Ringen. Zwei Raketen pro Lanze entscheiden das Duell.', waves: [{ n: 2, cls: 'lanze', name: 'Sim-Lanze', skill: 0.8, upgrades: { lasers: 2 } }] },
+  raketen: { tier: 1, name: 'Raketenstand', kind: 'clear', gold: 50, silver: 90, needs: 'missiles', desc: 'Vier sehr schnelle Drohnen. Für Laser fast zu flink, ideal für Raketen.',
+    tip: 'Ziel im Visier halten, bis „ERFASST“ erscheint, dann F oder rechte Maustaste. Ohne Raketenwerfer: Geduld und Vorhalten.', waves: [{ n: 4, drone: true, fast: true }] },
+  schwarm: { tier: 1, name: 'Schwarm', kind: 'clear', gold: 170, silver: 260, desc: 'Drei Wellen mit je vier Wespen. Ausdauer zählt.',
+    tip: 'Zwischen den Wellen Abstand gewinnen, damit sich Schild und Energie erholen.', waves: [{ n: 4, skill: 0.5 }, { n: 4, skill: 0.55 }, { n: 4, skill: 0.65, upgrades: { lasers: 1 } }] },
+
+  korsar: { tier: 2, name: 'Kanonenboot', kind: 'clear', gold: 120, silver: 200, needs: 'missiles', desc: 'Eine schwer gepanzerte Corsair mit Rückenturm und zwei Begleitjägern.',
+    tip: 'Erst die Begleitjäger, dann die Corsair. Ihr Turm deckt alles ab, also von unten und in Bewegung angreifen. Raketen auf die Corsair.', waves: [{ n: 2, skill: 0.55 }, { n: 1, cls: 'corsair', name: 'Sim-Corsair', skill: 0.7 }] },
+  hinterhalt: { tier: 2, name: 'Hinterhalt', kind: 'clear', gold: 100, silver: 170, desc: 'Sechs Wespen aus allen Richtungen auf einmal, wie im Trümmerfeld vor Mimas.',
+    tip: 'Sofort Nachbrenner und raus aus der Mitte. Dann die Verfolger einzeln abfangen.', waves: [{ n: 6, skill: 0.6, around: true }] },
+
+  goldstaffel: { tier: 3, name: 'Goldene Staffel', kind: 'clear', gold: 150, silver: 240, needs: 'missiles', desc: 'Vier Lanzen in Konsortiumsgold, in zwei Rotten.',
+    tip: 'Schilde und Laser sollten auf Stufe 3 sein. Raketen auf die Führungsmaschine jeder Rotte.', waves: [{ n: 2, cls: 'lanze', name: 'Gold', skill: 0.8, upgrades: { lasers: 3, shield: 2 }, paint: '#d1a23a' }, { n: 2, cls: 'lanze', name: 'Gold', skill: 0.85, upgrades: { lasers: 3, shield: 3 }, paint: '#d1a23a' }] },
+  doppel: { tier: 3, name: 'Doppelkeil', kind: 'clear', gold: 170, silver: 280, needs: 'missiles', desc: 'Zwei Corsairs, die sich gegenseitig decken.',
+    tip: 'Eine Corsair von der anderen trennen: im Bogen fliegen, bis nur noch eine dir folgt.', waves: [{ n: 2, cls: 'corsair', name: 'Sim-Corsair', skill: 0.75 }] },
+
+  korvette: { tier: 4, name: 'Zollkorvette', kind: 'clear', gold: 240, silver: 380, needs: 'missiles', desc: 'Eine Korvette der Liga mit Jagdschutz. Groß, langsam, sehr zäh.',
+    tip: 'Die Korvette dreht sich kaum. Hinter ihr bist du fast sicher. Erst den Jagdschutz, dann alle Raketen auf die Korvette.', waves: [{ n: 3, skill: 0.65 }, { n: 1, cls: 'korvette', name: 'Sim-Korvette', skill: 0.7, scale: 0.45 }] },
+  marathon: { tier: 4, name: 'Archiv-Marathon', kind: 'clear', gold: 300, silver: 450, desc: 'Fünf Wellen, jede härter als die letzte.',
+    tip: 'Raketen für die Lanzen in Welle 4 und 5 aufheben.', waves: [{ n: 3, skill: 0.5 }, { n: 4, skill: 0.6 }, { n: 2, cls: 'corsair', name: 'Sim-Corsair', skill: 0.7 }, { n: 3, cls: 'lanze', name: 'Sim-Lanze', skill: 0.8 }, { n: 4, cls: 'lanze', name: 'Sim-Lanze', skill: 0.85, upgrades: { lasers: 2 } }] },
 };
+export const MEDALS = ['', 'Bronze', 'Silber', 'Gold'];
+/** One-time credit bonus per medal level reached (by tier). */
+export const simReward = (S, medal) => [0, 150, 300, 600][medal] * (1 + S.tier * 0.75);
+
+export const simUnlocked = (g, S) => MOONS[SIM_TIERS[S.tier].moon].unlock(g);
+
+/** Medal for a finished run (0 = failed). */
+export function simMedal(S, r) {
+  if (!r.won) return 0;
+  if (S.kind === 'survive') return r.hull >= 0.7 ? 3 : r.hull >= 0.35 ? 2 : 1;
+  if (S.kind === 'escort') return r.ally >= 0.8 ? 3 : r.ally >= 0.5 ? 2 : 1;
+  return r.sec <= S.gold ? 3 : r.sec <= S.silver ? 2 : 1;
+}
 
 async function simScript(c, game, id) {
-  const f = c.flight, p = f.player, S = SIM_SCENARIOS[id], g = game.state;
+  const f = c.flight, p = f.player, S = SIM_SCENARIOS[id];
+  const t0 = f.time;
+  const result = { id, sec: 0, won: false, hull: 1, ally: null };
+  const finish = async (won, msg) => {
+    result.won = won; result.sec = Math.round(f.time - t0); result.hull = p.hull / p.maxHull;
+    f.hud.showToast(msg, 4);
+    c.objective(won ? 'Simulation abgeschlossen' : 'Simulation fehlgeschlagen');
+    await c.wait(3.5);
+    game.endSim(f, result);
+  };
   await c.wait(1.5);
   c.say('Simulator', `Simulation „${S.name}“ startet. Keine echten Schäden, keine Kosten. Abbrechen mit L.`, 'cassini');
-  const t0 = f.time;
+  if (S.tip) { await c.wait(2); f.hud.say('Ausbilder', S.tip, '#8fd18f', Math.max(6, S.tip.length / 14)); }
+  if (S.needs === 'missiles' && p.stats.missiles <= 0) f.hud.showToast('Dein Schiff hat keine Raketen · das wird schwer', 3.5);
+
+  // escort: a sim freighter crossing the arena that the raiders go for
+  let ally = null;
+  if (S.kind === 'escort') {
+    const start = p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 600).add(new THREE.Vector3(300, -80, 0));
+    ally = await f.spawn({ cls: 'mule', faction: 'cassini', name: 'Sim-Frachter', pos: start, paint: '#7fd4ff', tags: ['objective', 'ally', 'noFriendlyFire'],
+      ai: { mode: 'goto', point: start.clone().addScaledVector(p.forward(new THREE.Vector3()), 9000), throttle: 0.35, arrive: 200, aggressive: false } });
+    ally.cargoLabel = 'Schutzbefohlen';
+  }
+  const spawnWave = async (W, w) => {
+    const center = p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 1600).add(new THREE.Vector3((Math.random() - 0.5) * 800, (Math.random() - 0.5) * 300, 0));
+    if (W.drone) {
+      const wave = await c.spawnWave(Array.from({ length: W.n }, (_, i) => ({ cls: 'wespe', faction: 'neutral', name: `Zieldrohne ${i + 1}`, paint: W.fast ? '#ffb050' : '#7fd4ff',
+        pos: center.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(250)), tags: ['noFriendlyFire', 'objective'],
+        ai: { mode: 'patrol', center: center.clone(), radius: W.fast ? 700 : 450, aggressive: false } })));
+      wave.forEach(d => { d.stats = { ...d.stats, speed: W.fast ? 300 + Math.random() * 60 : 90 + Math.random() * 60, turn: W.fast ? 2.6 : d.stats.turn }; d.shield = 0; d.maxShield = 1; d.hull = d.maxHull = W.fast ? 220 : 90; });
+      return wave;
+    }
+    const opts = { cls: W.cls, name: W.name || 'Sim-Wespe', skill: W.skill, upgrades: W.upgrades, paint: W.paint, dist: 300, target: ally && ally.alive ? ally : undefined };
+    let wave;
+    if (W.around) {
+      wave = [];
+      for (let i = 0; i < W.n; i++) {
+        const d = new THREE.Vector3().randomDirection(); d.y *= 0.4;
+        wave.push(...await c.pirates(1, p.pos.clone().addScaledVector(d.normalize(), 1300), { ...opts, dist: 50, name: `${opts.name} ${i + 1}` }));
+      }
+    } else wave = await c.pirates(W.n, ally && ally.alive ? ally.pos.clone().add(new THREE.Vector3(1400, 200, -600)) : center, opts);
+    if (W.scale) for (const s of wave) { s.maxHull *= W.scale; s.hull = s.maxHull; s.maxShield *= W.scale; s.shield = s.maxShield; }
+    return wave;
+  };
+
+  if (S.kind === 'survive') {
+    c.objective(`${S.name} · ${S.survive} s überleben`);
+    await c.wait(2);
+    let wave = await spawnWave(S.waves[0], 0);
+    let left = S.survive, refill = 0;
+    await c.until(dt => {
+      if (!p.alive) return true;
+      left -= dt; refill -= dt;
+      c.objective(`${S.name} · noch ${Math.ceil(Math.max(0, left))} s überleben`);
+      if (refill <= 0 && c.alive(wave).length < S.waves[0].n) { refill = 6; spawnWave({ ...S.waves[0], n: 1 }, 0).then(w => wave.push(...w)); }
+      return left <= 0;
+    });
+    if (!p.alive) return;
+    for (const s of c.alive(wave)) s.ai = { mode: 'flee', t: 0 };
+    return finish(true, 'ÜBERLEBT');
+  }
+
   for (let w = 0; w < S.waves.length; w++) {
-    const W = S.waves[w];
     c.objective(`${S.name} · Welle ${w + 1} von ${S.waves.length}`);
     await c.wait(w ? 3 : 2.5);
-    const center = p.pos.clone().addScaledVector(p.forward(new THREE.Vector3()), 1600).add(new THREE.Vector3((Math.random() - 0.5) * 800, (Math.random() - 0.5) * 300, 0));
-    let wave;
-    if (W.drone) {
-      wave = await c.spawnWave(Array.from({ length: W.n }, (_, i) => ({ cls: 'wespe', faction: 'neutral', name: `Zieldrohne ${i + 1}`, paint: '#7fd4ff',
-        pos: center.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(250)), tags: ['noFriendlyFire', 'objective'],
-        ai: { mode: 'patrol', center: center.clone(), radius: 450, aggressive: false } })));
-      wave.forEach(d => { d.stats = { ...d.stats, speed: 90 + Math.random() * 60 }; d.shield = 0; d.maxShield = 1; d.hull = d.maxHull = 90; });
-    } else wave = await c.pirates(W.n, center, { cls: W.cls, name: W.name || 'Sim-Wespe', skill: W.skill, upgrades: W.upgrades, dist: 300 });
-    await c.until(() => c.alive(wave).length === 0);
+    const wave = await spawnWave(S.waves[w], w);
+    await c.until(() => c.alive(wave).length === 0 || (ally && !ally.alive) || !p.alive);
+    if (!p.alive) return;
+    if (ally && !ally.alive) { result.ally = 0; return finish(false, 'FRACHTER VERLOREN'); }
   }
-  const sec = Math.round(f.time - t0);
-  g.simBest = g.simBest || {};
-  const best = g.simBest[id];
-  if (!best || sec < best) g.simBest[id] = sec;
-  f.hud.showToast(`SIMULATION ABGESCHLOSSEN · ${sec} s${!best || sec < best ? ' · NEUE BESTZEIT' : ''}`, 4);
-  c.say('Simulator', 'Simulation abgeschlossen. Beende die Übung.', 'cassini');
-  c.objective('Simulation abgeschlossen');
-  await c.wait(4);
-  game.endSim(f, true);
+  if (ally) result.ally = ally.hull / ally.maxHull;
+  return finish(true, 'SIMULATION ABGESCHLOSSEN');
 }
 
 async function bountyScript(c, game, job) {

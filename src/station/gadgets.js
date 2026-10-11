@@ -82,7 +82,7 @@ export const GADGETS = {
       g.add(mesh(new THREE.TorusGeometry(0.06, 0.006, 6, 24, Math.PI), M.black(), 0, 0.05, -0.02, Math.PI / 2)); return g; } },
   kristall: { name: 'Archivkristall', text: 'Ein Datenkristall aus dem Gewölbe von Iapetus. Juno sagt, er enthält eine einzige Zahl.', when: (g) => g.flags['done:gewoelbe'],
     build: () => { const g = new THREE.Group(); plinth(g); g.add(mesh(new THREE.OctahedronGeometry(0.04, 0), M.glow('#b98aff', 1.6), 0, 0.085, 0, 0, 0.5)); return g; } },
-  pokal: { name: 'Simulator-Pokal', text: 'Alle fünf Szenarien im Gefechtssimulator geschafft. Femi hat ihn graviert: „Zu gut für die Börse.“', when: (g) => Object.keys(g.simBest || {}).length >= 5,
+  pokal: { name: 'Simulator-Pokal', text: 'Die ganze Grundausbildung im Gefechtssimulator in Gold. Femi hat ihn graviert: „Zu gut für die Börse.“', when: (g) => ['drohnen', 'rotte', 'ausweichen', 'geleit', 'staffel'].every(k => g.simMedals?.[k] === 3),
     build: () => { const g = new THREE.Group(); const gd = M.gold(); g.add(mesh(new THREE.BoxGeometry(0.07, 0.03, 0.07), M.black(), 0, 0.015, 0)); g.add(mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.05, 10), gd, 0, 0.055, 0));
       g.add(mesh(new THREE.LatheGeometry([0.004, 0.025, 0.04, 0.045].map((r, i) => new THREE.Vector2(r, i * 0.022)), 20), gd, 0, 0.08, 0)); return g; } },
   sprung: { name: 'Sprungkompass', text: 'Ein altes Navigationsinstrument, das Lenka dir beim Einbau des Sprungtriebwerks dazugelegt hat.', when: (g) => g.ships?.some(s => (s.upgrades?.jump || 0) > 0),

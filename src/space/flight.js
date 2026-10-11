@@ -15,6 +15,9 @@ import { Streaks } from '../ui/streaks.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _ec = new THREE.Color();
 const BOLT_SPEED = 900;
+// aim assist: within this cone (rad) of a hostile's lead point the guns snap to it and the bolts home in a little
+const SCRAP_FIELD = 30;   // pieces kept drifting around Cassini (refilled continuously, so it can be farmed for as long as you like)
+export const ASSIST_CONE = 0.12, ASSIST_CONE_TURRET = 0.08, ASSIST_RANGE = 2000;
 
 export class FlightMode {
   /**
@@ -86,7 +89,7 @@ export class FlightMode {
       grid.userData.follow = true; this.simGrid = grid; sc.add(grid);
     }
     // scrap drifting around the home station
-    if (this.zoneId === 'rhea' && this.station && !this.opts.sim) { this.scrapField = true; for (let i = 0; i < 26; i++) this.spawnFieldPiece(); }
+    if (this.zoneId === 'rhea' && this.station && !this.opts.sim) { this.scrapField = true; for (let i = 0; i < SCRAP_FIELD; i++) this.spawnFieldPiece(); }
     // player
     const rec = this.opts.playerRecord;
     this.player = await Ship.create({ record: rec, faction: 'player', player: true, name: this.game.state.callsign });
@@ -260,15 +263,18 @@ export class FlightMode {
     ship.energy -= ship.isPlayer ? 2.2 : 1;
     const fwd = ship.forward(new THREE.Vector3());
     // converge on ~600 m (player) or the target lead point (AI)
-    let aimPoint;
-    if (ship.isPlayer) aimPoint = this.assistAim(ship, fwd, 0.07) || ship.pos.clone().addScaledVector(fwd, 600);
-    else if (ship.target) aimPoint = this.leadFor(ship, ship.target);
+    let aimPoint, homing = null;
+    if (ship.isPlayer) {
+      const a = this.assistAim(ship, fwd, ASSIST_CONE);
+      aimPoint = a ? a.point : ship.pos.clone().addScaledVector(fwd, 600);
+      homing = a?.ship || null;
+    } else if (ship.target) aimPoint = this.leadFor(ship, ship.target);
     const color = ship.isPlayer ? '#ff4a3a' : ship.faction === 'schakale' ? '#4aff6a' : ship.faction === 'konsortium' ? '#ffcc44' : '#5ab0ff';
     const fireOne = (gp) => {
       const dir = aimPoint ? aimPoint.clone().sub(gp).normalize() : fwd.clone();
       if (dir.dot(fwd) < 0.97) dir.copy(fwd);
       if (!ship.isPlayer) dir.add(new THREE.Vector3().randomDirection().multiplyScalar(0.012 + 0.04 * (1 - (ship.ai?.skill ?? 0.5)))).normalize();
-      this.bolts.fire(gp, dir, BOLT_SPEED, ship.vel, ship, ship.stats.laserDmg, color);
+      this.bolts.fire(gp, dir, BOLT_SPEED, ship.vel, ship, ship.stats.laserDmg, color, 2.2, 14, 0.55, homing);
     };
     if (n >= 2 && guns.length >= 2) { fireOne(guns[ship.gunIdx % guns.length]); fireOne(guns[(ship.gunIdx + 1) % guns.length]); ship.gunIdx += 2; }
     else { fireOne(guns[ship.gunIdx % guns.length]); ship.gunIdx++; }
@@ -412,25 +418,31 @@ export class FlightMode {
     const dir = cam.getWorldDirection(new THREE.Vector3());
     const right = _w.set(1, 0, 0).applyQuaternion(cam.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
-    const assist = this.assistAim(p, dir, 0.05, cam.position);
+    const assist = this.assistAim(p, dir, ASSIST_CONE_TURRET, cam.position);
     for (const side of [-1, 1]) {
       const from = cam.position.clone().addScaledVector(dir, 2.2).addScaledVector(right, side * 0.55).addScaledVector(up, -0.35);
-      const d = (assist ? assist.clone().sub(from).normalize() : dir.clone()).add(new THREE.Vector3().randomDirection().multiplyScalar(0.004)).normalize();
-      this.bolts.fire(from, d, BOLT_SPEED, p.vel, p, p.stats.laserDmg, '#ff9a3a');
+      const d = (assist ? assist.point.clone().sub(from).normalize() : dir.clone()).add(new THREE.Vector3().randomDirection().multiplyScalar(0.004)).normalize();
+      this.bolts.fire(from, d, BOLT_SPEED, p.vel, p, p.stats.laserDmg, '#ff9a3a', 2.2, 14, 0.55, assist?.ship || null);
     }
     this.shake = Math.min(0.25, (this.shake || 0) + 0.04);
     this.game.audio?.laser(0.9, true, 'turret');
   }
 
-  /** Aim assist: if the guns point within `cone` rad of a hostile's lead point, the bolts go to the lead point. */
+  /**
+   * Aim assist: if the guns point within `cone` rad of a hostile's lead point, the bolts go to the lead point
+   * (and home in on that ship a little). The cone widens at close range, where a few degrees are only a few metres.
+   * Returns { point, ship } or null; the HUD uses the same test for its green "IM ZIEL" marker.
+   */
   assistAim(p, dir, cone, from = p.pos) {
-    let best = null, ba = cone;
+    let best = null, ba = Infinity;
     const cands = p.target?.alive && !p.target.isObject ? [p.target] : this.ships.filter(s => s.alive && s !== p && this.isHostile(s, p));
     for (const s of cands) {
-      if (s.pos.distanceTo(p.pos) > 1600) continue;
+      const dist = s.pos.distanceTo(p.pos);
+      if (dist > ASSIST_RANGE) continue;
       const lp = this.leadFor(p, s);
       const a = _v.copy(lp).sub(from).normalize().angleTo(dir);
-      if (a < ba) { ba = a; best = lp; }
+      const c = Math.max(cone, Math.atan((s.hitRadius * 2.2) / Math.max(dist, 1)));
+      if (a < c && a < ba) { ba = a; best = { point: lp, ship: s }; }
     }
     return best;
   }
@@ -484,7 +496,7 @@ export class FlightMode {
 
   requestDock() {
     if (this.state !== 'flying') return;
-    if (this.opts.sim) { this.game.endSim(this, false); return; }
+    if (this.opts.sim) { this.game.endSim(this, null); return; }
     if (this.missionBlocksDock) { this.hud.showToast(this.missionBlocksDock, 2.5); return; }
     if (!this.station) { this.hud.showToast('Keine Station in Reichweite', 2); return; }
     if (this.zone.hostile) { this.hud.showToast('Andocken verweigert', 2); return; }
@@ -718,7 +730,7 @@ export class FlightMode {
     for (const s of this.ships) {
       if (!s.alive || s === bolt.owner) continue;
       if (bolt.owner && !this.isHostile(bolt.owner, s) && !(s.isPlayer || bolt.owner.isPlayer)) continue; // AI don't hurt friends
-      const r = s.hitRadius;
+      const r = bolt.owner?.isPlayer ? s.hitRadius * 1.35 + 1.5 : s.hitRadius;
       const t = THREE.MathUtils.clamp(_w.copy(s.pos).sub(a).dot(seg), 0, L);
       const closest = a.clone().addScaledVector(seg, t);
       if (closest.distanceToSquared(s.pos) < r * r) {
@@ -799,17 +811,18 @@ export class FlightMode {
   }
 
   /** A drifting field of scrap around the home station: free money for anyone with a salvage net. */
-  spawnFieldPiece(far = false) {
+  spawnFieldPiece(far = false, near = null) {
     if (!this.salvageGeo) this.spawnSalvage(new THREE.Vector3(0, -1e6, 0), new THREE.Vector3(), 0);
     this.fieldGeos ||= [new THREE.BoxGeometry(2.2, 0.25, 1.6), new THREE.CylinderGeometry(0.35, 0.35, 3.2, 10), new THREE.BoxGeometry(1.4, 1.0, 1.2), new THREE.DodecahedronGeometry(0.9, 0)];
     this.fieldGeos.forEach(g => g.userData.shared = true);
     const c = this.station.pos;
     let pos;
-    for (let k = 0; k < 8; k++) {
+    for (let k = 0; k < 8 && !near; k++) {
       const d = new THREE.Vector3().randomDirection(); d.y *= 0.35; d.normalize();
       pos = c.clone().addScaledVector(d, 700 + Math.random() * 2200);
       if (!far || pos.distanceTo(this.player.pos) > 1500) break;
     }
+    if (near) pos = near.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(30 + Math.random() * 60));
     const m = new THREE.Mesh(this.fieldGeos[Math.floor(Math.random() * this.fieldGeos.length)], this.salvageMat);
     m.position.copy(pos); m.scale.setScalar(1 + Math.random() * 1.2); m.rotation.set(Math.random() * 6, Math.random() * 6, 0);
     this.scene.add(m);
@@ -819,8 +832,16 @@ export class FlightMode {
   updateSalvage(dt) {
     const p = this.player;
     if (this.scrapField) {
-      this.fieldT = (this.fieldT || 0) + dt;
-      if (this.fieldT > 15 && this.salvage.filter(s => s.field).length < 22) { this.fieldT = 0; this.spawnFieldPiece(true); }
+      // refill the field every few seconds; now and then a whole cluster from a broken-up hauler drifts in
+      this.fieldT = (this.fieldT || 0) + dt; this.clusterT = (this.clusterT ?? 40) - dt;
+      const n = this.salvage.filter(s => s.field).length;
+      if (this.fieldT > 3 && n < SCRAP_FIELD) { this.fieldT = 0; this.spawnFieldPiece(true); }
+      if (this.clusterT <= 0 && n < SCRAP_FIELD + 8) {
+        this.clusterT = 50 + Math.random() * 40;
+        const d = new THREE.Vector3().randomDirection(); d.y *= 0.3; d.normalize();
+        const at = this.station.pos.clone().addScaledVector(d, 1400 + Math.random() * 1200);
+        if (at.distanceTo(this.player.pos) > 1200) for (let k = 0; k < 4 + Math.floor(Math.random() * 3); k++) this.spawnFieldPiece(true, at);
+      }
     }
     for (let i = this.salvage.length - 1; i >= 0; i--) {
       const s = this.salvage[i];
@@ -835,11 +856,13 @@ export class FlightMode {
         } else {
           rec.cargo.schrott = have + 1;
           this.game.state.flags.firstSalvage = true;
+          if (this.game.sortie) this.game.sortie.salvage++;
           this.hud.showToast(`+1 t Bergungsschrott · Netz ${have + 1}/${cap} t`, 1.8);
           this.game.audio?.blip?.();
           s.life = 0;
         }
       } else if (d < 220) s.mesh.position.lerp(p.pos, Math.min(1, dt * 0.35));   // the net pulls nearby pieces in a little
+      if (s.field && s.mesh.position.distanceToSquared(this.station.pos) > 4200 * 4200) s.life = 0;   // drifted off: recycled into a new piece
       if (s.life <= 0) { this.scene.remove(s.mesh); this.salvage.splice(i, 1); }
     }
   }

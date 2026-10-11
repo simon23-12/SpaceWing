@@ -5,9 +5,9 @@ import { input } from '../core/input.js';
 import { assets } from '../core/assets.js';
 import { UI } from '../ui/ui.js';
 import { state, newGame, activeShip, logEntry, addCredits, fmt, addShip } from './state.js';
-import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation } from './data.js';
+import { STATIONS, shipStats, MOONS, MOON_ORDER, JUMP_CLASS, moonOfStation, SHIP_CLASSES } from './data.js';
 import { STORY, npcDialogue, finaleChoice, kroneEnding, PEOPLE } from './story.js';
-import { Director, onDockJobs, generateJobs } from './missions.js';
+import { Director, onDockJobs, generateJobs, SIM_SCENARIOS, simMedal, simReward, MEDALS } from './missions.js';
 import { FlightMode } from '../space/flight.js';
 import { checkGadgets, GADGETS } from '../station/gadgets.js';
 import { RoomMode } from '../station/room.js';
@@ -27,6 +27,16 @@ export class Game {
     this.clock = new THREE.Clock();
     if (import.meta.env.DEV) window.__S = { state, newGame, addShip };
     addEventListener('keydown', (e) => this.onKey(e));
+    // Esc while the mouse is captured never reaches the page: the lost pointer lock opens the menu instead
+    input.onLockLost = () => setTimeout(() => {
+      if (performance.now() - (this.escT || 0) < 300 || this.ui.modalOpen) return;
+      if (this.mode?.isRoom || (this.mode?.isFlight && this.mode.state === 'flying')) this.ui.pause();
+    }, 60);
+    // in fullscreen, keep Esc for the game menu (Chrome/Edge keyboard lock); F12 toggles fullscreen
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) navigator.keyboard?.lock?.(['Escape']).catch(() => {});
+      else navigator.keyboard?.unlock?.();
+    });
     addEventListener('pointerdown', () => { this.audio.start(); this.applyVolume(); if (this.mode?.kind === 'title') this.audio.setMusic('menu'); }, { once: false });
     const loop = () => { requestAnimationFrame(loop); this.frame(); };
     loop();
@@ -60,6 +70,7 @@ export class Game {
   onKey(e) {
     if (e.code === 'F12') { e.preventDefault(); if (!e.repeat) this.toggleFullscreen(); return; }
     if (e.code === 'Escape') {
+      this.escT = performance.now();
       if (this.ui.dlg) return;
       if (this.ui.closeTop()) return;
       if (this.mode && this.mode.kind !== 'title') this.ui.pause();
@@ -74,6 +85,7 @@ export class Game {
   }
 
   async toTitle() {
+    this.sortie = null;
     await this.leaveMode();
     this.ui.clear();
     this.audio.setMusic('menu');
@@ -293,6 +305,8 @@ export class Game {
     const zone = STATIONS[g.location].zone;
     g.docked = false;
     this.save();
+    // flight report: what changed between undocking and the next docking (shown after landing)
+    this.sortie = { time: 0, from: g.location, credits0: g.credits, earned0: g.earned, kills0: g.kills, salvage: 0, rec, hull0: rec.hull ?? 1, temp: !!rec.uid?.startsWith('TEMP') };
     await this.startFlight(zone, 'undock', rec);
   }
 
@@ -346,6 +360,7 @@ export class Game {
   async arrive(flight, zoneId) {
     const rec = flight.player.record;
     const jumped = !!flight.travel?.jump;
+    if (this.sortie) { this.sortie.time += flight.time; this.sortie.jumps = (this.sortie.jumps || 0) + (jumped ? 1 : 0); }
     this.syncShipState(flight);
     if (jumped) this.state.day += 1;
     await this.startFlight(zoneId, 'arrive', rec, { jumped });
@@ -360,6 +375,8 @@ export class Game {
   async onDocked(flight, stationId) {
     const g = this.state;
     this.syncShipState(flight);
+    const sortie = this.sortie; this.sortie = null;
+    if (sortie) sortie.time += flight.time;
     await this.leaveMode();
     this.ui.clear();
     g.location = stationId; g.docked = true;
@@ -386,26 +403,67 @@ export class Game {
     if (msgs.length) this.audio.coins();
     this.save();
     await this.enterStation(stationId);
+    if (sortie) this.ui.debrief(this.sortieReport(sortie, stationId));
   }
 
-  /** Combat simulator: fly a copy of your active ship, nothing is lost. */
-  async startSim(id) {
-    const g = this.state, ship = activeShip(g);
-    if (!ship) { this.ui.notify('Ohne eigenes Schiff gibt es keine Simulation.'); return; }
-    const rec = { ...ship, uid: 'TEMP-SIM', hull: 1, cargo: {}, missiles: undefined, upgrades: { ...ship.upgrades } };
+  /** Numbers for the flight report after docking. */
+  sortieReport(s, stationId) {
+    const g = this.state, rec = s.rec;
+    const st = rec && !s.temp && SHIP_CLASSES[rec.cls] ? shipStats(rec) : null;
+    const hull1 = s.temp ? null : rec?.hull ?? 1;
+    return {
+      time: s.time, station: stationId, from: s.from, jumps: s.jumps || 0,
+      earned: g.earned - s.earned0, net: g.credits - s.credits0, kills: g.kills - s.kills0,
+      salvage: s.salvage, net_t: s.temp ? 0 : rec?.cargo?.schrott || 0,
+      hull0: s.temp ? null : s.hull0, hull1, repair: st && hull1 < 0.999 ? Math.round((1 - hull1) * st.hull * 6) : 0,
+      ship: rec,
+    };
+  }
+
+  /** Ships the simulator can load: your own (with their mods) and stock test profiles of ships sold in opened moon systems. */
+  simShips() {
+    const g = this.state, out = g.ships.map(s => ({ key: s.uid, rec: s, own: true }));
+    const profiles = [['mule', 'rhea'], ['kestrel', 'enceladus'], ['corsair', 'mimas'], ['lanze', 'titan']];
+    for (const [cls, moon] of profiles) if (MOONS[moon].unlock(g)) out.push({ key: 'probe:' + cls, rec: { cls, name: SHIP_CLASSES[cls].name, upgrades: {}, paint: null, cargo: {} }, own: false });
+    return out;
+  }
+
+  /** Combat simulator: fly a copy of one of your ships (or a test profile), nothing is lost. */
+  async startSim(id, shipKey) {
+    const g = this.state;
+    const pick = this.simShips().find(s => s.key === shipKey) || this.simShips().find(s => s.key === g.activeShip);
+    if (!pick) { this.ui.notify('Ohne eigenes Schiff gibt es keine Simulation.'); return; }
+    g.simShip = pick.key;
+    // missiles: the simulator loads every rack it has (undefined = full)
+    const rec = { ...pick.rec, uid: 'TEMP-SIM', hull: 1, cargo: {}, missiles: undefined, upgrades: { ...pick.rec.upgrades } };
+    this.simRun = { id, shipKey: pick.key, shipName: pick.rec.name, own: pick.own };
     await this.startFlight('sim', 'arrive', rec, { sim: id });
   }
 
-  async endSim(flight, won) {
+  /** result: { won, sec, hull, ally } from the sim script, or null when shot down / aborted. */
+  async endSim(flight, result) {
     if (this.mode !== flight) return;
+    const g = this.state, run = this.simRun || { id: flight.opts.sim };
+    const S = SIM_SCENARIOS[run.id];
+    const r = result || { won: false, sec: Math.round(flight.time), hull: 0 };
+    const medal = simMedal(S, r);
+    g.simMedals ||= {}; g.simBest ||= {};
+    const before = g.simMedals[run.id] || 0;
+    let reward = 0;
+    if (medal > before) { reward = Math.round(simReward(S, medal) - simReward(S, before)); g.simMedals[run.id] = medal; }
+    let newBest = false;
+    if (r.won && S.kind === 'clear' && (!g.simBest[run.id] || r.sec < g.simBest[run.id])) { g.simBest[run.id] = r.sec; newBest = true; }
+    if (reward) addCredits(g, reward, `Simulator: ${MEDALS[medal]} in „${S.name}“`);
     await this.fadeOut(0.6);
     await this.enterRoom('bruecke', 'from_sim');
-    if (!won) this.ui.notify('Simulation beendet.');
+    this.save();
+    this.ui.simReport({ ...run, S, r, medal, before, reward, newBest, aborted: !result && flight.player.alive });
   }
 
   async onPlayerDead(flight) {
     const g = this.state;
-    if (flight.opts.sim) { this.ui.notify('Simulation: abgeschossen. Kein echter Schaden.'); return this.endSim(flight, false); }
+    this.sortie = null;
+    if (flight.opts.sim) return this.endSim(flight, null);
     await this.fadeOut(1.2);
     await this.leaveMode();
     this.ui.clear();

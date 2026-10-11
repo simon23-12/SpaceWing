@@ -113,7 +113,7 @@ export class Bolts {
     return this.mats.get(color);
   }
 
-  fire(pos, dir, speed, inheritVel, owner, dmg, color, life = 2.2, len = 14, width = 0.55) {
+  fire(pos, dir, speed, inheritVel, owner, dmg, color, life = 2.2, len = 14, width = 0.55, homing = null) {
     let m = this.pool.pop();
     if (!m) { m = new THREE.Mesh(this.geo, this.material(color)); m.frustumCulled = false; }
     m.material = this.material(color);
@@ -121,7 +121,7 @@ export class Bolts {
     m.position.copy(pos);
     this.scene.add(m);
     const vel = dir.clone().multiplyScalar(speed).add(inheritVel);
-    this.list.push({ mesh: m, vel, dir: dir.clone(), owner, dmg, life, len, color });
+    this.list.push({ mesh: m, vel, dir: dir.clone(), owner, dmg, life, len, color, homing });
     if (this.list.length > this.max) this.remove(0);
   }
 
@@ -138,6 +138,15 @@ export class Bolts {
       const b = this.list[i];
       b.life -= dt;
       prev.copy(b.mesh.position);
+      // aim-assisted player bolts curve gently towards their target (forgives a target that jinks after the shot)
+      const h = b.homing;
+      if (h && h.alive) {
+        const sp = b.vel.length(), d = h.pos.distanceTo(b.mesh.position);
+        const want = tmp.copy(h.pos).addScaledVector(h.vel, d / sp).sub(b.mesh.position).normalize();
+        const cur = side.copy(b.vel).divideScalar(sp);
+        const ang = cur.angleTo(want);
+        if (ang > 1e-4 && ang < 0.6) b.vel.copy(cur.lerp(want, Math.min(1, 0.16 * dt / ang)).normalize().multiplyScalar(sp));
+      }
       b.mesh.position.addScaledVector(b.vel, dt);
       if (b.life <= 0 || hitTest(prev, b.mesh.position, b)) { this.remove(i); continue; }
       // orient: long axis (Y) along velocity, face the camera

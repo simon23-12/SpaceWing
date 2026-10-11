@@ -12,6 +12,7 @@ VEND = os.path.join(REPO, '..', 'SpaceWing_vendor')
 REFS = os.path.join(VEND, 'voice_refs', 'clips')
 OUT = os.path.join(REPO, 'public', 'assets', 'voice')
 TMP = os.path.join(VEND, 'voice_tmp')
+RETRY_BELOW = float(sys.argv[sys.argv.index('--retry-below') + 1]) if '--retry-below' in sys.argv else 0
 
 ROBOT = 'aecho=0.8:0.8:7|11:0.4|0.3,flanger=delay=1.5:depth=1.2:speed=0.6,highpass=f=140'
 COMPUTER = 'aecho=0.6:0.5:4:0.22,highpass=f=120'
@@ -123,12 +124,16 @@ def work(worker, workers, device='cpu', reverse=False):
         if not c:
             continue
         h = fnv(line['text'])
-        if h in part or h in done_hashes():   # another worker (CPU / GPU) may have done it
+        if RETRY_BELOW:
+            if not (h in part and part[h]['sim'] < RETRY_BELOW):
+                continue
+        elif h in part or h in done_hashes():   # another worker (CPU / GPU) may have done it
             continue
         ref, exag, cfg, fx = c
         text = speakable(line['text'])
         best = None
-        for attempt in range(4):
+        prev = part.get(h)
+        for attempt in range(8 if RETRY_BELOW else 4):
             torch.manual_seed(1000 * attempt + n)
             w = model.generate(text, language_id='de', audio_prompt_path=os.path.join(REFS, ref + '.wav'),
                                exaggeration=exag, cfg_weight=cfg, temperature=0.75 if attempt < 2 else 0.6)
@@ -141,6 +146,8 @@ def work(worker, workers, device='cpu', reverse=False):
             if sim >= 0.9:
                 break
         sim, w, heard = best
+        if prev and prev['sim'] >= sim:   # retry did not beat the old take: keep it
+            print(f'[{worker}] keep old take ({prev["sim"]}) for {line["text"][:40]}', flush=True); continue
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tf:
             sf.write(tf.name, w, model.sr)
             af = ['-af', (fx + ',' if fx else '') + 'loudnorm=I=-18:TP=-1.5']

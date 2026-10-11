@@ -219,3 +219,75 @@ tr.pvrow { cursor: pointer; } tr.pvrow:hover { background: rgba(127,212,255,.06)
 .title .tlayers::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 70% 40%, rgba(0,0,0,0) 0%, rgba(0,0,0,.5) 75%); }
 .title .tlayers > div { position: absolute; inset: -4%; background-size: cover; background-position: center; will-change: transform; }
 .title .tst { filter: drop-shadow(0 0 30px rgba(0,0,0,.35)); }
+
+/* salvage net readout above the status gauge */
+.hud-salvage { position: absolute; left: 30px; bottom: 186px; width: 230px; padding: 7px 10px 8px; color: #ffd9a8; font-size: 12px; letter-spacing: .12em;
+  background: linear-gradient(90deg, rgba(30,16,4,.62), rgba(30,16,4,0)); border-left: 2px solid #ffb050; }
+.hud-salvage .sl { color: rgba(255,176,80,.85); font-weight: 600; }
+.hud-salvage .sl b { color: #ff7a4a; margin-left: 6px; animation: blink 1s steps(2) infinite; }
+.hud-salvage .cells { display: flex; gap: 3px; margin: 5px 0 4px; flex-wrap: wrap; }
+.hud-salvage .cells i { width: 14px; height: 7px; background: rgba(255,176,80,.14); transform: skewX(-20deg); }
+.hud-salvage .cells i.on { background: #ffb050; box-shadow: 0 0 6px #ffb050; }
+.hud-salvage .sv { font-size: 14px; letter-spacing: .06em; } .hud-salvage .sv b { font-size: 18px; color: #fff; }
+.hud-salvage .sv span { color: var(--warm); margin-left: 8px; }
+.hud-salvage .sh { color: rgba(255,217,168,.6); font-size: 11px; letter-spacing: .04em; margin-top: 3px; }
+.hud-salvage.pulse { animation: salvPulse .7s ease-out; }
+@keyframes salvPulse { 0% { box-shadow: inset 0 0 0 40px rgba(255,176,80,.35); } 100% { box-shadow: inset 0 0 0 40px rgba(255,176,80,0); } }
+
+/* flight report */
+.debrief { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 10px; }
+.dtile { border: 1px solid var(--line); background: linear-gradient(160deg, rgba(127,212,255,.07), rgba(0,0,0,.2)); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.dtile label { font-family: var(--f-head); letter-spacing: .22em; font-size: 12px; color: var(--dim); }
+.dtile b { font-family: var(--f-head); font-size: 30px; color: #fff; letter-spacing: .04em; }
+.dtile span { font-size: 13px; color: var(--dim); min-height: 1.2em; }
+.dtile.good b { color: var(--good); } .dtile.bad b { color: var(--bad); } .dtile.warn b { color: var(--warm); } .dtile.amber b { color: #ffb050; }
+.drow { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+@media (max-width: 700px) { .debrief { grid-template-columns: repeat(2, 1fr); } }
+
+/* jobs the ship cannot fly yet */
+.card.blocked { opacity: .5; filter: grayscale(.85); }
+.card.blocked:hover { opacity: .75; }
+.card .lockline { color: var(--bad); font-size: 13px; margin: 2px 0 6px; letter-spacing: .03em; }
+
+/* game menu (Esc) */
+.pausemenu { display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
+.pausemenu .btn { display: flex; justify-content: space-between; align-items: center; }
+.pausemenu .btn small { color: var(--dim); font-size: 12px; letter-spacing: .1em; }
+.pausemenu .pmrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pausemenu .pmrow .btn { justify-content: center; white-space: normal; }
+.pausemenu p { font-size: 13px; line-height: 1.5; margin: 4px 0 0; }
+
+/* combat simulator */
+.simtop { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+.simtop .sl { font-family: var(--f-head); letter-spacing: .22em; font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+.simships { display: flex; gap: 8px; flex-wrap: wrap; }
+.simship { border: 1px solid var(--line); padding: 8px 12px; cursor: pointer; display: flex; flex-direction: column; min-width: 170px; background: rgba(0,0,0,.25); }
+.simship b { font-family: var(--f-head); letter-spacing: .06em; font-size: 16px; }
+.simship span { font-size: 12px; color: var(--dim); } .simship em { color: var(--bad); font-style: normal; }
+.simship:hover { border-color: var(--accent); } .simship.on { border-color: var(--warm); background: rgba(255,207,122,.08); box-shadow: inset 3px 0 0 var(--warm); }
+.simsum { text-align: right; font-size: 14px; color: var(--dim); white-space: nowrap; } .simsum b { font-family: var(--f-head); font-size: 34px; color: #ffd76a; }
+.simhint { margin: 12px 0 4px; padding: 10px 14px; border-left: 2px solid var(--warm); background: rgba(255,207,122,.06); line-height: 1.5; font-size: 14px; }
+.simtier { margin-top: 18px; } .simtier h4 { font-family: var(--f-head); letter-spacing: .16em; margin: 0 0 8px; text-transform: uppercase; }
+.simtier h4 span { font-size: 13px; letter-spacing: .04em; color: var(--dim); text-transform: none; margin-left: 10px; font-family: var(--f-body, inherit); }
+.simtier.locked .cards { opacity: .45; filter: grayscale(.9); }
+.simcard { position: relative; } .simcard .medals { position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; }
+.simcard .tip, .simres .tip { font-size: 13px; line-height: 1.45; color: #cfe3ee; } .tip b { color: var(--good); letter-spacing: .12em; font-size: 11px; margin-right: 6px; }
+.medal { width: 16px; height: 16px; border-radius: 50%; display: inline-block; box-shadow: inset 0 -2px 3px rgba(0,0,0,.4); }
+.medal.m1 { background: radial-gradient(circle at 35% 30%, #f3c59a, #a8642e 60%, #6b3a16); }
+.medal.m2 { background: radial-gradient(circle at 35% 30%, #ffffff, #b8c2cc 55%, #6e7a86); }
+.medal.m3 { background: radial-gradient(circle at 35% 30%, #fff6c8, #f0c040 55%, #9a6d10); box-shadow: 0 0 8px rgba(255,210,90,.6), inset 0 -2px 3px rgba(0,0,0,.4); }
+.medal.off { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+.simres { display: grid; grid-template-columns: 170px 1fr; gap: 22px; align-items: start; }
+.simres .line { font-size: 20px; } .mtxt.m1 { color: #e0a070; } .mtxt.m2 { color: #dfe6ec; } .mtxt.m3 { color: #ffd76a; }
+.bigmedal { position: relative; width: 160px; height: 160px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-head); letter-spacing: .2em; font-size: 20px; color: rgba(0,0,0,.65);
+  box-shadow: inset 0 -8px 16px rgba(0,0,0,.45), inset 0 6px 12px rgba(255,255,255,.4), 0 0 0 6px rgba(255,255,255,.06); animation: medalIn .8s cubic-bezier(.2,1.4,.4,1); }
+.bigmedal.m1 { background: radial-gradient(circle at 35% 30%, #f6cfa6, #b06a32 60%, #6b3a16); }
+.bigmedal.m2 { background: radial-gradient(circle at 35% 30%, #ffffff, #b8c2cc 55%, #6e7a86); }
+.bigmedal.m3 { background: radial-gradient(circle at 35% 30%, #fff8d0, #f0c040 55%, #9a6d10); box-shadow: 0 0 40px rgba(255,210,90,.55), inset 0 -8px 16px rgba(0,0,0,.45), inset 0 6px 12px rgba(255,255,255,.5); }
+.bigmedal.fail { background: radial-gradient(circle at 35% 30%, #5a3a3a, #2a1414); color: var(--bad); font-size: 60px; }
+@keyframes medalIn { from { transform: scale(.3) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 700px) { .simres { grid-template-columns: 1fr; } .simtop { flex-direction: column; } }
+.bigmedal::before { content: ''; position: absolute; inset: 12px; border-radius: 50%; border: 2px solid rgba(0,0,0,.16); box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
+.bigmedal span { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bigmedal:not(.fail) span::before { content: '★'; font-size: 44px; line-height: 1; color: rgba(0,0,0,.28); text-shadow: 0 1px 0 rgba(255,255,255,.4); }
+.panel.narrow { width: min(560px, 94vw); }

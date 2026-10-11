@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FACTIONS } from '../game/data.js';
 import { hostile } from './ship.js';
 import { CommScreen, drawStatus, drawDrive } from './hudParts.js';
+import { ASSIST_CONE, ASSIST_CONE_TURRET } from './flight.js';
 
 const _v = new THREE.Vector3(), _p = new THREE.Vector3();
 
@@ -30,6 +31,7 @@ export class HUD {
     this.commScreen = new CommScreen(this.comm);
     this.hitT = 0; this.lastShield = null;
     this.target = el('div', 'hud-panel hud-target hidden', this.root);
+    this.salvageEl = el('div', 'hud-salvage hidden', this.root);
     this.radar = el('canvas', 'hud-radar', this.root);
     this.radar.width = this.radar.height = 220;
     this.rctx = this.radar.getContext('2d');
@@ -89,9 +91,29 @@ export class HUD {
     drawStatus(this.statusCv, p, flight, this.hitT);
     drawDrive(this.driveCv, p, this.gunner ? 'GESCHÜTZTURM' : flight.camMode === 'cockpit' ? 'COCKPIT' : 'VERFOLGER');
 
+    this.drawSalvage(flight);
     this.draw(flight);
     this.drawRadar(flight);
     this.drawTarget(flight);
+  }
+
+  /** Salvage net: what is in it, what it is worth, and when it is full. */
+  drawSalvage(flight) {
+    const p = flight.player, rec = p.record;
+    const net = rec?.cargo?.schrott || 0, cap = p.stats.salvage || 2;
+    const near = !this.gunner && (flight.salvage || []).some(sv => sv.mesh.position.distanceToSquared(p.pos) < 2500 * 2500);
+    const show = !this.gunner && rec?.cargo && (net > 0 || near);
+    this.salvageEl.classList.toggle('hidden', !show);
+    if (!show) return;
+    const key = net + '/' + cap;
+    if (this._sk === key) return;
+    if (this._sk && net > +this._sk.split('/')[0]) { this.salvageEl.classList.remove('pulse'); void this.salvageEl.offsetWidth; this.salvageEl.classList.add('pulse'); }
+    this._sk = key;
+    const full = net >= cap;
+    this.salvageEl.innerHTML = `<div class="sl">BERGUNGSNETZ${full ? ' <b>VOLL</b>' : ''}</div>
+      <div class="cells">${Array.from({ length: cap }, (_, i) => `<i class="${i < net ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="sv"><b>${net}</b> / ${cap} t <span>≈ ${Math.round(net * 150).toLocaleString('de-DE')} Cr</span></div>
+      ${full ? '<div class="sh">An einer Station verkaufen · Netz in der Werkstatt aufrüsten</div>' : net ? '' : '<div class="sh">Trümmer in der Nähe: einfach hindurchfliegen</div>'}`;
   }
 
   drawTarget(flight) {
@@ -186,7 +208,7 @@ export class HUD {
         if (!l.behind) {
           const aimDir = this.gunner ? cam.getWorldDirection(new THREE.Vector3()) : p.forward(new THREE.Vector3());
           const from = this.gunner ? cam.position : p.pos;
-          const onT = hostileTo && lp.clone().sub(from).normalize().angleTo(aimDir) < (this.gunner ? 0.05 : 0.07) && d < 1600;
+          const onT = hostileTo && flight.assistAim(p, aimDir, this.gunner ? ASSIST_CONE_TURRET : ASSIST_CONE, from)?.ship === s;
           const lc = onT ? '#5aff8a' : col;
           ctx.strokeStyle = lc; ctx.lineWidth = onT ? 2.5 : 1.8;
           ctx.beginPath(); ctx.arc(l.x, l.y, onT ? 11 : 9, 0, Math.PI * 2); ctx.stroke();

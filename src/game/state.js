@@ -35,6 +35,21 @@ export const state = {
     return null;
   },
   hasSave() { try { return !!localStorage.getItem(KEY); } catch { return false; } },
+  /** Save file for download: the last stored state (in flight that is the state at undocking). */
+  exportJSON() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch { }
+    const g = raw ? JSON.parse(raw) : current;
+    return g ? JSON.stringify({ game: 'spacewing-saturn', saved: new Date().toISOString(), state: g }, null, 1) : null;
+  },
+  /** Reads a save file; returns the state or throws with a readable message. */
+  parseJSON(text) {
+    let d;
+    try { d = JSON.parse(text); } catch { throw new Error('Die Datei ist kein gültiges JSON.'); }
+    const g = d && d.game === 'spacewing-saturn' ? d.state : d;
+    if (!g || typeof g !== 'object' || !g.callsign || !Array.isArray(g.ships) || !g.flags || typeof g.credits !== 'number') throw new Error('Das ist kein SpaceWing-Spielstand.');
+    return { ...newGame(g.callsign), ...g };
+  },
   wipe() { try { localStorage.removeItem(KEY); } catch { } },
 };
 

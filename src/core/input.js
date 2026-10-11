@@ -23,7 +23,12 @@ class Input {
     addEventListener('mouseup', e => { this.mouse.buttons &= ~(1 << e.button); });
     addEventListener('wheel', e => { this.mouse.wheel += Math.sign(e.deltaY); }, { passive: true });
     addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('pointerlockchange', () => { this.locked = !!document.pointerLockElement; });
+    // the browser swallows Esc while the mouse is captured and just releases it; report that so the game can open its menu
+    document.addEventListener('pointerlockchange', () => {
+      const was = this.locked;
+      this.locked = !!document.pointerLockElement;
+      if (was && !this.locked && performance.now() - (this.selfUnlock || 0) > 250) this.onLockLost?.();
+    });
   }
 
   down(code) { return this.enabled && this.keys.has(code); }
@@ -37,7 +42,7 @@ class Input {
       catch { el.requestPointerLock(); }
     }
   }
-  unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
+  unlock() { if (document.pointerLockElement) { this.selfUnlock = performance.now(); document.exitPointerLock(); } }
 
   /**
    * Gamepad / joystick (Gamepad API), polled once per frame.

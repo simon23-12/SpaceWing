@@ -193,8 +193,6 @@ export function drawStatus(cv, p, flight, hitT) {
   }
   x.fillStyle = p.flightAssist ? 'rgba(168,228,255,0.6)' : '#ff9a5a';
   x.fillText(p.flightAssist ? 'FLUGHILFE' : 'NEWTON', X, 136);
-  const net = p.record?.cargo?.schrott || 0;
-  if (!flight.gunner) { x.textAlign = 'right'; x.fillStyle = 'rgba(255,176,80,0.8)'; x.fillText(`BERGUNG ${net}/${p.stats.salvage || 2} t`, W - 4, 136); x.textAlign = 'left'; }
 }
 
 // ------------------------------------------------------------------ drive panel (speed, throttle, boost)

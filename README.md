@@ -17,15 +17,18 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 - **Brückenübersicht im Stil von X-Wing Alliance:** ein in Cycles gerendertes Bild des Kommandodecks mit anklickbaren Bereichen (Bar, Hangar, Quartiere, Aussichtsplattform, Söldnerbörse, Werft, Systemkarte).
 - **Begehbare Station in der Ich-Perspektive:** Deck 4 der Hochstation Cassini ist ein zusammenhängendes Level. Vom Kommandodeck läuft man durch Schiebetüren in den Ringgang (Bar „Cassini-Spalt“, Kabinen), durch den Hangar-Zugang zu Hangar 7 und fährt mit dem Glaslift hinauf in die Aussichtskuppel. Die Beleuchtung ist in Blender als Global Illumination gebacken, durch die Fenster sieht man den echten Saturn.
 - **Menschen statt Puppen:** Alle Stationsbewohner sind geriggte MakeHuman-Figuren mit echten Hauttexturen, Kleidung und Frisuren (CC0) und retargeteten Quaternius-Animationen (CC0): Atmen und Gewichtsverlagerung im Stand, natürliches Sitzen, Gesten beim Reden, Trinken, Gehen. Wer in der Nähe ist, dreht den Kopf zum Spieler. Jede Figur hat einen kleinen Dialogbaum.
-- **Fünf Monde als Level:** Rhea, Enceladus, Mimas, Titan und Iapetus, jeder mit eigener Station, eigener Stimmung und eigener Rolle im Handelskrieg. Monde werden im Lauf der Karriere freigeschaltet und per **Hyperraumsprung** erreicht. Dafür braucht das Schiff ein Sprungtriebwerk (Klasse I bis III) aus der Werft. Saturn ist überall sichtbar und im HUD als Fixpunkt markiert.
+- **Fünf Monde als Level:** Rhea, Enceladus, Mimas, Titan und Iapetus, jeder mit eigener Station, eigener Stimmung und eigener Rolle im Handelskrieg. Monde werden im Lauf der Karriere freigeschaltet und per **Hyperraumsprung** erreicht. Dafür braucht das Schiff ein Sprungtriebwerk (Klasse I bis III) aus der Werft. Saturn ist überall sichtbar.
 - **Apartments:** Auf jeder Mondstation kann man eine Wohnung kaufen. Zwischen eigenen Apartments reist man per Transit-Kapsel ohne Flug.
 - **Flug mit Verfolgerkamera oder Cockpit:** Das 3D-Cockpit hat Live-Anzeigen für Radar, Ziel und Systeme. Dazu kommen Flughilfe mit Newton-Modus, Nachbrenner, Laser, Raketen mit Zielerfassung, KI-Gegner, Eskorten und Andock-Autopilot.
 - **Realistischer Saturn:** abgeplatteter Planet mit Wolkenbändern und Polarhexagon, Ringe mit realer Radialstruktur (C-, B- und A-Ring, Cassini-Teilung, Encke-Lücke, F-Ring), gegenseitige Schatten von Planet und Ringen sowie die Monde Mimas, Enceladus, Tethys, Dione, Rhea, Titan (mit Atmosphäre), Iapetus (zweifarbig, mit Äquatorgrat) und Phoebe.
 - **Reisen:** Hyperraumsprung zwischen den Monden, Fusionsbrand innerhalb eines Mondsystems (Mimas ↔ Ringrand, Iapetus ↔ Phoebe).
-- **Geld verdienen im Heimatsystem:** Zwischen Hochstation Cassini, dem Bergbauposten Inktomi und dem Frachtdepot L4 gibt es immer Frachtaufträge, ganz ohne Sprungtriebwerk. Unterwegs überfallen manchmal Schakale: Im Rhea-System kann man ihnen mit dem Nachbrenner immer entkommen. Wer kämpft, bekommt Abschussprämien und kann Trümmer einsammeln und als Bergungsschrott verkaufen (Bergungsnetz in der Werkstatt aufrüstbar).
+- **Geld verdienen im Heimatsystem:** Zwischen Hochstation Cassini, dem Bergbauposten Inktomi und dem Frachtdepot L4 gibt es immer Frachtaufträge, ganz ohne Sprungtriebwerk. Unterwegs überfallen manchmal Schakale: Im Rhea-System kann man ihnen mit dem Nachbrenner immer entkommen. Wer kämpft, bekommt Abschussprämien und kann Trümmer einsammeln und als Bergungsschrott verkaufen (Bergungsnetz in der Werkstatt aufrüstbar, Füllstand im HUD). Um Cassini treibt ein Trümmerfeld, das ständig nachwächst: Dort kann man so lange farmen, wie man will.
 - **Werkstatt in Hangar 7:** Mechanikerin Yara Benedek baut Mods ein, repariert und lackiert gegen Kredits. Eine 3D-Vorschau zeigt jeden Umbau vorher, auch ohne Kredits. Raketenwerfer sind nachrüstbar, Raketen werden einzeln gekauft.
-- **Gefechtssimulator** auf dem Kommandodeck: fünf Übungsszenarien mit dem eigenen Schiff, ohne Schaden, mit Bestzeiten.
-- **Zielhilfe:** Vorhaltekreis vor jedem Gegner, der grün wird, wenn die Kanonen richtig ausgerichtet sind; Zielerfassung auch für Station und Trümmer.
+- **Gefechtssimulator** auf dem Kommandodeck: 14 Szenarien in fünf Stufen (Abschuss, Überleben, Geleitschutz), die mit den Mondsystemen freigeschaltet werden. Wahl des Schiffs (eigene Schiffe oder Probeflug-Profile), Tipps zu jedem Szenario, Medaillen in Bronze, Silber und Gold mit einmaliger Prämie.
+- **Flugbericht** nach jedem Andocken: Missionszeit, eingesammelte Trümmer, verdientes Geld, Abschüsse und Schaden, mit Direktverkauf des Schrotts.
+- **Söldnerbörse:** Aufträge, die das Schiff noch nicht fliegen kann (Sprungklasse, gesperrter Mond, Frachtraum), sind ausgegraut.
+- **Speichern:** automatisch im Browser; im Menü (Esc) zusätzlich als JSON-Datei herunterladen und wieder laden, auch im Hauptmenü.
+- **Zielhilfe:** Vorhaltekreis vor jedem Gegner, der grün wird, wenn die Kanonen richtig ausgerichtet sind; dann lenken die Kanonen auf den Vorhaltepunkt und die Schüsse folgen dem Ziel ein wenig; Zielerfassung auch für Station und Trümmer.
 - **Vertonung:** Funksprüche und Dialoge sind mit lokaler Sprachsynthese (Piper) vertont; im All laufen sie durch einen Funkfilter mit Rauschen und Squelch.
 - **Wirtschaft:** zehn Handelswaren, deren Preise auf Story-Ereignisse reagieren (Saturnzoll, Embargo, Krieg), generierte Aufträge, sieben Upgrade-Bereiche pro Schiff, Lackierungen, Schiffskauf und -verkauf.
 - **Story:** acht Storymissionen mit drei Enden, siehe [docs/STORY.md](docs/STORY.md).
@@ -57,7 +60,7 @@ python3 tools/bl.py blender/ships.py spacewing
 
 **Im Kugelturm (Mission 1):** Maus zielen · Linksklick/Leertaste feuern · T Ziel
 
-**Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T Ziel · C Kamera · L andocken · M Systemkarte · Esc Pause
+**Im All:** Maus lenken · W/S Schub · A/D rollen · Shift Nachbrenner · Linksklick/Leertaste Laser · Rechtsklick/F Rakete · T Ziel · C Kamera · L andocken · M Systemkarte · Esc Menü
 
 **Auf der Station:** WASD gehen · Shift laufen · Maus umsehen · E benutzen/sprechen · Tab Deckplan
 
@@ -65,7 +68,7 @@ python3 tools/bl.py blender/ships.py spacewing
 
 **Joystick (HOTAS):** Knüppel lenken, Drehachse rollen, Schubhebel Schub, Abzug Laser, Taste 2 Rakete, Taste 3 Nachbrenner, Taste 4 Ziel.
 
-**Überall:** F12 Vollbild
+**Überall:** F12 Vollbild an/aus · Esc Menü (Speichern, JSON-Export/-Import, Tastenbelegung)
 
 ## Asset-Lizenzen
 

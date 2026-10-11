@@ -560,7 +560,7 @@ export const STORY = {
       wreck.ai = null;
       wreck.input.throttle = 0;
       await c.talk([
-        ['Bordcomputer', 'Schwaches Transpondersignal empfangen: SANKT ROSTIG. Keine Triebwerksaktivität.', 'neutral'],
+        ['Bordcomputer', 'Schwaches Transpondersignal empfangen: EISVOGEL. Keine Triebwerksaktivität.', 'neutral'],
         ['Ringgilde Patrouille', 'Pilot, wir haben den Eisvogel auch gesehen. Wir kommen nicht nah ran, da draußen jagen Schakale. Viel Glück.', 'ringgilde'],
       ]);
       c.objective('Den Eisvogel finden');
