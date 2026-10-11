@@ -18,9 +18,15 @@ const MOON_PROGS = {
 };
 const NOTE = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
-// Recorded soundtrack (all CC0, OpenGameArt; see README). The procedural score fills the rest (station lounge, bar jazz).
-const TRACK_VOL = { menu: 0.55, dome: 0.5, battle1: 0.5, battle2: 0.5 };
-const trackFor = (mode, moon) => mode === 'menu' ? 'menu' : mode === 'dome' ? 'dome' : mode === 'space' ? `space_${moon || 'rhea'}` : null;
+// Recorded soundtrack: CC0 tracks from OpenGameArt and our own pieces rendered by tools/music/compose.py (see README).
+// The new pieces are mastered louder, hence their lower volumes. The bar jazz stays procedural.
+const TRACK_VOL = { menu: 0.4, dome: 0.5, battle1: 0.5, battle2: 0.5, space_noir1: 0.3, space_noir2: 0.28, space_noir3: 0.32, station_noir1: 0.26, station_noir2: 0.26 };
+// in flight and on the station the music rotates at random (a new pick every launch, the next one when a track ends)
+const PLAYLISTS = {
+  space: ['space_rhea', 'space_noir1', 'space_noir2', 'space_noir3', 'space_mimas', 'space_iapetus', 'space_enceladus'],
+  station: ['station_noir1', 'station_noir2'],
+};
+const trackFor = (mode) => mode === 'menu' ? 'menu' : mode === 'dome' ? 'dome' : null;
 
 export class Audio {
   constructor() {
@@ -301,7 +307,9 @@ export class Audio {
     this.tracks ||= {};
     if (!this.tracks[name]) {
       const el = new window.Audio(assets.url(`assets/audio/music/${name}.mp3`));
-      el.loop = true; el.preload = 'auto';
+      const listed = Object.values(PLAYLISTS).some(l => l.includes(name));
+      el.loop = !listed; el.preload = 'auto';
+      if (listed) el.addEventListener('ended', () => { if (this.curTrack?.name === name) this.nextInPlaylist(); });
       const src = this.ctx.createMediaElementSource(el);
       const g = this.ctx.createGain(); g.gain.value = 0;
       src.connect(g).connect(this.music);
@@ -329,11 +337,22 @@ export class Audio {
     this.curTrack = tr;
   }
 
+  /** A random track of the mode's playlist, never the one that just played. */
+  pickTrack(mode) {
+    const list = PLAYLISTS[mode];
+    if (!list) return trackFor(mode);
+    const pool = list.filter(n => n !== this.lastPick?.[mode]);
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    (this.lastPick ||= {})[mode] = name;
+    return name;
+  }
+  nextInPlaylist() { if (PLAYLISTS[this.musicMode] && !this.battle) this.playTrack(this.pickTrack(this.musicMode), 3); }
+
   setMusic(mode, opts = {}) {
     if (!this.ctx || this.musicMode === mode) return;
     this.musicMode = mode;
     this.battle = false;
-    this.playTrack(trackFor(mode, this.moon), 1.6);
+    this.playTrack(this.pickTrack(mode), 1.6);
     this.music.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
     setTimeout(() => {
       if (this.musicMode !== mode) return;
@@ -360,7 +379,7 @@ export class Audio {
       this.playTrack('battle' + this.battleN, 1.2);
     } else if (this.battle && now - (this.lastCombat || 0) > 8) {
       this.battle = false;
-      this.playTrack(trackFor('space', this.moon), 4);
+      this.playTrack(this.pickTrack('space'), 4);
     }
   }
 
@@ -405,18 +424,14 @@ export class Audio {
     while (s.next < C.currentTime + 0.25) {
       if (s.mode === 'jazz') this.jazzBeat(s, s.next, spb);
       else if ((s.mode === 'space' || s.mode === 'menu') && !this.curTrack) this.ambientBeat(s, s.next, spb);
-      else if (s.mode === 'station') this.stationBeat(s, s.next, spb);
+      else if (s.mode === 'station' && !this.curTrack) this.stationBeat(s, s.next, spb);
       s.next += spb; s.beat++;
       if (s.beat % 4 === 0) s.bar++;
     }
   }
 
-  /** Each moon has its own harmonic colour and its own recorded track for the flight score. */
-  setMoon(id) {
-    const changed = this.moon !== id;
-    this.moon = id;
-    if (changed && this.musicMode === 'space' && !this.battle) this.playTrack(trackFor('space', id), 2.5);
-  }
+  /** Each moon has its own harmonic colour (procedural fill); the recorded flight score keeps rotating across jumps. */
+  setMoon(id) { this.moon = id; }
 
   // ambient: slow evolving pads + sparse bells, pulse when in combat. Harmony depends on the moon.
   ambientBeat(s, t, spb) {
