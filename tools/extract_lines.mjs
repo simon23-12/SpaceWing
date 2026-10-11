@@ -1,7 +1,7 @@
 // Collects every spoken line (dialogues + radio comms) from the game sources for the voice-over generator.
-// Usage: node tools/extract_lines.mjs > tools/lines.json
+// Usage: node tools/extract_lines.mjs tools/lines.json   (writes UTF-8 itself; avoids PowerShell's UTF-16 redirection)
 // A line's text may contain {name} where the player's callsign is inserted at runtime.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import * as acorn from 'acorn';
 import { ancestor } from 'acorn-walk';
 
@@ -124,4 +124,5 @@ for (const file of FILES) {
     },
   });
 }
-process.stdout.write(JSON.stringify([...out.values()], null, 1));
+const json = JSON.stringify([...out.values()], null, 1);
+if (process.argv[2]) { writeFileSync(process.argv[2], json, 'utf8'); console.log(`${out.size} lines → ${process.argv[2]}`); } else process.stdout.write(json);

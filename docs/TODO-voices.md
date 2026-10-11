@@ -30,13 +30,10 @@ Stimmen (bereits in `tools/voices_cbx.py` → `CAST` eingetragen):
 
 ## Ablauf
 
-```bash
-node tools/extract_lines.mjs > tools/lines.json
-../SpaceWing_vendor/cbx/venv/bin/python tools/voices_cbx.py 0 1
-../SpaceWing_vendor/cbx/venv/bin/python tools/voices_cbx.py --merge
-```
+Einrichtung und Befehle für Windows (venv, CUDA, ffmpeg): **`docs/HANDOVER.md`, Abschnitt 3**.
 
-- Der erste Lauf überspringt alles, was schon vertont ist (Fortschritt in `../SpaceWing_vendor/voice_tmp/part*.json`), und erzeugt nur die fehlenden Zeilen.
+- Referenzclips liegen jetzt in `tools/voice/refs/`, der Fortschritt in `tools/voice/progress/part*.json`. Beides ist im Repo, so dass jeder Rechner dort weitermacht.
+- Der erste Lauf überspringt alles, was schon vertont ist, und erzeugt nur die fehlenden Zeilen.
 - Nur bestimmte Sprecher: `--speakers dome_saturn,dome_rhea --part dome` (eigene Fortschrittsdatei, wird beim Merge mitgenommen).
-- Nicht zwei Jobs gleichzeitig laufen lassen, sonst wird jede Zeile sehr langsam (~1 Zeile/min auf CPU allein).
-- Danach `public/assets/voice/*.mp3` und `index.json` committen.
+- Nicht zwei Jobs gleichzeitig laufen lassen, sonst wird jede Zeile sehr langsam.
+- Danach `public/assets/voice/`, `tools/voice/progress/` und `tools/lines.json` committen.

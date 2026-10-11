@@ -2,16 +2,19 @@
 with a Whisper check of every line against the script (regenerated until it says what is written).
 
 Writes public/assets/voice/<hash>.mp3 + index.json {hash: seconds}; same keys as before (FNV-1a of the line).
-Usage: ../SpaceWing_vendor/cbx/venv/bin/python tools/voices_cbx.py <worker> <workers>   (then: ... --merge)
-References: ../SpaceWing_vendor/voice_refs/clips/*.wav (12 s excerpts of LibriVox German recordings, public domain)."""
+Usage: <venv python> tools/voices_cbx.py 0 1 [--cuda]   (then: ... --merge)   · setup and Windows notes: docs/HANDOVER.md
+References: tools/voice/refs/*.wav (12 s excerpts of LibriVox German recordings, public domain).
+Progress (which line is done, with its Whisper score): tools/voice/progress/part*.json, kept in git so any machine can resume."""
 import difflib, json, os, re, subprocess, sys, tempfile
 import numpy as np
 
+try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')   # Windows consoles default to cp1252
+except Exception: pass
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VEND = os.path.join(REPO, '..', 'SpaceWing_vendor')
-REFS = os.path.join(VEND, 'voice_refs', 'clips')
+REFS = os.path.join(REPO, 'tools', 'voice', 'refs')
 OUT = os.path.join(REPO, 'public', 'assets', 'voice')
-TMP = os.path.join(VEND, 'voice_tmp')
+TMP = os.path.join(REPO, 'tools', 'voice', 'progress')
 RETRY_BELOW = float(sys.argv[sys.argv.index('--retry-below') + 1]) if '--retry-below' in sys.argv else 0
 # --speakers a,b: only these speakers; --part name: own progress file (lets a second job run beside another one)
 SPEAKERS = set(sys.argv[sys.argv.index('--speakers') + 1].split(',')) if '--speakers' in sys.argv else None
@@ -99,7 +102,7 @@ def done_hashes():
     out = set()
     for f in os.listdir(TMP):
         if f.startswith('part'):
-            try: out |= set(json.load(open(os.path.join(TMP, f))))
+            try: out |= set(json.load(open(os.path.join(TMP, f), encoding='utf-8')))
             except Exception: pass
     return out
 
@@ -114,10 +117,10 @@ def work(worker, workers, device='cpu', reverse=False):
     torch.set_num_threads(max(2, (os.cpu_count() or 8) // workers))
     model = ChatterboxMultilingualTTS.from_pretrained(device=device)
     asr = WhisperModel('small', device='cpu', compute_type='int8')
-    lines = json.load(open(os.path.join(REPO, 'tools', 'lines.json')))
+    lines = json.load(open(os.path.join(REPO, 'tools', 'lines.json'), encoding='utf-8-sig'))
     os.makedirs(OUT, exist_ok=True); os.makedirs(TMP, exist_ok=True)
     part_path = os.path.join(TMP, f'part_{PART}.json' if PART else f'part{worker}{"_" + device if device != "cpu" else ""}.json')
-    part = json.load(open(part_path)) if os.path.exists(part_path) else {}
+    part = json.load(open(part_path, encoding='utf-8')) if os.path.exists(part_path) else {}
     order = list(enumerate(lines))
     if reverse:
         order.reverse()
@@ -152,30 +155,33 @@ def work(worker, workers, device='cpu', reverse=False):
         sim, w, heard = best
         if prev and prev['sim'] >= sim:   # retry did not beat the old take: keep it
             print(f'[{worker}] keep old take ({prev["sim"]}) for {line["text"][:40]}', flush=True); continue
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tf:
-            sf.write(tf.name, w, model.sr)
+        # closed temp file first: Windows cannot write to a NamedTemporaryFile that is still open
+        fd, tmp_wav = tempfile.mkstemp(suffix='.wav'); os.close(fd)
+        try:
+            sf.write(tmp_wav, w, model.sr)
             af = ['-af', (fx + ',' if fx else '') + 'loudnorm=I=-18:TP=-1.5']
-            subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', tf.name, *af, '-ac', '1', '-ar', '24000', '-b:a', '48k',
+            subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-i', tmp_wav, *af, '-ac', '1', '-ar', '24000', '-b:a', '48k',
                             os.path.join(OUT, h + '.mp3')], check=True)
-            os.unlink(tf.name)
+        finally:
+            os.unlink(tmp_wav)
         part[h] = {'d': round(len(w) / model.sr, 2), 'sim': round(sim, 3)}
-        json.dump(part, open(part_path, 'w'))
+        json.dump(part, open(part_path, 'w', encoding='utf-8'), indent=0)
         print(f'[{worker}] {n + 1}/{len(lines)} sim={sim:.2f} {line["speaker"]}: {line["text"][:50]} | heard: {heard[:50]}', flush=True)
 
 
 def merge():
-    lines = json.load(open(os.path.join(REPO, 'tools', 'lines.json')))
+    lines = json.load(open(os.path.join(REPO, 'tools', 'lines.json'), encoding='utf-8-sig'))
     keep = {fnv(l['text']) for l in lines if cast_for(l)}
     index, sims = {}, []
     for f in os.listdir(TMP):
         if f.startswith('part'):
-            for h, v in json.load(open(os.path.join(TMP, f))).items():
+            for h, v in json.load(open(os.path.join(TMP, f), encoding='utf-8')).items():
                 if h in keep:
                     index[h] = v['d']; sims.append((v['sim'], h))
     for f in os.listdir(OUT):
         if f.endswith('.mp3') and f[:-4] not in index:
             os.unlink(os.path.join(OUT, f))
-    json.dump(index, open(os.path.join(OUT, 'index.json'), 'w'), separators=(',', ':'))
+    json.dump(index, open(os.path.join(OUT, 'index.json'), 'w', encoding='utf-8'), separators=(',', ':'))
     sims.sort()
     print('voiced', len(index), 'of', len(keep), '| mean similarity', round(sum(s for s, _ in sims) / max(1, len(sims)), 3), '| worst', sims[:5])
 
@@ -184,4 +190,4 @@ if __name__ == '__main__':
     if '--merge' in sys.argv:
         merge()
     else:
-        work(int(sys.argv[1]), int(sys.argv[2]), device='mps' if '--mps' in sys.argv else 'cpu', reverse='--reverse' in sys.argv)
+        work(int(sys.argv[1]), int(sys.argv[2]), device='cuda' if '--cuda' in sys.argv else 'mps' if '--mps' in sys.argv else 'cpu', reverse='--reverse' in sys.argv)
