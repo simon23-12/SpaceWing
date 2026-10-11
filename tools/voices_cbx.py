@@ -13,6 +13,9 @@ REFS = os.path.join(VEND, 'voice_refs', 'clips')
 OUT = os.path.join(REPO, 'public', 'assets', 'voice')
 TMP = os.path.join(VEND, 'voice_tmp')
 RETRY_BELOW = float(sys.argv[sys.argv.index('--retry-below') + 1]) if '--retry-below' in sys.argv else 0
+# --speakers a,b: only these speakers; --part name: own progress file (lets a second job run beside another one)
+SPEAKERS = set(sys.argv[sys.argv.index('--speakers') + 1].split(',')) if '--speakers' in sys.argv else None
+PART = sys.argv[sys.argv.index('--part') + 1] if '--part' in sys.argv else None
 
 ROBOT = 'aecho=0.8:0.8:7|11:0.4|0.3,flanger=delay=1.5:depth=1.2:speed=0.6,highpass=f=140'
 COMPUTER = 'aecho=0.6:0.5:4:0.22,highpass=f=120'
@@ -33,6 +36,7 @@ CAST = {
     'tanker': ('gr_206_rapunzel', 0.55, 0.5, None), 'quelle': ('ak_05_christianweihnachten_cs', 0.45, 0.5, None),
     'control': ('gr_214_spindel_weberschiffchen_und_nadel', 0.4, 0.5, None), 'gilde': ('gr_180_frau_holle', 0.5, 0.5, None),
     'gold': ('gr_160_diesiebenraben', 0.5, 0.5, None), 'boerse': ('ak_10_zweiweihnachtsabende_ksn', 0.45, 0.5, None),
+    'dome_saturn': ('ak_08_weihnachtsrezepte_nt', 0.5, 0.5, None), 'dome_rhea': ('gr_132_sterntaler', 0.45, 0.5, None),
     'generic': ('gr_215_strohhalm_kohle_und_bohne', 0.5, 0.5, None), 'mags_weak': ('ak_04_hampelmann_hok', 0.35, 0.5, None),
 }
 ALIAS = {
@@ -112,13 +116,13 @@ def work(worker, workers, device='cpu', reverse=False):
     asr = WhisperModel('small', device='cpu', compute_type='int8')
     lines = json.load(open(os.path.join(REPO, 'tools', 'lines.json')))
     os.makedirs(OUT, exist_ok=True); os.makedirs(TMP, exist_ok=True)
-    part_path = os.path.join(TMP, f'part{worker}{"_" + device if device != "cpu" else ""}.json')
+    part_path = os.path.join(TMP, f'part_{PART}.json' if PART else f'part{worker}{"_" + device if device != "cpu" else ""}.json')
     part = json.load(open(part_path)) if os.path.exists(part_path) else {}
     order = list(enumerate(lines))
     if reverse:
         order.reverse()
     for n, line in order:
-        if n % workers != worker:
+        if n % workers != worker or (SPEAKERS and line['speaker'] not in SPEAKERS):
             continue
         c = cast_for(line)
         if not c:

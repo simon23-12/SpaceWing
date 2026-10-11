@@ -92,6 +92,13 @@ CHARS = {
     'crew_e': dict(gender=1.0, age=0.58, muscle=0.55, weight=0.5, height=0.52, race=(0.0, 0.9, 0.1), skin='middleage_asian_male',
                    eyes='brown', brows='eyebrow009', lashes='eyelashes01', hair=('short03', '#141210', 0.85),
                    clothes=[('male_elegantsuit01', '#2c3a5a', 0.8), ('shoes04', None, 0)]),
+    # observation dome: two guides who explain what you see through the glass
+    'dome_saturn': dict(gender=0.0, age=0.7, muscle=0.5, weight=0.5, height=0.52, proportions=0.65, race=(0.05, 0.05, 0.9), skin='middleage_caucasian_female',
+                        eyes='bluegreen', brows='eyebrow003', lashes='eyelashes02', hair=('bob01', '#8a7f78', 0.8),
+                        clothes=[('female_elegantsuit01', '#2d4f5c', 0.8), ('shoes04', None, 0)]),
+    'dome_rhea': dict(gender=1.0, age=0.8, muscle=0.6, weight=0.62, height=0.55, race=(0.25, 0.45, 0.3), skin='onlytheghosts_old_eurasian_male',
+                      eyes='brown', brows='eyebrow010', lashes='eyelashes01', hair=('short02', '#b0aca4', 0.85),
+                      clothes=[('male_casualsuit02', ('#7a5a34', '#3a3830'), 0.8), ('shoes03', None, 0)]),
     # portrait-only leaders (also usable as NPCs at other stations)
     'varga': dict(gender=0.0, age=0.68, muscle=0.45, weight=0.45, height=0.62, proportions=0.8, race=(0.0, 0.1, 0.9), skin='toigo_light_skin_female_with_violet_makeup',
                   eyes='grey', brows='eyebrow003', lashes='eyelashes04', hair=('bob01', '#141210', 0.8),
@@ -486,6 +493,7 @@ PORTRAITS = {
     'varga': ('#f2c35a', '#1c1406'), 'morrow': ('#f2c35a', '#14100a'), 'brandt': ('#9fb4ff', '#0a0e1c'), 'noor': ('#6fc3ff', '#06121c'),
     'vesper': ('#d7b8ff', '#100a1a'), 'rook': ('#ff5a4a', '#1a0806'), 'saffi': ('#ff8ad8', '#1a0814'),
     'gast_kesh': ('#9fd18f', '#0c140a'), 'gast_rana': ('#c8a0ff', '#120c1a'), 'gast_tomas': ('#d8b07a', '#16100a'), 'gast_ilse': ('#7fe0d8', '#061414'),
+    'dome_saturn': ('#ffcf9a', '#14100c'), 'dome_rhea': ('#b8d4e8', '#0a0e14'),
     'crew_a': ('#9fc4ff', '#0a0e16'), 'crew_b': ('#9fc4ff', '#0a0e16'), 'crew_c': ('#bfe6ff', '#08121a'), 'crew_d': ('#ffd36a', '#16120a'), 'crew_e': ('#9fb4ff', '#0a0c18'),
 }
 

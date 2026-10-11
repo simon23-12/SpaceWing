@@ -23,6 +23,7 @@ const shots = () => ({
 export default defineConfig({
   base: './',
   build: { target: 'es2022', chunkSizeWarningLimit: 2000 },
-  server: { port: 5173 },
+  // voice-over jobs write mp3s while the game runs: no page reload for those
+  server: { port: 5173, watch: { ignored: ['**/public/assets/voice/**'] } },
   plugins: [shots()],
 });
