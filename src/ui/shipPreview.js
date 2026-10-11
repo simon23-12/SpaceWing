@@ -10,8 +10,9 @@ import { Particles, TEX } from '../space/effects.js';
  */
 
 const OLD = () => new THREE.MeshStandardMaterial({ color: 0x6f6458, roughness: 0.75, metalness: 0.35, emissive: 0xff7a2a, emissiveIntensity: 0, transparent: true });
-const NEW = () => new THREE.MeshStandardMaterial({ color: 0xd2d9e0, roughness: 0.28, metalness: 0.75, emissive: 0x4ad0ff, emissiveIntensity: 0, transparent: true });
-const GLOW = (c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(2.2), transparent: true, toneMapped: false });
+const NEW = () => new THREE.MeshStandardMaterial({ color: 0x6a6f76, roughness: 0.55, metalness: 0.6, emissive: 0x4ad0ff, emissiveIntensity: 0, transparent: true });
+// accents of the shown module: dark metal once fitted (the cyan only shows while it materialises)
+const GLOW = () => new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.7, metalness: 0.4, emissive: 0x4ad0ff, emissiveIntensity: 0, transparent: true });
 
 function box(w, h, d, mat) { return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); }
 function cyl(r1, r2, h, mat, seg = 20) { return new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), mat); }
@@ -94,13 +95,63 @@ function modAnchors(m, key, b, L, local) {
 }
 
 const MOD_KEYS = ['engine', 'lasers', 'shield', 'armor', 'reactor', 'missiles', 'cargo', 'salvage', 'jump'];
-// fitted modules are a little more compact than in the workshop's show-and-tell
-const MOD_SCALE = { engine: 0.78, jump: 0.5, cargo: 0.72, missiles: 0.85, shield: 0.85, reactor: 0.85 };
+// where a fitted module sits: on top of the hull, under it, on the flanks, or at the guns / nozzles
+const MOD_MOUNT = { shield: 'top', reactor: 'top', jump: 'top', missiles: 'bottom', cargo: 'bottom', salvage: 'bottom', armor: 'side', engine: 'nozzle', lasers: 'gun' };
+const MOD_MAT = () => new THREE.MeshStandardMaterial({ color: 0x5a5e64, roughness: 0.62, metalness: 0.55 });
+const MOD_DARK = () => new THREE.MeshStandardMaterial({ color: 0x33363b, roughness: 0.7, metalness: 0.4 });
 
 /**
- * Installed mods are visible on the hull: every upgrade with a level adds its module (the same parts the
- * workshop preview fits), a little bigger per level, in bare metal with cyan accents. Used in flight, in the
- * hangar and in the previews. Returns the group (child of model.root, name 'mods').
+ * A fitted module, small and in plain metal (no lights). Built at the origin with its mounting face at y = 0:
+ * top parts grow upwards, bottom parts downwards, side plates outwards (+x), nozzle/gun parts along the z axis.
+ * s = ship scale (length / 12.6), lv = upgrade level (a touch bigger per level).
+ */
+function fittedPart(key, s, lv, m, d) {
+  const g = new THREE.Group(), k = s * (1 + 0.04 * (Math.min(lv, 5) - 1));
+  const add = (geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { const o = new THREE.Mesh(geo, mat); o.position.set(x * k, y * k, z * k); o.rotation.set(rx, ry, rz); o.scale.setScalar(k); g.add(o); return o; };
+  switch (key) {
+    case 'shield':   // low emitter dome on a flat plinth
+      add(new THREE.CylinderGeometry(0.3, 0.34, 0.06, 20), d, 0, 0.03);
+      add(new THREE.SphereGeometry(0.22, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), m, 0, 0.05).scale.set(k, k * 0.55, k);
+      break;
+    case 'reactor':  // squat cooling stack with fins
+      add(new THREE.CylinderGeometry(0.18, 0.2, 0.22, 16), m, 0, 0.11);
+      for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(0.03, 0.16, 0.42), d, 0, 0.09, 0, 0, i * Math.PI / 4, 0);
+      break;
+    case 'jump':     // flat drive coil lying on the spine
+      add(new THREE.TorusGeometry(0.26, 0.045, 8, 28), m, 0, 0.05, 0, Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.1, 0.12, 0.08, 14), d, 0, 0.04);
+      break;
+    case 'missiles': // slim pod with two tubes
+      add(new THREE.BoxGeometry(0.42, 0.14, 1.1), m, 0, -0.07);
+      for (const x of [-0.11, 0.11]) add(new THREE.CylinderGeometry(0.07, 0.07, 1.0, 10), d, x, -0.16, -0.05, Math.PI / 2);
+      break;
+    case 'cargo':    // flat belly container
+      add(new THREE.BoxGeometry(0.8, 0.22, 1.3), m, 0, -0.11);
+      for (let i = 0; i < 3; i++) add(new THREE.BoxGeometry(0.82, 0.03, 0.05), d, 0, -0.12, -0.45 + i * 0.45);
+      break;
+    case 'salvage':  // small scoop under the nose
+      add(new THREE.BoxGeometry(0.12, 0.08, 0.5), d, 0, -0.04);
+      add(new THREE.CylinderGeometry(0.1, 0.16, 0.12, 14), m, 0, -0.1, -0.25);
+      break;
+    case 'armor':    // thin plate on the flank (outward = +x)
+      add(new THREE.BoxGeometry(0.05, 0.32, 1.6), m, 0.025, 0, 0);
+      add(new THREE.BoxGeometry(0.06, 0.04, 1.5), d, 0.03, 0.1, 0);
+      break;
+    case 'engine':   // collar around the nozzle, scaled to it later
+      add(new THREE.TorusGeometry(1, 0.08, 8, 28), d);
+      break;
+    case 'lasers':   // barrel extension with a muzzle ring (forward = -z)
+      add(new THREE.CylinderGeometry(0.035, 0.045, 0.5, 10), d, 0, 0, -0.25, Math.PI / 2);
+      add(new THREE.CylinderGeometry(0.06, 0.06, 0.07, 10), m, 0, 0, -0.47, Math.PI / 2);
+      break;
+  }
+  return g;
+}
+
+/**
+ * Installed mods are visible on the hull, but quietly: each upgrade with a level adds a small module in plain
+ * metal, placed by casting rays onto the hull so nothing floats. Used in flight, in the hangar and in the
+ * previews. Returns the group (child of model.root, name 'mods').
  */
 export function fitMods(model, upgrades = {}) {
   const root = model.root;
@@ -112,26 +163,67 @@ export function fitMods(model, upgrades = {}) {
   const saved = root.matrix.clone(), parent = root.parent;
   parent?.remove(root);
   root.position.set(0, 0, 0); root.quaternion.identity(); root.scale.set(1, 1, 1); root.updateMatrixWorld(true);
-  const b = new THREE.Box3().setFromObject(root), L = model.length || (b.max.z - b.min.z);
-  const local = (o) => o.getWorldPosition(new THREE.Vector3());
-  const mats = { old: MOD_MAT(), new: MOD_MAT(), glow: new THREE.MeshBasicMaterial({ color: new THREE.Color('#4ad0ff').multiplyScalar(1.6), toneMapped: false }) };
+  const hull = []; root.traverse(o => { if (o.isMesh && o.name.startsWith('hull')) hull.push(o); });
+  const b = new THREE.Box3(); hull.forEach(o => b.expandByObject(o));
+  if (b.isEmpty()) b.setFromObject(root);
+  const L = model.length || (b.max.z - b.min.z), s = L / 12.6, mid = (b.min.z + b.max.z) / 2;
+  const ray = new THREE.Raycaster();
+  const hit = (from, dir) => { ray.set(from, dir); ray.far = 1e4; return ray.intersectObjects(hull, false)[0]?.point || null; };
+  // first hull surface along a vertical line at (x, z); tries a few spots towards the middle if it misses
+  const surface = (x, z, up) => {
+    for (const f of [0, 0.25, 0.5, 0.75]) {
+      const zz = z + (mid - z) * f;
+      const p = hit(new THREE.Vector3(x, up ? b.max.y + 2 : b.min.y - 2, zz), new THREE.Vector3(0, up ? -1 : 1, 0));
+      if (p) return p;
+    }
+    return null;
+  };
+  const m = MOD_MAT(), d = MOD_DARK(), embed = 0.02 * s;
+  const place = (k, part, pos) => { part.position.copy(pos); part.userData.key = k; g.add(part); };
   for (const k of keys) {
-    const lv = upgrades[k];
-    for (const p of modAnchors(model, k, b, L, local)) {
-      const part = buildPart(k, 1, L, mats);
-      part.position.copy(p); part.scale.setScalar((MOD_SCALE[k] || 1) * (0.92 + 0.05 * Math.min(lv, 5)));
-      part.userData.key = k;
-      part.traverse(o => { if (o.isMesh) { o.castShadow = false; o.userData.mod = true; } });
-      g.add(part);
+    const lv = upgrades[k], mount = MOD_MOUNT[k];
+    if (mount === 'top' || mount === 'bottom') {
+      const z = { shield: mid + L * 0.08, reactor: mid + L * 0.24, jump: b.max.z - L * 0.2, missiles: mid - L * 0.05, cargo: mid + L * 0.18, salvage: b.min.z + L * 0.22 }[k];
+      const p = surface(0, z, mount === 'top');
+      if (p) place(k, fittedPart(k, s, lv, m, d), p.add(new THREE.Vector3(0, mount === 'top' ? -embed : embed, 0)));
+    } else if (mount === 'side') {
+      const y = (b.min.y + b.max.y) / 2;
+      for (const sx of [-1, 1]) {
+        const p = hit(new THREE.Vector3(sx * (b.max.x + 2), y, mid), new THREE.Vector3(-sx, 0, 0));
+        if (!p) continue;
+        const part = fittedPart(k, s, lv, m, d);
+        if (sx < 0) part.rotation.y = Math.PI;
+        place(k, part, p.add(new THREE.Vector3(-sx * embed, 0, 0)));
+      }
+    } else if (mount === 'nozzle') {
+      // a collar round each nozzle, sized from the engine-glow vertices next to that nozzle (several nozzles share one mesh)
+      const verts = [];
+      for (const x of model.glows.filter(x => x.engine)) {
+        const pa = x.mesh.geometry.attributes.position, v = new THREE.Vector3();
+        for (let i = 0; i < pa.count; i++) verts.push(v.fromBufferAttribute(pa, i).applyMatrix4(x.mesh.matrixWorld).clone());
+      }
+      for (const ex of model.exhausts) {
+        const p = ex.getWorldPosition(new THREE.Vector3());
+        let r = 0, zc = 0, n = 0;
+        for (const v of verts) {
+          const dxy = Math.hypot(v.x - p.x, v.y - p.y);
+          if (Math.abs(v.z - p.z) < 0.08 * L && dxy < 0.12 * L) { r = Math.max(r, dxy); zc += v.z; n++; }
+        }
+        if (!n || r < 0.01 * L) continue;
+        const part = fittedPart(k, 1, lv, m, d); part.scale.setScalar(r * 1.04);
+        place(k, part, new THREE.Vector3(p.x, p.y, zc / n - 0.03 * s));
+      }
+    } else if (mount === 'gun') {
+      for (const gun of model.guns) place(k, fittedPart(k, s, lv, m, d), gun.getWorldPosition(new THREE.Vector3()));
     }
   }
+  g.traverse(o => { if (o.isMesh) o.userData.mod = true; });
   root.add(g);
   saved.decompose(root.position, root.quaternion, root.scale);
   parent?.add(root);
   root.updateMatrixWorld(true);
   return g;
 }
-const MOD_MAT = () => new THREE.MeshStandardMaterial({ color: 0x6c737c, roughness: 0.38, metalness: 0.85 });
 
 export class ShipPreview {
   constructor(canvas, rec) {
@@ -241,7 +333,8 @@ export class ShipPreview {
       A.mats.old.opacity = 1 - THREE.MathUtils.smoothstep(t, 1.0, 1.5);
       A.mats.new.opacity = THREE.MathUtils.smoothstep(t, 1.25, 1.6);
       A.mats.new.wireframe = t < 2.2;
-      A.mats.new.emissiveIntensity = t < 2.3 ? 1.6 : 1.6 * (1 - k3) + 0.15;
+      A.mats.new.emissiveIntensity = t < 2.3 ? 1.6 : 1.6 * (1 - k3);
+      A.mats.glow.emissiveIntensity = A.mats.new.emissiveIntensity;
       A.mats.glow.opacity = A.mats.new.opacity;
       for (const P of A.parts) {
         P.o.position.copy(P.p).add(new THREE.Vector3(0, lift * k1 * 1.6, 0)); P.o.rotation.set(k1 * 0.6, k1 * 1.4, 0);

@@ -5,7 +5,7 @@ import { generateJobs, acceptJob, abandonJob, jobBlocker, SIM_SCENARIOS, SIM_TIE
 import { STORY, PEOPLE, acceptStory, finaleChoice, storyJumpPass } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
-import { ACTIONS, ACTION, AXES, keysFor, keyLabel, bindKey, resetKeys, withKeys, profileFor, saveProfile, resetProfile, defaultProfile, padLabel, padName } from '../core/bindings.js';
+import { ACTIONS, ACTION, AXES, keysFor, keyLabel, bindKey, resetKeys, importControls, withKeys, profileFor, saveProfile, resetProfile, defaultProfile, padLabel, padName } from '../core/bindings.js';
 import { Streaks } from './streaks.js';
 import { ShipPreview } from './shipPreview.js';
 
@@ -1025,7 +1025,7 @@ export class UI {
         <div class="pmrow"><button class="btn small" data-a="export">Spielstand als JSON herunterladen</button><button class="btn small" data-a="import">JSON-Spielstand laden</button></div>
         <button class="btn" data-a="full">Vollbild an/aus <small>F12</small></button>
         <button class="btn" data-a="title">Hauptmenü</button>
-        <p class="dim">Das Spiel speichert automatisch im Browser (beim Andocken und nach wichtigen Ereignissen). Die JSON-Datei ist deine Sicherung, auch für einen anderen Rechner.${inFlight ? ' Im Flug enthält sie den Stand beim Abflug.' : ''}</p></div>`;
+        <p class="dim">Das Spiel speichert automatisch im Browser (beim Andocken und nach wichtigen Ereignissen). Die JSON-Datei ist deine Sicherung, auch für einen anderen Rechner, und enthält deine Tastenbelegung, die Joystick-Einstellungen und die Optionen.${inFlight ? ' Im Flug enthält sie den Stand beim Abflug.' : ''}</p></div>`;
       body.querySelector('[data-a="resume"]').onclick = () => wrap._close();
       body.querySelector('[data-a="controls"]').onclick = () => this.controlsPanel();
       body.querySelector('[data-a="save"]').onclick = () => { this.game.save(); this.notify('Gespeichert'); this.sfx('coins'); };
@@ -1062,9 +1062,12 @@ export class UI {
       try {
         const g = state.parseJSON(await file.text());
         if (state.hasSave() && !confirm(`Spielstand „${g.callsign}“ (Tag ${g.day}, ${fmt(g.credits)} Cr) laden? Der aktuelle Stand im Browser wird ersetzt.`)) return;
+        const ex = g._extras || {};
         state.set(g); state.save();
+        const keys = importControls(ex.controls);
+        if (ex.settings) { Object.assign(this.game.settings, ex.settings); this.game.saveSettings(); this.game.applyVolume(); }
         this.closeAllModals(); this.pauseEl = null; this.game.setPaused(false);
-        this.notify(`Spielstand geladen: ${esc(g.callsign)}, Tag ${g.day}`);
+        this.notify(`Spielstand geladen: ${esc(g.callsign)}, Tag ${g.day}${keys ? '<br><span class="dim">Tastenbelegung und Joystick übernommen</span>' : ''}`);
         this.game.continueGame();
       } catch (e) { this.sfx('error'); this.notify(esc(e.message)); }
     };

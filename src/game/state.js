@@ -1,5 +1,6 @@
 import { COMMODITIES, STATIONS, SHIP_CLASSES, shipStats, RANKS } from './data.js';
 import { ZONES } from '../space/universe.js';
+import { exportControls } from '../core/bindings.js';
 
 const KEY = 'spacewing.save.v1';
 
@@ -49,7 +50,10 @@ export const state = {
     let raw = null;
     try { raw = localStorage.getItem(KEY); } catch { }
     const g = raw ? JSON.parse(raw) : current;
-    return g ? JSON.stringify({ game: 'spacewing-saturn', saved: new Date().toISOString(), state: g }, null, 1) : null;
+    // key/joystick bindings and options travel with the save, so a fresh browser gets them back too
+    let settings = null;
+    try { settings = JSON.parse(localStorage.getItem('spacewing.settings') || 'null'); } catch { }
+    return g ? JSON.stringify({ game: 'spacewing-saturn', saved: new Date().toISOString(), state: g, controls: exportControls(), settings }, null, 1) : null;
   },
   /** Reads a save file; returns the state or throws with a readable message. */
   parseJSON(text) {
@@ -57,7 +61,10 @@ export const state = {
     try { d = JSON.parse(text); } catch { throw new Error('Die Datei ist kein gültiges JSON.'); }
     const g = d && d.game === 'spacewing-saturn' ? d.state : d;
     if (!g || typeof g !== 'object' || !g.callsign || !Array.isArray(g.ships) || !g.flags || typeof g.credits !== 'number') throw new Error('Das ist kein SpaceWing-Spielstand.');
-    return migrate({ ...newGame(g.callsign), ...g });
+    const out = migrate({ ...newGame(g.callsign), ...g });
+    // not part of the game state: handed to the importer separately (older files have neither)
+    Object.defineProperty(out, '_extras', { value: { controls: d.controls || null, settings: d.settings || null }, enumerable: false });
+    return out;
   },
   wipe() { try { localStorage.removeItem(KEY); } catch { } },
 };

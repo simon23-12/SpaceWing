@@ -91,6 +91,16 @@ export function bindKey(id, slot, code) {
 }
 export function resetKeys() { data.keys = {}; save(); }
 
+/** Key and joystick bindings for the JSON save file. */
+export function exportControls() { return JSON.parse(JSON.stringify(data)); }
+/** Restore bindings from a save file (replaces the ones in this browser). */
+export function importControls(c) {
+  if (!c || typeof c !== 'object') return false;
+  data = { keys: { ...(c.keys || {}) }, pads: { ...(c.pads || {}) } };
+  save();
+  return true;
+}
+
 /** One readable key for prompts and objectives, e.g. K('dock') → "L". */
 export const K = (id) => keyLabel(keysFor(id)[0]);
 
