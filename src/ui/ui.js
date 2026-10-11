@@ -133,7 +133,8 @@ export class UI {
     const el = $(`<div class="topbar">
       <span class="loc">${st ? st.name.toUpperCase() : ''}</span><span>Tag ${g.day}</span><span>${esc(g.callsign)} · ${rank(g)}</span><span class="sp"></span>
       <span>${ship ? esc(ship.name) + ' · Rumpf ' + Math.round(ship.hull * 100) + '%' : 'Kein Schiff'}</span>
-      <span class="cr">${fmt(g.credits)} Cr</span></div>`);
+      <span class="cr">${fmt(g.credits)} Cr</span><span class="tbkey" title="Pilotenstatus: Reputation, Kredits, Aufträge">[${keyLabel(keysFor('stats')[0])}] Status</span></div>`);
+    el.querySelector('.tbkey').onclick = () => this.toggleStats();
     return el;
   }
 
@@ -236,10 +237,14 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ Söldnerbörse
-  openBoerse() {
+  openBoerse(initialTab = 'auftraege') {
     const station = this.g.location;
-    this.panel('Söldnerbörse', `${STATIONS[station].name} · Dispatcher Femi Oduya`, (body, rebuild) => {
+    let tab = initialTab;
+    this.panel('Söldnerbörse', `${STATIONS[station].name} · Dispatcher Femi Oduya`, (body, rebuild, close, w) => {
       const g = this.g;
+      w.querySelector('.tabs')?.remove();
+      this.tabs(body, [['auftraege', 'Aufträge'], ['erledigt', `Erledigt${g.jobsDone?.length ? ' · ' + g.jobsDone.filter(d => d.status === 'ok').length : ''}`]], tab, (k) => { tab = k; rebuild(); });
+      if (tab === 'erledigt') return this.doneJobs(body);
       const jobs = generateJobs(g, station);
       const st = STORY[g.story];
       let html = '<div class="cards">';
@@ -280,6 +285,48 @@ export class UI {
       });
       body.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { abandonJob(this.game, g.jobs.find(x => x.id === b.dataset.drop)); this.sfx(); rebuild(); });
     });
+  }
+
+  /** History of finished, failed and abandoned jobs and story missions. */
+  doneJobs(body) {
+    const g = this.g, list = g.jobsDone || [];
+    const kinds = { fracht: 'Fracht', kopfgeld: 'Kopfgeld', eskorte: 'Eskorte', story: 'Story' };
+    const ok = list.filter(d => d.status === 'ok');
+    // story missions finished before the history existed (older saves) are listed from the flags
+    const old = Object.keys(STORY).filter(id => g.flags['done:' + id] && !list.some(d => d.kind === 'story' && d.title === STORY[id].title));
+    let html = `<div class="donesum"><div><label>ERLEDIGT</label><b>${ok.length + old.length}</b></div><div><label>VERDIENT</label><b class="warm">${fmt(ok.reduce((a, d) => a + (d.pay || 0), 0))} Cr</b></div><div><label>ABSCHÜSSE</label><b>${g.kills}</b></div></div>`;
+    if (!list.length && !old.length) { body.innerHTML = html + '<p class="dim">Noch keine Aufträge erledigt. Frachtaufträge im Rhea-System sind ein guter Anfang.</p>'; return; }
+    html += '<table class="grid"><tr><th>Tag</th><th>Art</th><th>Auftrag</th><th>Ort</th><th class="num">Lohn</th></tr>';
+    for (const d of list) html += `<tr class="${d.status === 'ok' ? '' : 'dim'}"><td>${d.day}</td><td>${kinds[d.kind] || ''}</td><td>${esc(d.title)}${d.status === 'ok' ? ' <span class="good">✓</span>' : ` <span class="bad">${esc(d.status)}</span>`}</td><td>${esc(d.where || '')}</td><td class="num warm">${d.pay ? fmt(d.pay) : '–'}</td></tr>`;
+    for (const id of old) html += `<tr><td>–</td><td>Story</td><td>${esc(STORY[id].title)} <span class="good">✓</span></td><td></td><td class="num">–</td></tr>`;
+    body.innerHTML = html + '</table>';
+  }
+
+  // ------------------------------------------------------------------ pilot status (P anywhere on a station)
+  pilotStats() {
+    const g = this.g;
+    const reps = Object.entries(g.rep).map(([k, v]) => `<span>${FACTIONS[k]?.name || k}</span><div class="meter"><div style="width:${Math.min(100, Math.abs(v))}%;background:${v >= 0 ? 'var(--good)' : 'var(--bad)'}"></div></div><span class="${v >= 0 ? 'good' : 'bad'}">${v}</span>`).join('');
+    const ship = activeShip(g);
+    return `<h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">PILOT</h4>
+        <div class="statgrid"><span>Rufzeichen</span><b>${esc(g.callsign)}</b><span></span><span>Rang</span><b>${rank(g)}</b><span></span>
+        <span>Kredits</span><b class="warm">${fmt(g.credits)}</b><span></span><span>Verdient</span><b>${fmt(g.earned)}</b><span></span><span>Abschüsse</span><b>${g.kills}</b><span></span><span>Tag</span><b>${g.day}</b><span></span>
+        <span>Schiff</span><b>${ship ? esc(ship.name) : '–'}</b><span>${ship ? 'Rumpf ' + Math.round(ship.hull * 100) + ' %' : ''}</span><span>Aufträge</span><b>${g.jobs.length} offen</b><span>${(g.jobsDone || []).filter(d => d.status === 'ok').length} erledigt</span></div>
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">REPUTATION</h4><div class="statgrid">${reps}</div>`;
+  }
+
+  /** Pilot status (credits, rank, reputation, story) on a key press anywhere on a station; the same key closes it. */
+  toggleStats() {
+    if (this.statsEl) { this.statsEl._close(); return; }
+    if (this.modalOpen) return;
+    const g = this.g, st = STORY[g.story];
+    this.statsEl = this.panel('Pilotenstatus', `${esc(g.callsign)} · Tag ${g.day} · [${keyLabel(keysFor('stats')[0])}] schließt`, (body) => {
+      body.innerHTML = `<div class="split"><div>${this.pilotStats()}</div><div>
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">STORY</h4><div class="sidehint" style="position:static;max-width:none">${this.storyHint() || '–'}</div>
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">LAUFENDE AUFTRÄGE</h4>${g.jobs.length ? g.jobs.map(j => `<div>${esc(j.title)}${j.done ? ' <span class="good">✓ erfüllt, andocken zum Kassieren</span>' : ` <span class="dim">→ ${esc(j.kind === 'fracht' ? STATIONS[j.to].name : ZONES[j.zone].name)}</span>`}</div>`).join('') : '<span class="dim">Keine.</span>'}
+        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">LETZTE EINTRÄGE</h4><div style="font-size:14px;line-height:1.6">${g.log.slice(0, 6).map(l => `<div><span class="dim">Tag ${l.day}</span> · ${esc(l.text)}</div>`).join('')}</div>
+      </div></div>`;
+    }, { wide: true, onClose: () => { this.statsEl = null; } });
+    this.sfx('blip');
   }
 
   // ------------------------------------------------------------------ market
@@ -588,12 +635,8 @@ export class UI {
   openTerminal() {
     this.panel('Terminal', 'Kabine 4-117 · Hochstation Cassini', (body, rebuild) => {
       const g = this.g;
-      const reps = Object.entries(g.rep).map(([k, v]) => `<span>${FACTIONS[k]?.name || k}</span><div class="meter"><div style="width:${Math.min(100, Math.abs(v))}%;background:${v >= 0 ? 'var(--good)' : 'var(--bad)'}"></div></div><span class="${v >= 0 ? 'good' : 'bad'}">${v}</span>`).join('');
       body.innerHTML = `<div class="split"><div>
-        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">PILOT</h4>
-        <div class="statgrid"><span>Rufzeichen</span><b>${esc(g.callsign)}</b><span></span><span>Rang</span><b>${rank(g)}</b><span></span>
-        <span>Kredits</span><b class="warm">${fmt(g.credits)}</b><span></span><span>Verdient</span><b>${fmt(g.earned)}</b><span></span><span>Abschüsse</span><b>${g.kills}</b><span></span><span>Tag</span><b>${g.day}</b><span></span></div>
-        <h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:16px 0 8px">REPUTATION</h4><div class="statgrid">${reps}</div>
+        ${this.pilotStats()}
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn small warm" data-save>Speichern</button><button class="btn small" data-apt>Apartments &amp; Transit</button><button class="btn small" data-story>Story-Bibel</button></div>
         </div><div><h4 style="font-family:var(--f-head);letter-spacing:.14em;margin:0 0 8px">LOGBUCH</h4>
         <div style="max-height:52vh;overflow:auto;font-size:14px;line-height:1.6">${g.log.map(l => `<div><span class="dim">Tag ${l.day}</span> · ${esc(l.text)}</div>`).join('') || '<span class="dim">Noch leer.</span>'}</div></div></div>`;
@@ -643,7 +686,11 @@ export class UI {
     const hereMoon = moonOfZone(here);
     const ship = flight ? (flight.player.record?.cls ? flight.player.record : null) : activeShip(g);
     const jumpCls = ship ? shipStats(ship).jump : 0;
-    let selMoon = hereMoon, selZone = null;
+    // the active mission's target system is pre-selected, its zone is tagged
+    const goalZones = new Set([...g.jobs.filter(j => !j.done).map(j => j.kind === 'fracht' ? STATIONS[j.to].zone : j.zone),
+      ...(STORY[g.story]?.zone && g.flags['accepted:' + g.story] && !g.flags['done:' + g.story] ? [STORY[g.story].zone] : [])]);
+    const navZone = flight?.navGoal?.zone || [...goalZones][0];
+    let selMoon = navZone && navZone !== here ? moonOfZone(navZone) : hereMoon, selZone = null;
     const wrap = this.panel('Systemkarte · Saturn', flight ? `Sprungtriebwerk: Klasse ${JUMP_CLASS[jumpCls]} · Ziel wählen` : 'Die fünf Monde · Saturn ist dein Fixpunkt', (body) => {
       body.innerHTML = `<div class="mapwrap"><canvas width="900" height="666"></canvas><div class="dest"><div class="destinfo"></div><div class="list"></div></div></div>`;
       const cv = body.querySelector('canvas'), ctx = cv.getContext('2d');
@@ -693,7 +740,7 @@ export class UI {
         if (!ok) return;
         for (const zid of M.zones) {
           const z = ZONES[zid];
-          const row = $(`<div style="margin-top:10px"><div><b>${esc(z.name)}</b>${zid === here ? ' <span class="good">(hier)</span>' : ''}${z.hostile ? ' <span class="bad">feindlich</span>' : ''}</div></div>`);
+          const row = $(`<div style="margin-top:10px"><div><b>${esc(z.name)}</b>${zid === here ? ' <span class="good">(hier)</span>' : ''}${z.hostile ? ' <span class="bad">feindlich</span>' : ''}${goalZones.has(zid) ? ' <span class="goaltag">AUFTRAG</span>' : ''}</div></div>`);
           if (flight && zid !== here) {
             const jump = mid !== hereMoon;
             const t = travelInfo(here, zid);

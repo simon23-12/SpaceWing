@@ -1,4 +1,5 @@
 import { COMMODITIES, STATIONS, SHIP_CLASSES, shipStats, RANKS } from './data.js';
+import { ZONES } from '../space/universe.js';
 
 const KEY = 'spacewing.save.v1';
 
@@ -79,6 +80,14 @@ export function addCredits(g, n, reason) {
   g.credits = Math.round(g.credits + n);
   if (n > 0) g.earned += n;
   if (reason) logEntry(g, `${n > 0 ? '+' : ''}${fmt(n)} Cr – ${reason}`);
+}
+
+/** Finished (or failed) jobs and story missions, newest first, for the "Erledigt" tab of the Söldnerbörse. */
+export function recordDone(g, job, status = 'ok') {
+  g.jobsDone ||= [];
+  g.jobsDone.unshift({ day: g.day, kind: job.kind, title: job.title, client: job.client, pay: status === 'ok' ? job.pay || 0 : 0, status,
+    where: job.kind === 'fracht' ? STATIONS[job.to]?.name : job.kind === 'story' ? job.where : ZONES[job.zone]?.name?.split(' ·')[0] });
+  if (g.jobsDone.length > 60) g.jobsDone.length = 60;
 }
 
 export function logEntry(g, text) {

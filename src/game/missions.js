@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { STATIONS, COMMODITIES, SHIP_CLASSES, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS, shipStats } from './data.js';
 import { ZONES, travelInfo } from '../space/universe.js';
-import { addCredits, logEntry, fmt, activeShip, cargoFree } from './state.js';
+import { addCredits, logEntry, fmt, activeShip, cargoFree, recordDone } from './state.js';
 import { STORY } from './story.js';
 
 class Abort extends Error {}
@@ -162,6 +162,7 @@ export function abandonJob(game, job) {
   g.jobs = g.jobs.filter(j => j.id !== job.id);
   for (const s of g.ships) delete s.cargo['job:' + job.id];
   g.rep.cassini = (g.rep.cassini || 0) - 2;
+  recordDone(g, job, 'abgebrochen');
   logEntry(g, `Auftrag abgebrochen: ${job.title}`);
 }
 
@@ -174,11 +175,13 @@ export function onDockJobs(game, station) {
       if (!ship) continue;
       delete ship.cargo['job:' + j.id];
       addCredits(g, j.pay, `Fracht geliefert (${j.client})`);
+      recordDone(g, j);
       g.jobs = g.jobs.filter(x => x !== j);
       msgs.push(`Lieferung abgeschlossen: +${fmt(j.pay)} Cr`);
     }
     if ((j.kind === 'kopfgeld' || j.kind === 'eskorte') && j.done) {
       addCredits(g, j.pay, j.title);
+      recordDone(g, j);
       g.jobs = g.jobs.filter(x => x !== j);
       msgs.push(`${j.title}: +${fmt(j.pay)} Cr`);
     }
@@ -448,7 +451,7 @@ async function escortScript(c, game, job) {
     }
     return fr.ai.mode !== 'goto';
   });
-  if (!fr.alive) { c.objective('Eskorte gescheitert'); game.state.jobs = game.state.jobs.filter(j => j !== job); logEntry(game.state, 'Eskorte gescheitert.'); return; }
+  if (!fr.alive) { c.objective('Eskorte gescheitert'); game.state.jobs = game.state.jobs.filter(j => j !== job); recordDone(game.state, job, 'gescheitert'); logEntry(game.state, 'Eskorte gescheitert.'); return; }
   job.done = true;
   c.say(job.client, 'Wir sind sicher an der Bucht. Danke, Pilot – die Zahlung ist angewiesen.', 'neutral');
   c.objective('Eskorte erfüllt – zum Kassieren andocken');

@@ -61,7 +61,13 @@ export class HUD {
   toggleHelp() { this.help.style.opacity = this.help.style.opacity === '1' ? 0 : 1; }
 
   setZone(t) { this.zone.textContent = t; }
-  setObjective(t) { t = withKeys(t); this.obj.innerHTML = t ? `<b>ZIEL</b> ${t}` : ''; this.obj.classList.toggle('hidden', !t); }
+  /** Mission scripts set the objective; when they have none, the standing course hint of the active mission shows. */
+  setObjective(t) { this._obj = t || ''; this.showObjective(); }
+  setNav(t) { this._nav = t || ''; this.showObjective(); }
+  showObjective() {
+    const t = withKeys(this._obj || this._nav || '');
+    this.obj.innerHTML = t ? `<b>${this._obj ? 'ZIEL' : 'AUFTRAG'}</b> ${t}` : ''; this.obj.classList.toggle('hidden', !t);
+  }
   showToast(t, dur = 3) { this.toast.innerHTML = withKeys(t); this.toast.classList.add('on'); this.toastT = dur; }
   prompt(t) { this.promptEl.classList.toggle('hidden', !t); if (t) this.promptEl.innerHTML = withKeys(t); }
 
@@ -126,13 +132,13 @@ export class HUD {
     this.target.classList.remove('hidden');
     const d = flight.player.pos.distanceTo(t.pos);
     const fc = FACTIONS[t.faction] || FACTIONS.neutral;
-    const dist = d > 2000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
+    const dist = t.kind === 'nav' ? 'außerhalb der Zone' : d > 2000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
     if (t.isObject) {
       const key = t.name + '|' + Math.round(d / 10);
       if (this._tk === key) return;
       this._tk = key;
       this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
-        <div class="tfac">${t.kind === 'salvage' ? 'Objekt · Trümmer' : 'Objekt · Station · ' + fc.name}</div>
+        <div class="tfac">${t.kind === 'salvage' ? 'Objekt · Trümmer' : t.kind === 'nav' ? 'Kursmarke · Auftragsziel' : 'Objekt · Station · ' + fc.name}</div>
         <div class="tinfo">${withKeys(t.info)}</div><div class="tdist">${dist}</div>`;
       return;
     }
@@ -231,7 +237,7 @@ export class HUD {
     }
     // locked object (station / salvage): bracket and label
     const tg = p.target;
-    if (tg && tg.isObject && tg.alive) {
+    if (tg && tg.isObject && tg.alive && tg.kind !== 'nav') {
       const sp = this.project(cam, tg.pos), d = p.pos.distanceTo(tg.pos);
       if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) this.targetArrow(ctx, sp);
       else this.targetMark(ctx, sp.x, sp.y, tg.kind === 'salvage' ? 14 : 30, tg.name, d);
@@ -251,11 +257,13 @@ export class HUD {
     for (const w of flight.waypoints) {
       const sp = this.project(cam, w.pos);
       const d = p.pos.distanceTo(w.pos);
-      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) { this.edgeArrow(ctx, sp, '#ffd36a', true); continue; }
+      const sel = w.id === 'nav' && flight.navTarget && p.target === flight.navTarget;
+      if (sp.behind || sp.x < 0 || sp.x > W || sp.y < 0 || sp.y > H) { if (sel) this.targetArrow(ctx, sp); else this.edgeArrow(ctx, sp, '#ffd36a', true); continue; }
+      if (sel) { ctx.save(); ctx.strokeStyle = TGT; ctx.shadowColor = TGT_GLOW; ctx.shadowBlur = 10; ctx.lineWidth = 2.4; this.bracket(ctx, sp.x, sp.y, 20, false); ctx.restore(); }
       ctx.strokeStyle = '#ffd36a'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(sp.x, sp.y - 10); ctx.lineTo(sp.x + 10, sp.y); ctx.lineTo(sp.x, sp.y + 10); ctx.lineTo(sp.x - 10, sp.y); ctx.closePath(); ctx.stroke();
       ctx.fillStyle = '#ffd36a';
-      ctx.fillText(`${w.label}  ${d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 14, sp.y + 4);
+      ctx.fillText(`${w.label}  ${w.follow ? Math.round(w.follow.km).toLocaleString('de-DE') + ' km' : d > 2000 ? (d / 1000).toFixed(1) + 'km' : Math.round(d) + 'm'}`, sp.x + 14, sp.y + 4);
     }
     // damage vignette
     flight.game.renderer.grade.uniforms.hit.value = Math.max(0, 0.6 - (p.time - p.lastHit) * 1.5) * (p.hull < p.maxHull ? 1 : 0.4);
@@ -360,7 +368,7 @@ export class HUD {
     }
     for (const w of flight.waypoints) plot(w.pos, '#ffd36a', 3, false, true);
     if (flight.station) plot(flight.station.pos, '#8fd18f', 4, false, true);
-    if (p.target?.isObject && p.target.alive) plot(p.target.pos, TGT, 3, true, true);
+    if (p.target?.isObject && p.target.alive && p.target.kind !== 'nav') plot(p.target.pos, TGT, 3, true, true);
     ctx.fillStyle = '#bff'; ctx.beginPath(); ctx.moveTo(c, c - 6); ctx.lineTo(c + 4, c + 4); ctx.lineTo(c - 4, c + 4); ctx.fill();
   }
 }

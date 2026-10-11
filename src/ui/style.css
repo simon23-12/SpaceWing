@@ -349,3 +349,10 @@ td.nowrap { white-space: nowrap; }
 .balance { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 14px; padding: 8px 12px; border: 1px solid var(--line2); background: rgba(255,207,122,.06); font-family: var(--f-head); letter-spacing: .14em; }
 .balance span { color: var(--dim); font-size: 13px; }
 .balance b { color: var(--warm); font-size: 22px; letter-spacing: .06em; }
+.topbar .tbkey { pointer-events: auto; cursor: pointer; color: var(--dim); font-size: 13px; letter-spacing: .14em; border: 1px solid var(--line); padding: 3px 8px; }
+.topbar .tbkey:hover { color: var(--text); border-color: var(--accent); }
+.donesum { display: flex; gap: 12px; margin-bottom: 14px; }
+.donesum > div { flex: 1; border: 1px solid var(--line); padding: 8px 12px; background: rgba(127,212,255,.04); }
+.donesum label { display: block; color: var(--dim); font-family: var(--f-head); letter-spacing: .16em; font-size: 12px; }
+.donesum b { font-family: var(--f-head); font-size: 24px; }
+.goaltag { color: #1a1206; background: var(--warm); font-family: var(--f-head); font-size: 12px; letter-spacing: .14em; padding: 1px 6px; margin-left: 6px; }

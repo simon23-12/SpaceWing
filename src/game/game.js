@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Renderer } from '../core/renderer.js';
 import { Audio } from '../core/audio.js';
 import { input } from '../core/input.js';
+import { keysFor } from '../core/bindings.js';
 import { assets } from '../core/assets.js';
 import { UI } from '../ui/ui.js';
 import { state, newGame, activeShip, logEntry, addCredits, fmt, addShip } from './state.js';
@@ -74,6 +75,11 @@ export class Game {
     if (e.code === 'F12') { e.preventDefault(); if (!e.repeat) this.toggleFullscreen(); return; }
     if (this.mode?.kind === 'intro') {
       if (['Escape', 'Space', 'Enter', 'NumpadEnter'].includes(e.code)) { e.preventDefault(); this.mode.skip(); }
+      return;
+    }
+    // pilot status: anywhere on a station (walking, deck overview, docked menu), never in flight
+    if (keysFor('stats').includes(e.code) && !e.repeat && input.enabled && this.state && ['room', 'overview', 'dock'].includes(this.mode?.isRoom ? 'room' : this.mode?.kind) && !this.ui.dlg) {
+      if (this.ui.statsEl || !this.ui.modalOpen) { e.preventDefault(); this.ui.toggleStats(); }
       return;
     }
     if (e.code === 'Escape') {

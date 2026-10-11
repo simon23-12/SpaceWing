@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SkyLayer } from './skyLayer.js';
 import { ZONES, zoneAnchor, BODIES, SATURN, travelInfo } from './universe.js';
+import { STORY } from '../game/story.js';
 import { Ship, hostile } from './ship.js';
 import { updateAI, leadPoint, steerTo } from './ai.js';
 import { Bolts, Explosions, SpaceDust, Particles, TEX } from './effects.js';
@@ -9,7 +10,7 @@ import { Station, bakedMaterial } from './station.js';
 import { assets } from '../core/assets.js';
 import { Debris } from './debris.js';
 import { input } from '../core/input.js';
-import { FACTIONS, MOONS, moonOfZone } from '../game/data.js';
+import { FACTIONS, MOONS, moonOfZone, STATIONS } from '../game/data.js';
 import { cargoFree } from '../game/state.js';
 import { Streaks } from '../ui/streaks.js';
 
@@ -109,7 +110,49 @@ export class FlightMode {
     this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
     this.updateCamera(1, true);
     if (this.opts.mission) await this.opts.mission.start(this);
+    this.setupNav();
     this.emit('ready');
+  }
+
+  /**
+   * Where the active mission wants you to go. In the target zone: the station (pre-selected) or the fight.
+   * Elsewhere: a course marker in the direction of the target zone that can be locked like a target, and the
+   * objective line explains the way (system map, fusion burn or jump). Story missions come first, then jobs.
+   */
+  setupNav() {
+    if (this.opts.sim || this.gunner) return;
+    const g = this.game.state, goals = [];
+    const st = STORY[g.story];
+    if (st?.zone && g.flags['accepted:' + g.story] && !g.flags['done:' + g.story]) goals.push({ zone: st.zone, what: `Story: ${st.title}`, story: true });
+    for (const j of g.jobs) {
+      if (j.done) goals.push({ zone: this.zoneId, what: `${j.title} erfüllt`, dock: true, cash: true });
+      else if (j.kind === 'fracht') goals.push({ zone: STATIONS[j.to].zone, what: j.title, dock: true, station: STATIONS[j.to].name });
+      else goals.push({ zone: j.zone, what: j.title });
+    }
+    const goal = goals.find(x => x.zone !== this.zoneId && !x.cash) || goals[0];
+    if (!goal) return;
+    this.navGoal = goal;
+    if (goal.zone === this.zoneId) {
+      if (goal.dock && this.station && !this.zone.hostile) {
+        const w = this.waypoints.find(w => w.id === 'dock');
+        if (w) w.label = 'ZIEL · Andockbucht ' + this.station.name;
+        this.hud.setNav(goal.cash ? `${goal.what} · zum Kassieren an ${this.station.name} andocken [{k:dock}]` : `${goal.what} · abliefern: an ${this.station.name} andocken [{k:dock}]`);
+        if (this.opts.spawn !== 'undock') this.player.target = this.targetObjects().find(o => o.kind === 'station');
+      } else this.hud.setNav(`${goal.what} · Einsatzgebiet erreicht`);
+      return;
+    }
+    const from = this.anchor, to = zoneAnchor(goal.zone);
+    const dir = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize();
+    const jump = moonOfZone(goal.zone) !== moonOfZone(this.zoneId);
+    const name = goal.station || ZONES[goal.zone].name.split(' · ').pop();
+    const km = travelInfo(this.zoneId, goal.zone).distance;
+    const how = jump ? `Raumsprung nach ${MOONS[moonOfZone(goal.zone)].name}` : 'Fusionsbrand';
+    const p = this.player;
+    this.navTarget = { isObject: true, kind: 'nav', name: `Kurs: ${name}`, faction: 'neutral', alive: true, vel: new THREE.Vector3(), radius: 10,
+      get pos() { return p.pos.clone().addScaledVector(dir, 60000); }, info: `${goal.what}<br>[{k:map}] Systemkarte → ${how} „${name}“` };
+    this.addWaypoint('nav', p.pos.clone().addScaledVector(dir, 60000), `KURS · ${name}`).follow = { dir, km };
+    this.hud.setNav(`${goal.what} · Ziel ${name}: [{k:map}] Systemkarte öffnen und ${how} wählen`);
+    if (this.opts.spawn === 'arrive' && !this.player.target) this.player.target = this.navTarget;
   }
 
   async loadCockpit() {
@@ -450,6 +493,7 @@ export class FlightMode {
   /** Things you can lock onto besides ships: the station and salvage pieces nearby. */
   targetObjects() {
     const p = this.player, out = [];
+    if (this.navTarget) out.push(this.navTarget);
     if (this.station) {
       const st = this.station, zs = this.zone.station;
       this._stTgt ||= { isObject: true, kind: 'station', name: st.name || 'Station', faction: st.faction || 'neutral', alive: true, vel: new THREE.Vector3(), radius: 200,
@@ -661,6 +705,7 @@ export class FlightMode {
     if (this.debris) this.debris.update(dt, this.camera);
     if (this.opts.mission) this.opts.mission.update?.(this, dt);
     if (this.simGrid && p.pos.distanceTo(this.simGrid.position) > 3000) this.simGrid.position.lerp(p.pos, 0.02);
+    for (const w of this.waypoints) if (w.follow) w.pos.copy(p.pos).addScaledVector(w.follow.dir, 60000);
     this.updateCamera(dt);
     // far layer follows the camera (km)
     const o = this.anchorOverride || this.anchor;

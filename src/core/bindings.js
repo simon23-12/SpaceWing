@@ -36,6 +36,7 @@ export const ACTIONS = [
   ['run', 'Rennen', 'station', ['ShiftLeft']],
   ['use', 'Benutzen / Sprechen', 'station', ['KeyE']],
   ['deckplan', 'Deckplan', 'station', ['Tab']],
+  ['stats', 'Pilotenstatus (Reputation, Kredits)', 'station', ['KeyP']],
   ['menu', 'Menü (zusätzlich zu Esc)', 'beide', []],
 ];
 export const ACTION = Object.fromEntries(ACTIONS.map(a => [a[0], { id: a[0], label: a[1], ctx: a[2], keys: a[3] }]));

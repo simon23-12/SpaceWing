@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { addCredits, logEntry, addShip, fmt } from './state.js';
+import { addCredits, logEntry, addShip, fmt, recordDone } from './state.js';
 import { moonOfZone } from './data.js';
+import { ZONES } from '../space/universe.js';
 
 /*
  * Story missions. Each entry:
@@ -245,6 +246,7 @@ function completeStory(game, id, reward, next, text) {
   const g = game.state;
   g.flags['done:' + id] = true;
   if (reward) addCredits(g, reward, `Mission „${STORY[id].title}“`);
+  recordDone(g, { kind: 'story', title: STORY[id].title, pay: reward || 0, client: 'Story', where: ZONES[STORY[id].zone]?.name?.split(' ·')[0] || '' });
   g.story = next;
   logEntry(g, text || `Mission abgeschlossen: ${STORY[id].title}`);
   game.audio?.coins();
