@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addCredits, logEntry, addShip, fmt } from './state.js';
+import { moonOfZone } from './data.js';
 
 /*
  * Story missions. Each entry:
@@ -228,6 +229,16 @@ export function acceptStory(game, id) {
   g.flags['accepted:' + id] = true;
   logEntry(g, `Storymission angenommen: ${STORY[id].title}`);
   game.ui.notify(`Neue Mission: ${STORY[id].title}`);
+}
+
+/**
+ * Moon the current story mission's patron clears for jumps (null if none): with a `jumpPass` the mission's
+ * moon is reachable whatever the drive class, so the story never forces a particular shipyard build.
+ */
+export function storyJumpPass(g) {
+  const st = STORY[g.story];
+  if (!st?.jumpPass || !g.flags['accepted:' + g.story] || g.flags['done:' + g.story]) return null;
+  return moonOfZone(st.zone);
 }
 
 function completeStory(game, id, reward, next, text) {
@@ -518,6 +529,7 @@ export const STORY = {
     title: 'Goldene Lanzen', giver: ODUYA, zone: 'titan',
     available: (g) => g.flags['done:zoll'],
     brief: 'Ein versiegelter Datenkern muss nach Kraken-Hafen auf Titan, persönlich an das Büro der Konsulin Varga. Absender unbekannt, Bezahlung großzügig: 4.000 Cr.',
+    jumpPass: 'Das Büro der Konsulin schickt eine Sprungfreigabe: Das Leitfeuer von Kraken-Hafen zieht dich nach Titan, auch ohne Sprungtriebwerk Klasse II. Die Sprungenergie zahlt das Konsortium.',
     onAccept(game) { game.state.flags.datacore = true; },
     async flight(c, game) {
       const g = game.state, f = c.flight;
@@ -627,6 +639,7 @@ export const STORY = {
     title: 'Das Gewölbe', giver: JUNO, zone: 'iapetus',
     available: (g) => g.flags['done:funkstille'],
     brief: 'Bringe Mags und Juno Vesper nach Iapetus zum Gewölbe des Archivs. Das Konsortium wird versuchen, euch aufzuhalten.',
+    jumpPass: 'Juno kennt die Codes des alten Archiv-Leitfeuers: Es holt euch ins Iapetus-System, auch ohne Sprungtriebwerk Klasse III.',
     async flight(c, game) {
       const g = game.state, f = c.flight;
       if (g.flags['done:gewoelbe'] || f.opts.spawn !== 'arrive') return;
@@ -724,6 +737,7 @@ export const STORY = {
     title: 'Schakalnest', giver: NOOR, zone: 'phoebe',
     available: (g) => g.flags['done:blockade'],
     brief: 'Fliege nach Phoebe, schalte die Verteidigung des Schakalnests aus und lade Silas Rooks Logbücher herunter, um Vargas Verbindung zu den Schakalen zu beweisen. Zahlung: 12.000 Cr.',
+    jumpPass: 'Junos Archiv-Leitfeuer bringt dich wieder ins Iapetus-System, auch ohne Sprungtriebwerk Klasse III.',
     async flight(c, game) {
       const g = game.state, f = c.flight;
       if (g.flags.evidence2) { c.objective('Beweise sichern: Zurück nach Rhea'); return; }

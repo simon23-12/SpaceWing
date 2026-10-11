@@ -2,7 +2,7 @@ import { assets } from '../core/assets.js';
 import { SHIP_CLASSES, UPGRADES, MAX_UPGRADE, maxLevel, upgradePrice, PAINTS, PAINT_PRICE, shipStats, COMMODITIES, STATIONS, FACTIONS, MOONS, MOON_ORDER, moonOfZone, moonOfStation, JUMP_CLASS } from '../game/data.js';
 import { state, activeShip, cargoUsed, cargoFree, addCredits, fmt, rank, price, availableAt, logEntry, addShip } from '../game/state.js';
 import { generateJobs, acceptJob, abandonJob, jobBlocker, SIM_SCENARIOS, SIM_TIERS, MEDALS, simReward } from '../game/missions.js';
-import { STORY, PEOPLE, acceptStory, finaleChoice } from '../game/story.js';
+import { STORY, PEOPLE, acceptStory, finaleChoice, storyJumpPass } from '../game/story.js';
 import { ZONES, BODIES, zoneAnchor, travelInfo, SATURN } from '../space/universe.js';
 import { input } from '../core/input.js';
 import { ACTIONS, ACTION, AXES, keysFor, keyLabel, bindKey, resetKeys, withKeys, profileFor, saveProfile, resetProfile, defaultProfile, padLabel, padName } from '../core/bindings.js';
@@ -187,12 +187,13 @@ export class UI {
     if (old) old.replaceWith(this.topbar());
   }
 
-  /** Warning line if a mission zone lies in a moon system the active ship cannot jump to yet. */
-  jumpNeed(zone) {
+  /** Warning line if a mission zone lies in a moon system the active ship cannot jump to yet; for a story mission with a jump pass, the pass note instead. */
+  jumpNeed(zone, story = null) {
     const mid = zone && moonOfZone(zone);
     if (!mid) return '';
     const need = MOONS[mid].jump, ship = activeShip(this.g), have = ship ? shipStats(ship).jump : 0;
     if (mid === moonOfStation(this.g.location) || have >= need) return '';
+    if (story?.jumpPass) return `<p class="good" style="margin:4px 0 8px">${esc(story.jumpPass)}</p>`;
     return `<p class="bad" style="margin:4px 0 8px">Ziel ${MOONS[mid].name}: Sprungtriebwerk Klasse ${JUMP_CLASS[need]} nötig (Werft).</p>`;
   }
 
@@ -202,7 +203,7 @@ export class UI {
     if (!st || g.story === 'ende') return g.flags.endingShown ? '<b>FREIES SPIEL</b><br>Die Geschichte ist erzählt. Das Saturnsystem bleibt offen für Aufträge, Handel und Kopfgelder.' : '';
     if (g.story === 'prolog') return '<b>PROLOG · VIERZIG KREDITS</b><br>40 Kredits auf dem Konto, kein Schiff. Geh in die Bar und hör dich um.';
     if (g.story === 'eisfracht' && !g.flags['accepted:eisfracht']) return '<b>EISFRACHT</b><br>Kix meinte, die Alte am Fenstertisch der Bar sucht einen Piloten.';
-    if (g.flags['accepted:' + g.story]) return `<b>${esc(st.title.toUpperCase())}</b><br>${esc(st.brief)}${this.jumpNeed(st.zone)}`;
+    if (g.flags['accepted:' + g.story]) return `<b>${esc(st.title.toUpperCase())}</b><br>${esc(st.brief)}${this.jumpNeed(st.zone, st)}`;
     if (g.story === 'funkstille') return '<b>FUNKSTILLE</b><br>Von Mags fehlt jede Spur. Vielleicht weiß Kix in der Bar mehr.';
     if (g.story === 'kassini') return '<b>DIE KASSINI-TEILUNG</b><br>Mags und Juno warten in der Bar. Es ist Zeit für eine Entscheidung.';
     if (st.available && st.available(g)) return `<b>NEUE STORYMISSION</b><br>„${esc(st.title)}“ wartet an der Söldnerbörse.`;
@@ -245,8 +246,8 @@ export class UI {
       const st = STORY[g.story];
       let html = '<div class="cards">';
       if (st && st.available && st.available(g) && !g.flags['accepted:' + g.story] && st.giver !== 'kix' && st.giver !== 'juno') {
-        const need = this.jumpNeed(st.zone);
-        html += `<div class="card story${need ? ' blocked' : ''}"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p>${need}<div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1" ${need ? 'disabled' : ''}>Annehmen</button></div></div>`;
+        const need = this.jumpNeed(st.zone, st), blocked = need && !st.jumpPass;
+        html += `<div class="card story${blocked ? ' blocked' : ''}"><div class="meta">STORYMISSION</div><h4>${esc(st.title)}</h4><p>${esc(st.brief)}</p>${need}<div class="row"><span class="warm">Story</span><button class="btn small warm" data-story="1" ${blocked ? 'disabled' : ''}>Annehmen</button></div></div>`;
       }
       if (g.story === 'kassini' && !g.flags.ending && g.flags['done:schakalnest']) {
         html += `<div class="card story"><div class="meta">STORY</div><h4>Die Kassini-Teilung</h4><p>Mags und Juno warten in der Bar auf deine Entscheidung.</p></div>`;
@@ -703,10 +704,11 @@ export class UI {
             const jump = mid !== hereMoon;
             const t = travelInfo(here, zid);
             const borrowed = flight.player.record?.uid?.startsWith('TEMP');   // story ships: the owner pays the fuel
-            const fuelCost = borrowed ? 0 : jump ? Math.round((260 + M.jump * 180) * (g.flags.zoll ? 1.4 : 1)) : Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
-            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Hyperraumsprung' : 'Fusionsbrand'} · ${fuelCost} Cr</button>`);
+            const pass = jump && storyJumpPass(g) === mid;                       // story patron's beacon pulls the ship over
+            const fuelCost = borrowed || pass ? 0 : jump ? Math.round((260 + M.jump * 180) * (g.flags.zoll ? 1.4 : 1)) : Math.round(t.fuel * (g.flags.zoll ? 26 : 18));
+            const b = $(`<button class="btn ${jump ? 'warm' : ''} small" style="margin-top:6px">${jump ? 'Hyperraumsprung' : 'Fusionsbrand'} · ${pass ? 'Sprungfreigabe' : fuelCost + ' Cr'}</button>`);
             const blocked = flight.ships.some(s => s.alive && flight.isHostile(s, flight.player) && s.pos.distanceTo(flight.player.pos) < 2500);
-            if (jump && jumpCls < M.jump) b.disabled = true, b.textContent = `Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig (Werft)`;
+            if (jump && jumpCls < M.jump && !pass) b.disabled = true, b.textContent = `Sprungtriebwerk Klasse ${JUMP_CLASS[M.jump]} nötig (Werft)`;
             else if (blocked) b.disabled = true, b.textContent = 'Feinde zu nah';
             else if (g.credits < fuelCost) b.disabled = true, b.textContent = 'Zu wenig Kredits für Treibstoff';
             b.onclick = () => { g.credits -= fuelCost; wrap._close(); this.game.travel(flight, zid, jump); };
