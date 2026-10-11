@@ -168,6 +168,7 @@ export class RoomMode {
     this.updateRoom(true);
     this.roomEnvs();
     await this.populate();
+    await this.game.renderer.warm(this.scene, this.camera);
     if (this.cine) return;
     this.game.renderer.setLayers(this.sky, { scene: this.scene, camera: this.camera });
     this.ui();

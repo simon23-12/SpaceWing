@@ -5,7 +5,8 @@ import { CommScreen, drawStatus, drawDrive } from './hudParts.js';
 import { ASSIST_CONE, ASSIST_CONE_TURRET } from './flight.js';
 import { K, withKeys } from '../core/bindings.js';
 
-const _v = new THREE.Vector3(), _p = new THREE.Vector3();
+const _v = new THREE.Vector3(), _p = new THREE.Vector3(), _q = new THREE.Quaternion();
+const RADAR_W = 300, RADAR_H = 170;   // CSS pixels (the canvas has twice that)
 // the selected target (T / Y) is always purple, so it never blends in with the faction-coloured contacts
 const TGT = '#c45cff', TGT_GLOW = 'rgba(196,92,255,0.85)';
 
@@ -36,11 +37,11 @@ export class HUD {
     this.target = el('div', 'hud-panel hud-target hidden', this.root);
     this.salvageEl = el('div', 'hud-salvage hidden', this.root);
     this.radar = el('canvas', 'hud-radar', this.root);
-    this.radar.width = this.radar.height = 220;
+    this.radar.width = RADAR_W * 2; this.radar.height = RADAR_H * 2;
     this.rctx = this.radar.getContext('2d');
     this.help = el('div', 'hud-help', this.root, gunner
-      ? `Maus: Turm drehen · LMB/${K('fire')}: Feuer · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('help')}: Hilfe`
-      : `Maus: Steuern · ${K('throttleUp')}/${K('throttleDown')}: Schub · ${K('rollLeft')}/${K('rollRight')}: Rollen · ${K('strafeLeft')}/${K('strafeRight')}: Seitwärts · ${K('boost')}: Boost · LMB/${K('fire')}: Laser · RMB/${K('missile')}: Rakete · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('camera')}: Kamera · ${K('dock')}: Andocken · ${K('map')}: Karte · ${K('help')}: Hilfe`);
+      ? `Maus: Turm drehen · LMB/${K('fire')}: Feuer · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('targetHostile')}: nächster Feind · ${K('help')}: Hilfe`
+      : `Maus: Steuern · ${K('throttleUp')}/${K('throttleDown')}: Schub · ${K('rollLeft')}/${K('rollRight')}: Rollen · ${K('strafeLeft')}/${K('strafeRight')}: Seitwärts · ${K('boost')}: Boost · LMB/${K('fire')}: Laser · RMB/${K('missile')}: Rakete · ${K('targetNext')}/${K('targetPrev')}: Ziel vor/zurück · ${K('targetAim')}: Ziel am Fadenkreuz · ${K('targetHostile')}: nächster Feind · ${K('camera')}: Kamera · ${K('dock')}: Andocken · ${K('map')}: Karte · ${K('help')}: Hilfe`);
     this.help.style.opacity = 0;
     this.commQueue = [];
     this.commT = 0;
@@ -126,6 +127,15 @@ export class HUD {
       ${full ? '<div class="sh">An einer Station verkaufen · Netz in der Werkstatt aufrüsten</div>' : net ? '' : '<div class="sh">Trümmer in der Nähe: einfach hindurchfliegen</div>'}`;
   }
 
+  /** Screen rectangle of the live view in the target panel (or null). */
+  targetView() {
+    if (this.target.classList.contains('hidden')) return null;
+    const v = this.target.querySelector('.tview');
+    if (!v) return null;
+    const r = v.getBoundingClientRect();
+    return r.width > 10 && r.height > 10 ? r : null;
+  }
+
   drawTarget(flight) {
     const t = flight.player.target;
     if (!t || !t.alive) { this.target.classList.add('hidden'); return; }
@@ -137,7 +147,7 @@ export class HUD {
       const key = t.name + '|' + Math.round(d / 10);
       if (this._tk === key) return;
       this._tk = key;
-      this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
+      this.target.innerHTML = `<div class="thead">ZIEL</div>${t.kind === 'nav' ? '' : '<div class="tview"></div>'}<div class="tname" style="color:${t.kind === 'salvage' ? '#ffb050' : fc.color}">${t.name}</div>
         <div class="tfac">${t.kind === 'salvage' ? 'Objekt · Trümmer' : t.kind === 'nav' ? 'Kursmarke · Auftragsziel' : 'Objekt · Station · ' + fc.name}</div>
         <div class="tinfo">${withKeys(t.info)}</div><div class="tdist">${dist}</div>`;
       return;
@@ -147,7 +157,7 @@ export class HUD {
     if (this._tk === key) return;
     this._tk = key;
     const cls = t.stats?.name ? `${t.stats.name}${t.stats.role ? ' · ' + t.stats.role : ''}` : '';
-    this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tname" style="color:${fc.color}">${t.name}</div>
+    this.target.innerHTML = `<div class="thead">ZIEL</div><div class="tview"></div><div class="tname" style="color:${fc.color}">${t.name}</div>
       <div class="tfac">${cls}</div>
       <div class="tfac">${fc.name}${t.cargoLabel ? ' · ' + t.cargoLabel : ''}</div>
       <div class="bar"><label>SCHILD</label><div class="track"><div class="fill shield" style="width:${100 * t.shield / t.maxShield}%"></div></div></div>
@@ -336,39 +346,86 @@ export class HUD {
     ctx.restore();
   }
 
+  /**
+   * Radar as a tilted disc seen from behind and above: range rings in perspective, a rotating sweep, every contact
+   * on a stem from its spot on the plane up (or down) to its height, so above/below reads at a glance.
+   * Contacts pulse when the sweep passes, hostiles blink, the target gets a purple ring.
+   */
   drawRadar(flight) {
-    const ctx = this.rctx, S = 220, c = S / 2, R = 100;
-    const p = flight.player;
-    ctx.clearRect(0, 0, S, S);
-    ctx.fillStyle = 'rgba(6,14,22,0.55)'; ctx.beginPath(); ctx.arc(c, c, R + 6, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(120,200,255,0.25)'; ctx.lineWidth = 1;
-    for (const r of [R, R * 0.66, R * 0.33]) { ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke(); }
-    ctx.beginPath(); ctx.moveTo(c - R, c); ctx.lineTo(c + R, c); ctx.moveTo(c, c - R); ctx.lineTo(c, c + R); ctx.stroke();
+    const ctx = this.rctx, W = RADAR_W, Hh = RADAR_H, px = 2;
+    const cx = W / 2, cy = Hh * 0.47, R = W * 0.43, tilt = 0.42;   // tilt = cos of the viewing angle onto the plane
+    const p = flight.player, now = performance.now() / 1000;
+    ctx.setTransform(px, 0, 0, px, 0, 0);
+    ctx.clearRect(0, 0, W, Hh);
     const range = flight.radarRange || 5000;
-    const inv = p.quat.clone().invert();
-    const plot = (pos, col, size, isT, sq) => {
+    const inv = _q.copy(p.quat).invert();
+    const sweep = (now * 1.6) % (Math.PI * 2);
+    // disc, rings, sweep (drawn in plane space: y squashed by the tilt)
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(1, tilt);
+    const bg = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R * 1.05);
+    bg.addColorStop(0, 'rgba(20,60,80,0.55)'); bg.addColorStop(0.75, 'rgba(6,22,34,0.55)'); bg.addColorStop(1, 'rgba(4,12,20,0.2)');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(0, 0, R * 1.04, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 1 / tilt * 0.9;
+    for (const [r, al] of [[1, 0.5], [0.66, 0.28], [0.33, 0.22]]) { ctx.strokeStyle = `rgba(120,210,255,${al})`; ctx.beginPath(); ctx.arc(0, 0, R * r, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(120,210,255,0.14)';
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 0.33, Math.sin(a) * R * 0.33); ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); ctx.stroke(); }
+    // forward wedge (field of view) and the sweep trail
+    ctx.fillStyle = 'rgba(160,230,255,0.06)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, -Math.PI / 2 - 0.6, -Math.PI / 2 + 0.6); ctx.closePath(); ctx.fill();
+    for (let k = 0; k < 14; k++) {
+      ctx.fillStyle = `rgba(90,220,255,${0.16 * (1 - k / 14)})`;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, sweep - (k + 1) * 0.05, sweep - k * 0.05); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(150,240,255,0.7)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(sweep) * R, Math.sin(sweep) * R); ctx.stroke();
+    ctx.restore();
+    // contacts, far ones first
+    const items = [];
+    const add = (pos, col, size, opts = {}) => {
       const l = _v.copy(pos).sub(p.pos).applyQuaternion(inv);
-      const d = l.length();
-      const k = Math.min(1, Math.sqrt(d / range));
-      const h = Math.hypot(l.x, l.z) || 1;
-      const x = c + (l.x / h) * k * R, y = c + (l.z / h) * k * R;
-      const elev = THREE.MathUtils.clamp(-l.y / range * R * 0.6, -25, 25);
-      ctx.strokeStyle = col; ctx.globalAlpha = 0.5;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + elev); ctx.stroke();
-      ctx.globalAlpha = d > range ? 0.45 : 1; ctx.fillStyle = col;
-      if (sq) ctx.fillRect(x - size, y + elev - size, size * 2, size * 2);
-      else { ctx.beginPath(); ctx.arc(x, y + elev, size, 0, Math.PI * 2); ctx.fill(); }
-      if (isT) { ctx.globalAlpha = 1; ctx.strokeStyle = TGT; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y + elev, size + 4, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1; }
-      ctx.globalAlpha = 1;
+      const d = l.length(), k = Math.min(1, Math.sqrt(d / range)), h = Math.hypot(l.x, l.z) || 1;
+      const nx = l.x / h * k, nz = l.z / h * k;
+      const elev = THREE.MathUtils.clamp(l.y / range, -1, 1);
+      items.push({ x: cx + nx * R, y: cy + nz * R * tilt, e: -Math.sign(elev) * Math.min(1, Math.sqrt(Math.abs(elev))) * R * 0.32, col, size, out: d > range, ang: Math.atan2(nz, nx), ...opts });
     };
     for (const s of flight.ships) {
       if (s === p || !s.alive) continue;
-      const col = hostile(s.faction, 'player', flight.hostileOverrides) ? '#ff5a4a' : (FACTIONS[s.faction] || FACTIONS.neutral).color;
-      plot(s.pos, col, s.stats.length > 30 ? 3.5 : 2.5, p.target === s);
+      const hostileTo = hostile(s.faction, 'player', flight.hostileOverrides);
+      add(s.pos, hostileTo ? '#ff5a4a' : (FACTIONS[s.faction] || FACTIONS.neutral).color, s.stats.length > 30 ? 3.6 : 2.6, { hostile: hostileTo, tgt: p.target === s, ship: true });
     }
-    for (const w of flight.waypoints) plot(w.pos, '#ffd36a', 3, false, true);
-    if (flight.station) plot(flight.station.pos, '#8fd18f', 4, false, true);
-    if (p.target?.isObject && p.target.alive && p.target.kind !== 'nav') plot(p.target.pos, TGT, 3, true, true);
-    ctx.fillStyle = '#bff'; ctx.beginPath(); ctx.moveTo(c, c - 6); ctx.lineTo(c + 4, c + 4); ctx.lineTo(c - 4, c + 4); ctx.fill();
+    for (const w of flight.waypoints) add(w.pos, '#ffd36a', 2.6, { shape: 'diamond' });
+    if (flight.station) add(flight.station.pos, '#8fd18f', 3.4, { shape: 'square' });
+    if (p.target?.isObject && p.target.alive && p.target.kind !== 'nav') add(p.target.pos, TGT, 2.6, { tgt: true, shape: 'square' });
+    items.sort((u, v) => u.y - v.y);
+    for (const it of items) {
+      const top = it.y + it.e;
+      // the sweep lights contacts up as it passes
+      let since = (sweep - it.ang) % (Math.PI * 2); if (since < 0) since += Math.PI * 2;
+      const glow = Math.max(0, 1 - since / 1.2);
+      ctx.globalAlpha = it.out ? 0.4 : 0.55;
+      ctx.strokeStyle = it.col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(it.x, it.y, 2.6, 2.6 * tilt, 0, 0, Math.PI * 2); ctx.stroke();   // foot on the plane
+      ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(it.x, top); ctx.stroke();                  // stem
+      const blink = it.hostile ? 0.6 + 0.4 * Math.sin(now * 8) : 1;
+      ctx.globalAlpha = (it.out ? 0.5 : 1) * blink;
+      ctx.shadowColor = it.col; ctx.shadowBlur = 4 + glow * 10;
+      ctx.fillStyle = it.col;
+      const sz = it.size * (1 + glow * 0.45);
+      if (it.shape === 'square') ctx.fillRect(it.x - sz, top - sz, sz * 2, sz * 2);
+      else if (it.shape === 'diamond') { ctx.beginPath(); ctx.moveTo(it.x, top - sz * 1.3); ctx.lineTo(it.x + sz, top); ctx.lineTo(it.x, top + sz * 1.3); ctx.lineTo(it.x - sz, top); ctx.closePath(); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(it.x, top, sz, 0, Math.PI * 2); ctx.fill(); }
+      ctx.shadowBlur = 0;
+      if (it.tgt) {
+        ctx.globalAlpha = 1; ctx.strokeStyle = TGT; ctx.lineWidth = 1.6;
+        const rr = sz + 4 + Math.sin(now * 5) * 1.2;
+        ctx.beginPath(); ctx.arc(it.x, top, rr, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
+      }
+    }
+    ctx.globalAlpha = 1;
+    // own ship: a small chevron in the middle, standing on the plane
+    ctx.fillStyle = '#d8fbff'; ctx.shadowColor = '#7fd4ff'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(cx, cy - 7); ctx.lineTo(cx + 5, cy + 4); ctx.lineTo(cx, cy + 1.5); ctx.lineTo(cx - 5, cy + 4); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(160,220,240,0.75)'; ctx.font = '600 10px Rajdhani, sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(`${(range / 1000).toFixed(0)} km`, cx + R, cy + R * tilt + 12); ctx.textAlign = 'left';
   }
 }
+

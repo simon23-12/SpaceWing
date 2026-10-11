@@ -93,6 +93,26 @@ export class Renderer {
     u.flash.value = 0; u.hit.value = 0;
   }
 
+  /**
+   * Warm-up behind the loading screen: compile every shader of the scene and upload its textures now, so the
+   * first frames (and the first look into another room) do not stutter. Hidden objects are included.
+   */
+  async warm(scene, camera) {
+    const hidden = [];
+    scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    const seen = new Set();
+    scene.traverse(o => {
+      for (const m of [].concat(o.material || [])) {
+        for (const k of ['map', 'lightMap', 'aoMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap']) {
+          const t = m[k];
+          if (t && !seen.has(t) && t.image) { seen.add(t); try { this.gl.initTexture(t); } catch { } }
+        }
+      }
+    });
+    try { await (this.gl.compileAsync ? this.gl.compileAsync(scene, camera) : this.gl.compile(scene, camera)); } catch (e) { console.warn('warm-up', e); }
+    for (const o of hidden) o.visible = false;
+  }
+
   render(dt) {
     this.grade.uniforms.time.value += dt;
     this.composer.render(dt);

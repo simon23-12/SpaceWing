@@ -59,7 +59,7 @@ export class Game {
     if (input.pad?.hit('menu') && (this.mode?.isRoom || this.mode?.isFlight) && !this.ui.modalOpen) this.ui.pause();
     else if (input.actHit('menu') && !this.ui.modalOpen && (this.mode?.isRoom || this.mode?.isFlight)) this.ui.pause();
     if (this.mode && !this.paused && this.mode.update) this.mode.update(dt);
-    if (this.mode && this.mode.render3D !== false) this.renderer.render(dt);
+    if (this.mode && this.mode.render3D !== false) { this.renderer.render(dt); if (!this.paused) this.mode.postRender?.(dt); }
     input.endFrame();
   }
 

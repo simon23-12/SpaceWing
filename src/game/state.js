@@ -79,7 +79,8 @@ export function addShip(g, cls, name) {
 
 export function activeShip(g) { return g.ships.find(s => s.uid === g.activeShip) || null; }
 
-export function cargoUsed(ship) { return Object.values(ship.cargo || {}).reduce((a, b) => a + b, 0); }
+/** Hold in use. Salvage rides in the salvage net, which has its own capacity (see shipStats().salvage). */
+export function cargoUsed(ship) { return Object.entries(ship.cargo || {}).reduce((a, [k, n]) => k === 'schrott' ? a : a + n, 0); }
 
 export function cargoFree(ship) { return shipStats(ship).cargo - cargoUsed(ship); }
 

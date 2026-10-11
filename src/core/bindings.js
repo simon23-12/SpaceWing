@@ -24,6 +24,7 @@ export const ACTIONS = [
   ['targetNext', 'Nächstes Ziel', 'flug', ['KeyT']],
   ['targetPrev', 'Vorheriges Ziel', 'flug', ['KeyR']],
   ['targetAim', 'Ziel am Fadenkreuz', 'flug', ['KeyG', 'KeyY']],
+  ['targetHostile', 'Nächster Feind', 'flug', ['KeyB']],
   ['camera', 'Cockpit / Verfolgerkamera', 'flug', ['KeyC']],
   ['assist', 'Flughilfe an/aus', 'flug', ['KeyZ']],
   ['dock', 'Andocken', 'flug', ['KeyL']],

@@ -189,7 +189,7 @@ table.grid tr:hover td { background: rgba(127,212,255,.05); }
 .hud-target .tinfo { font-family: var(--f-text); font-size: 13px; color: #cfe4ee; letter-spacing: 0; margin-top: 4px; line-height: 1.35; }
 .hud-target .tdist small { font-size: 12px; color: var(--dim); margin-left: 6px; }
 .hud-target .tdist { text-align: right; font-size: 20px; color: #fff; margin-top: 4px; }
-.hud-radar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); width: 200px; height: 200px; }
+.hud-radar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 300px; height: 170px; }
 .hud-help { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); font-family: var(--f-text); letter-spacing: 0; font-size: 13px; color: var(--dim); background: rgba(0,0,0,.5); padding: 6px 12px; transition: opacity 1s; max-width: 90vw; text-align: center; }
 
 /* ------------------------------------------------ map */
@@ -374,3 +374,7 @@ td.nowrap { white-space: nowrap; }
 .hsell label { display: block; color: var(--dim); font-family: var(--f-head); letter-spacing: .16em; font-size: 12px; }
 .hsell b { font-family: var(--f-head); font-size: 28px; }
 @media (max-width: 760px) { .hangar { grid-template-columns: 1fr; } .hinfo { flex-direction: column; } .hsell { text-align: left; } }
+.hud-target .tview { height: 128px; margin: 4px -4px 8px; border: 1px solid rgba(196,92,255,.35); background: transparent; position: relative; }
+.hud-target .tview::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(196,92,255,.06) 0 1px, transparent 1px 3px); pointer-events: none; }
+/* the live view is drawn into the canvas below: keep the panel's tint off that strip */
+.hud-target:has(.tview) { background: linear-gradient(to bottom, rgba(4,10,16,.55) 0 30px, transparent 30px 165px, rgba(4,10,16,.55) 165px); }

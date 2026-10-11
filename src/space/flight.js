@@ -11,7 +11,6 @@ import { assets } from '../core/assets.js';
 import { Debris } from './debris.js';
 import { input } from '../core/input.js';
 import { FACTIONS, MOONS, moonOfZone, STATIONS } from '../game/data.js';
-import { cargoFree } from '../game/state.js';
 import { Streaks } from '../ui/streaks.js';
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _ec = new THREE.Color();
@@ -69,6 +68,8 @@ export class FlightMode {
     this.satLight.position.copy(toSat).multiplyScalar(1000);
     sc.add(this.satLight);
     sc.add(new THREE.AmbientLight(0x202430, 0.4));
+    // key light for the target live view: always in the scene (no shader recompiles), lit only while that view renders
+    this.viewLight = new THREE.DirectionalLight(0xdfe8ff, 0); sc.add(this.viewLight, this.viewLight.target);
     this.sky.setOrigin(...this.anchor);
     this.captureEnvironment();
 
@@ -111,6 +112,7 @@ export class FlightMode {
     this.updateCamera(1, true);
     if (this.opts.mission) await this.opts.mission.start(this);
     this.setupNav();
+    await this.game.renderer.warm(this.scene, this.camera);
     this.emit('ready');
   }
 
@@ -189,7 +191,7 @@ export class FlightMode {
       x.fillStyle = '#031018'; x.fillRect(0, 0, 320, 240);
       x.font = '600 20px Rajdhani, sans-serif'; x.fillStyle = '#7fd4ff';
       if (m.name === 'screen_l') {
-        x.drawImage(this.hud.radar, 50, 10, 220, 220);
+        x.drawImage(this.hud.radar, 0, 35, 320, 181);
       } else if (m.name === 'screen_c') {
         const t = p.target;
         if (t && t.alive) { x.fillStyle = '#c45cff'; x.fillRect(0, 0, 6, 240); x.strokeStyle = '#c45cff'; x.lineWidth = 3; x.strokeRect(1.5, 1.5, 317, 237); }
@@ -407,11 +409,12 @@ export class FlightMode {
     if (input.actHit('targetNext')) this.cycleTarget(1);
     if (input.actHit('targetPrev')) this.cycleTarget(-1);
     if (input.actHit('targetAim')) this.targetAhead();
+    if (input.actHit('targetHostile')) this.targetNearestHostile();
     if (input.actHit('camera')) this.camMode = this.camMode === 'chase' ? 'cockpit' : 'chase';
     if (input.actHit('help')) this.hud.toggleHelp();
     if ((input.click(2) && input.locked) || input.actHit('missile')) {
       if (this.lock && this.lock.t >= p.stats.lockTime) { this.fireMissile(p, this.lock.target); this.lock.t = 0; }
-      else this.hud.showToast('Keine Zielerfassung', 1.2);
+      else this.hud.showToast(p.target?.alive && !p.target.isObject && !this.isHostile(p.target, p) ? 'Keine Raketen auf freundliche Ziele' : 'Keine Zielerfassung', 1.2);
     }
     if (input.actHit('dock')) this.requestDock();
     if (input.actHit('map')) { if (this.opts.sim) this.hud.showToast('Im Simulator gibt es keine Systemkarte', 2); else this.game.ui.openMap(this); }
@@ -425,7 +428,8 @@ export class FlightMode {
       if (!p.target || !p.target.alive) { const h = this.nearestHostile(p, 2500); if (h) p.target = h; else if (p.target && !p.target.alive) p.target = null; }
     }
     const t = p.target;
-    if (t && t.alive && !t.isObject && p.missiles > 0) {
+    // missiles only lock onto hostiles: friendly ships and objects can be selected, never locked
+    if (t && t.alive && !t.isObject && p.missiles > 0 && this.isHostile(t, p)) {
       const to = _v.copy(t.pos).sub(p.pos); const d = to.length();
       const ang = to.normalize().angleTo(p.forward(_w));
       if (d < 3500 && ang < 0.35) {
@@ -451,6 +455,7 @@ export class FlightMode {
     if (input.actHit('targetNext')) this.cycleTarget(1);
     if (input.actHit('targetPrev')) this.cycleTarget(-1);
     if (input.actHit('targetAim')) this.targetAhead();
+    if (input.actHit('targetHostile')) this.targetNearestHostile();
     if (input.actHit('help')) this.hud.toggleHelp();
   }
 
@@ -519,6 +524,13 @@ export class FlightMode {
     const i = list.indexOf(p.target);
     p.target = list[i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length];
     this.game.audio?.blip();
+  }
+
+  /** Select the closest hostile ship (rebindable key, default B). */
+  targetNearestHostile() {
+    const h = this.nearestHostile(this.player, 12000);
+    if (h) { this.player.target = h; this.game.audio?.blip(); }
+    else this.hud.showToast('Keine Feinde in Reichweite', 1.2);
   }
 
   /** Lock whatever sits closest to the crosshair (ships count a little more than objects, distance a little). */
@@ -724,6 +736,48 @@ export class FlightMode {
     if (!p.alive && !this.deadHandled) { this.deadHandled = true; this.onPlayerDeath(); }
   }
 
+  /**
+   * Live view of the selected target in the target panel: a second camera circles the target and renders it
+   * straight into the panel's screen rectangle after the main frame (no post effects, no read-back).
+   */
+  postRender(dt) {
+    const t = this.player?.target, slot = this.hud.targetView();
+    if (!t || !t.alive || t.kind === 'nav' || !slot || this.state === 'travel') return;
+    const R = this.game.renderer.gl;
+    const cam = this.viewCam ||= new THREE.PerspectiveCamera(30, 1, 0.1, 5e4);
+    this.viewA = (this.viewA || 0) + dt * 0.35;
+    // what to frame: ships by their size, the station as a whole, salvage close up
+    const centre = t.kind === 'station' ? this.station.pos : t.pos;
+    const size = t.kind === 'station' ? this.station.boundR * 0.9 : t.kind === 'salvage' ? 3 : Math.max(4, (t.model?.length || t.radius * 2) * 0.62);
+    const dist = size / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * 0.8;
+    // orbit slowly, seen a little from above and from the side that faces us
+    const toUs = _v.copy(this.player.pos).sub(centre).setY(0);
+    const base = toUs.lengthSq() > 1 ? Math.atan2(toUs.x, toUs.z) : 0;
+    const a = base + Math.sin(this.viewA) * 0.9;
+    cam.position.set(centre.x + Math.sin(a) * dist * 0.92, centre.y + dist * 0.32, centre.z + Math.cos(a) * dist * 0.92);
+    cam.lookAt(centre);
+    cam.near = Math.max(0.05, dist * 0.02); cam.far = dist * 4 + size * 4;
+    cam.aspect = slot.width / slot.height; cam.updateProjectionMatrix();
+    const H = innerHeight, y = H - slot.bottom;
+    const wasVis = this.player.model.root.visible, ck = this.cockpit?.visible;
+    this.player.model.root.visible = t !== this.player && this.camMode !== 'cockpit' ? true : wasVis;
+    if (this.cockpit) this.cockpit.visible = false;
+    const dust = this.dust?.mesh?.visible;
+    if (this.dust?.mesh) this.dust.mesh.visible = false;
+    R.setScissorTest(true);
+    R.setScissor(slot.left, y, slot.width, slot.height); R.setViewport(slot.left, y, slot.width, slot.height);
+    R.setClearColor(0x03080e, 1); R.clear(true, true, false);
+    this.viewLight.position.copy(cam.position).add(_w.set(0, dist * 0.5, 0)); this.viewLight.target.position.copy(centre); this.viewLight.intensity = 2.2;
+    R.render(this.scene, cam);
+    this.viewLight.intensity = 0;
+    R.setScissorTest(false);
+    R.setViewport(0, 0, innerWidth, innerHeight);
+    R.setClearColor(0x000000, 1);
+    this.player.model.root.visible = wasVis;
+    if (this.cockpit) this.cockpit.visible = ck;
+    if (this.dust?.mesh) this.dust.mesh.visible = dust;
+  }
+
   updateCamera(dt, snap = false) {
     const p = this.player, cam = this.camera;
     const k = snap ? 1 : 1 - Math.exp(-dt * (this.camMode === 'cockpit' ? 30 : 7));
@@ -904,8 +958,8 @@ export class FlightMode {
       const d = s.mesh.position.distanceTo(p.pos);
       if (p.alive && d < 24 + p.hitRadius && !this.gunner) {
         const rec = p.record, cap = p.stats.salvage || 2, have = rec.cargo?.schrott || 0;
-        if (have >= cap || cargoFree(rec) <= 0) {
-          if (this.time - (this.netFullT || -9) > 4) { this.netFullT = this.time; this.hud.showToast(have >= cap ? `Bergungsnetz voll (${cap} t) – in der Werkstatt aufrüsten` : 'Frachtraum voll', 2.5); }
+        if (have >= cap) {
+          if (this.time - (this.netFullT || -9) > 4) { this.netFullT = this.time; this.hud.showToast(`Bergungsnetz voll (${cap} t) – in der Werkstatt aufrüsten`, 2.5); }
         } else {
           rec.cargo.schrott = have + 1;
           this.game.state.flags.firstSalvage = true;
