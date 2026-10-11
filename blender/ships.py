@@ -567,6 +567,262 @@ def _simpod(part):
 
 SHIPS.update({'prop_simpod': lambda: _simpod('body'), 'prop_simpod_hatch': lambda: _simpod('hood')})
 
+
+# ------------------------------------------------------------------------------------------- espresso machine
+
+def _espresso_mats():
+    """Small-scale materials for the cabin espresso machine (object space = metres, the machine is ~30 cm)."""
+    from swlib import G as _G
+    def new(name):
+        m = swlib.new_mat(name); m.node_tree.nodes.clear(); return m, _G(m.node_tree)
+    mats = {}
+    # polished chrome with faint smudges
+    m, g = new('esp_chrome'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    sm, _ = g.noise(g.vscale(p, 30.0), 1.0, 6, 0.6)
+    mats['chrome'] = swship._finish(m, g, g.rgb('#d7dade'), g.add(0.05, g.mul(g.smooth(sm, 0.55, 0.8), 0.12)), 1.0,
+                                     bump_h=g.mul(sm, 0.004), bump_strength=0.1)
+    # brushed stainless for the housing: horizontal grain
+    m, g = new('esp_brushed'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    px, py, pz = g.sep(p)
+    br, _ = g.noise(g.combine(g.mul(px, 4.0), g.mul(py, 900.0), g.mul(pz, 900.0)), 1.0, 3, 0.5)
+    sm, _ = g.noise(g.vscale(p, 18.0), 1.0, 5, 0.6)
+    base = g.mix(g.mul(br, 0.25), g.rgb('#cfd2d6'), g.rgb('#a3a6ab'))
+    mats['brushed'] = swship._finish(m, g, base, g.add(0.24, g.add(g.mul(br, 0.08), g.mul(g.smooth(sm, 0.6, 0.85), 0.1))), 0.6,
+                                      bump_h=g.mul(br, 0.01), bump_strength=0.15)
+    # deep oxblood enamel side panels
+    m, g = new('esp_enamel'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    n1, _ = g.noise(g.vscale(p, 25.0), 1.0, 5, 0.6)
+    mats['enamel'] = swship._finish(m, g, g.mix(g.mul(n1, 0.2), g.rgb('#7a1616'), g.rgb('#4a0c0c')), g.add(0.12, g.mul(n1, 0.08)), 0.0)
+    m, g = new('esp_black'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    n1, _ = g.noise(g.vscale(p, 40.0), 1.0, 5, 0.6)
+    mats['black'] = swship._finish(m, g, g.mix(g.mul(n1, 0.3), g.rgb('#141516'), g.rgb('#26272a')), 0.35, 0.0)
+    mats['rubber'] = swship.mat_rubber('esp_rubber', '#111214', 0.85)
+    # walnut: bands across the handle axis (Y), distorted
+    m, g = new('esp_wood'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    px, py, pz = g.sep(p)
+    wv = g.node('ShaderNodeTexWave', wave_type='RINGS', rings_direction='Y')
+    g._in(wv.inputs['Vector'], g.combine(g.mul(px, 1.0), g.mul(py, 0.15), g.mul(pz, 1.0)))
+    wv.inputs['Scale'].default_value = 160.0; wv.inputs['Distortion'].default_value = 2.5
+    wv.inputs['Detail'].default_value = 4.0; wv.inputs['Detail Scale'].default_value = 1.5
+    fine, _ = g.noise(g.combine(g.mul(px, 300.0), g.mul(py, 20.0), g.mul(pz, 300.0)), 1.0, 4, 0.6)
+    gr = g.add(g.mul(wv.outputs['Fac'], 0.7), g.mul(fine, 0.3))
+    mats['wood'] = swship._finish(m, g, g.ramp(gr, [(0.2, '#3a2312'), (0.6, '#55331a'), (0.9, '#6a4223')]), g.add(0.28, g.mul(gr, 0.15)), 0.0,
+                                   bump_h=g.mul(gr, 0.01), bump_strength=0.2)
+    m, g = new('esp_ceramic')
+    mats['ceramic'] = swship._finish(m, g, g.rgb('#f2eee6'), 0.1, 0.0)
+    m, g = new('esp_brass'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    n1, _ = g.noise(g.vscale(p, 60.0), 1.0, 6, 0.6)
+    mats['brass'] = swship._finish(m, g, g.mix(g.mul(g.smooth(n1, 0.5, 0.8), 0.6), g.rgb('#c99a45'), g.rgb('#7d5a26')), g.add(0.18, g.mul(n1, 0.2)), 1.0)
+    # drip tray grille: long slots
+    m, g = new('esp_grille'); p = g.node('ShaderNodeTexCoord').outputs['Object']
+    px, py, pz = g.sep(p)
+    slot = g.math('GREATER_THAN', g.math('FRACT', g.div(px, 0.0065)), 0.5)
+    inside = g.mul(g.math('LESS_THAN', g.abs(px), 0.098), g.math('LESS_THAN', g.abs(g.add(py, 0.167)), 0.036))
+    slot = g.mul(slot, inside)
+    mats['grille'] = swship._finish(m, g, g.mix(slot, g.rgb('#d0d3d7'), g.rgb('#0c0c0d')), g.add(0.1, g.mul(slot, 0.6)), g.sub(1.0, slot),
+                                     bump_h=g.mul(slot, -0.15), bump_strength=0.6)
+    # gauge dials (one material per gauge, polar coordinates around its centre)
+    for key, cx, cz in (('dial_l', -0.088, 0.255), ('dial_r', 0.088, 0.255)):
+        m, g = new('esp_' + key); p = g.node('ShaderNodeTexCoord').outputs['Object']
+        px, py, pz = g.sep(p)
+        dx, dz = g.sub(px, cx), g.sub(pz, cz)
+        r = g.math('SQRT', g.add(g.mul(dx, dx), g.mul(dz, dz)))
+        ang = g.math('ARCTAN2', dx, dz)                      # 0 = up, +/-pi = down
+        inarc = g.math('LESS_THAN', g.abs(ang), 2.36)
+        t = g.div(g.add(ang, 2.36), 4.72)                   # 0..1 across the scale
+        minor = g.math('LESS_THAN', g.math('FRACT', g.mul(t, 32.0)), 0.12)
+        major = g.math('LESS_THAN', g.math('FRACT', g.mul(t, 8.0)), 0.035)
+        ring_min = g.mul(g.math('GREATER_THAN', r, 0.0205), g.math('LESS_THAN', r, 0.024))
+        ring_maj = g.mul(g.math('GREATER_THAN', r, 0.0175), g.math('LESS_THAN', r, 0.024))
+        ticks = g.mul(inarc, g.mx(g.mul(minor, ring_min), g.mul(major, ring_maj)))
+        red = g.mul(g.mul(g.math('GREATER_THAN', t, 0.78), inarc), g.mul(g.math('GREATER_THAN', r, 0.0215), g.math('LESS_THAN', r, 0.024)))
+        arc = g.mul(inarc, g.mul(g.math('GREATER_THAN', r, 0.0238), g.math('LESS_THAN', r, 0.0246)))
+        edge = g.math('GREATER_THAN', r, 0.0262)
+        n1, _ = g.noise(g.vscale(p, 200.0), 1.0, 4, 0.6)
+        face = g.mix(g.mul(g.smooth(r, 0.012, 0.027), 0.25), g.mix(g.mul(n1, 0.08), g.rgb('#efe5cc'), g.rgb('#d6c7a2')), g.rgb('#b9a77e'))
+        col = g.mix(red, face, g.rgb('#b0201a'))
+        col = g.mix(g.mx(ticks, arc), col, g.rgb('#151515'))
+        col = g.mix(edge, col, g.rgb('#1a1a1c'))
+        mats[key] = swship._finish(m, g, col, 0.3, 0.0)
+    return mats
+
+
+def _tube(name, mat, pts, r, n=16, closed=False, cap=True):
+    """Sweep a circle along a polyline (parallel-transport frames). r: scalar or one radius per point."""
+    import bmesh
+    from mathutils import Vector
+    P = [Vector(p) for p in pts]
+    R_ = r if isinstance(r, (list, tuple)) else [r] * len(P)
+    k = len(P)
+    T = []
+    for i in range(k):
+        a = P[(i - 1) % k] if (closed or i > 0) else P[i]
+        b = P[(i + 1) % k] if (closed or i < k - 1) else P[i]
+        T.append((b - a).normalized())
+    N = [T[0].orthogonal().normalized()]
+    for i in range(1, k):
+        q = T[i - 1].rotation_difference(T[i])
+        nn = q @ N[-1]
+        nn = (nn - T[i] * nn.dot(T[i])).normalized()
+        N.append(nn)
+    bm = bmesh.new()
+    rings = []
+    for i in range(k):
+        B = T[i].cross(N[i])
+        rings.append([bm.verts.new(P[i] + R_[i] * (math.cos(2 * math.pi * j / n) * N[i] + math.sin(2 * math.pi * j / n) * B)) for j in range(n)])
+    pairs = list(zip(rings, rings[1:])) + ([(rings[-1], rings[0])] if closed else [])
+    for a, b in pairs:
+        for j in range(n):
+            bm.faces.new((a[j], a[(j + 1) % n], b[(j + 1) % n], b[j]))
+    if cap and not closed:
+        bm.faces.new(list(reversed(rings[0]))); bm.faces.new(rings[-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = swship._obj_from_bm(bm, name, mat)
+    swship.smooth(ob, 60)
+    return ob
+
+
+def _bez(p0, p1, p2, p3, k=12):
+    out = []
+    for i in range(k + 1):
+        t = i / k; u = 1 - t
+        out.append(tuple(u ** 3 * a + 3 * u * u * t * b + 3 * u * t * t * c + t ** 3 * d for a, b, c, d in zip(p0, p1, p2, p3)))
+    return out
+
+
+def _rbox(name, mat, size, loc, bevel, seg=4):
+    ob = box(name, mat, size, loc)
+    md = ob.modifiers.new('bev', 'BEVEL'); md.width = bevel; md.segments = seg; md.limit_method = 'ANGLE'
+    swship.apply_all(ob)
+    swship.smooth(ob, 40)
+    return ob
+
+
+def _cup(name, mats, x, y, z, upside=False, saucer=True):
+    """Espresso cup (with saucer when upright). Height 42 mm."""
+    P = []
+    h, rb, rt, w = 0.042, 0.018, 0.025, 0.0028
+    prof = [(0.0, 0.0), (0.0, rb), (0.004, rb + 0.0015), (h * 0.5, (rb + rt) / 2 + 0.002), (h, rt), (h + 0.0008, rt - w * 0.5),
+            (h, rt - w), (h * 0.5, (rb + rt) / 2 + 0.002 - w), (0.006, rb - w), (0.006, 0.0)]
+    if upside:
+        prof = [(h - yy, rr) for yy, rr in prof]
+    zc = z + (0.0045 if saucer and not upside else 0.0)
+    P.append(lathe(name, prof, mats['ceramic'], n=40, axis_pos=(x, y, zc), rot=(R(90), 0, 0)))
+    # handle on the right side: half loop
+    hz0 = zc + (h * 0.75 if not upside else h * 0.25)
+    hz1 = zc + (h * 0.3 if not upside else h * 0.7)
+    rx = x + (rb + rt) / 2 + 0.0015
+    P.append(_tube(name + '_h', mats['ceramic'], _bez((rx - 0.002, y, hz0), (rx + 0.014, y, hz0 + 0.002), (rx + 0.012, y, hz1 - 0.004), (rx - 0.003, y, hz1), 14), 0.0028, n=10))
+    if saucer and not upside:
+        P.append(lathe(name + '_s', [(0.0, 0.0), (0.0, 0.03), (0.002, 0.042), (0.0045, 0.046), (0.0048, 0.044), (0.003, 0.03), (0.0035, 0.0)],
+                       mats['ceramic'], n=48, axis_pos=(x, y, z), rot=(R(90), 0, 0)))
+    return P
+
+
+def _text(name, mat, body, loc, size, depth=0.0006):
+    import bpy
+    cu = bpy.data.curves.new(name, 'FONT'); cu.body = body; cu.size = size; cu.extrude = depth
+    cu.align_x = 'CENTER'; cu.align_y = 'CENTER'; cu.space_character = 1.15
+    ob = bpy.data.objects.new(name + '_tmp', cu); bpy.context.scene.collection.objects.link(ob)
+    ob.rotation_euler = (R(90), 0, 0); ob.location = loc
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(ob.evaluated_get(dg))
+    m = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(m)
+    m.matrix_world = ob.matrix_world.copy()
+    bpy.data.objects.remove(ob, do_unlink=True)
+    me.materials.append(mat)
+    return m
+
+
+def prop_espresso():
+    """'Cassini Classico' - an old Italian-style dual-boiler espresso machine for cabin 4-117, about 30 x 33 x 36 cm.
+    Front faces -Y (three.js +Z). Brushed housing, oxblood enamel side panels, chrome E61-style group,
+    walnut handles and knobs, two pressure gauges, gallery rail with cups on top, drip tray with brass name plate."""
+    M_ = _espresso_mats()
+    glow_r = mat_emit('glow_esp_red', '#ff3020', 6)
+    glow_a = mat_emit('glow_esp_amber', '#ffb040', 5)
+    P = []
+    # feet, plinth, housing, side panels, front plate
+    for fx in (-0.125, 0.125):
+        for fy in (-0.09, 0.14):
+            P.append(cyl(f'foot{fx}{fy}', M_['rubber'], 0.012, 0.014, (fx, fy, 0.007), rot=(0, 0, 0), n=20))
+    P.append(_rbox('plinth', M_['black'], (0.30, 0.30, 0.024), (0, 0.02, 0.026), 0.006))
+    P.append(_rbox('housing', M_['brushed'], (0.28, 0.28, 0.29), (0, 0.02, 0.183), 0.012))
+    for sx in (-1, 1):
+        P.append(_rbox(f'side{sx}', M_['enamel'], (0.006, 0.236, 0.236), (0.1405 * sx, 0.02, 0.18), 0.0028, seg=3))
+        P.append(_rbox(f'side_trim{sx}', M_['chrome'], (0.004, 0.246, 0.246), (0.1395 * sx, 0.02, 0.18), 0.0018, seg=2))
+    P.append(_rbox('front', M_['brushed'], (0.262, 0.006, 0.266), (0, -0.121, 0.188), 0.003, seg=3))
+    # cup warmer tray with gallery rail
+    P.append(_rbox('tray_top', M_['chrome'], (0.27, 0.27, 0.008), (0, 0.02, 0.331), 0.003, seg=3))
+    rr, rect = 0.02, []
+    x0, x1, y0, y1 = -0.122, 0.122, -0.100, 0.140
+    for cx, cy, a0 in ((x1 - rr, y1 - rr, 0), (x0 + rr, y1 - rr, 90), (x0 + rr, y0 + rr, 180), (x1 - rr, y0 + rr, 270)):
+        for i in range(7):
+            a = R(a0 + i * 15)
+            rect.append((cx + rr * math.cos(a), cy + rr * math.sin(a), 0.362))
+    P.append(_tube('rail', M_['chrome'], rect, 0.0035, n=12, closed=True))
+    for cx, cy in ((x0 + 0.006, y0 + 0.006), (x1 - 0.006, y0 + 0.006), (x0 + 0.006, y1 - 0.006), (x1 - 0.006, y1 - 0.006), (0, y0), (0, y1)):
+        P.append(cyl(f'post{cx}{cy}', M_['chrome'], 0.003, 0.028, (cx, cy, 0.349), rot=(0, 0, 0), n=10))
+    P += _cup('cup_t1', M_, -0.06, 0.06, 0.335, upside=True, saucer=False)
+    P += _cup('cup_t2', M_, 0.0, 0.085, 0.335, upside=True, saucer=False)
+    P += _cup('cup_t3', M_, 0.055, 0.02, 0.335, upside=False, saucer=True)
+    # E61-style group head: neck into the housing, column with domed top, brew lever
+    P.append(cyl('group_neck', M_['chrome'], 0.026, 0.05, (0, -0.145, 0.232), n=32))
+    P.append(lathe('group', [(0.158, 0.0), (0.158, 0.029), (0.163, 0.034), (0.172, 0.0355), (0.18, 0.032), (0.236, 0.030), (0.252, 0.027),
+                             (0.27, 0.021), (0.283, 0.012), (0.289, 0.005), (0.29, 0.0)], M_['chrome'], n=48, axis_pos=(0, -0.172, 0), rot=(R(90), 0, 0)))
+    P.append(lathe('group_ring', [(0.2, 0.0312), (0.2, 0.0328), (0.206, 0.0328), (0.206, 0.0312)], M_['black'], n=48, axis_pos=(0, -0.172, 0), rot=(R(90), 0, 0)))
+    P.append(cyl('lever_pivot', M_['chrome'], 0.008, 0.014, (0.029, -0.172, 0.262), rot=(0, R(90), 0), n=16))
+    P.append(_tube('lever', M_['chrome'], _bez((0.038, -0.172, 0.262), (0.05, -0.172, 0.29), (0.06, -0.175, 0.31), (0.066, -0.178, 0.334), 10), [0.0045] * 6 + [0.0038] * 5, n=12))
+    P.append(sphere('lever_ball', M_['wood'], 0.011, (0.066, -0.178, 0.343), seg=24, rings=12))
+    # portafilter: basket, twin spout, walnut handle
+    P.append(lathe('basket', [(0.126, 0.0), (0.126, 0.026), (0.13, 0.031), (0.15, 0.033), (0.157, 0.0345), (0.158, 0.0)], M_['chrome'], n=48,
+                   axis_pos=(0, -0.172, 0), rot=(R(90), 0, 0)))
+    for sx in (-1, 1):
+        P.append(_tube(f'spout{sx}', M_['chrome'], [(0, -0.172, 0.127), (0.006 * sx, -0.172, 0.12), (0.011 * sx, -0.172, 0.113)], [0.0045, 0.0042, 0.004], n=12))
+    P.append(_tube('pf_neck', M_['chrome'], [(0, -0.2, 0.142), (0, -0.218, 0.139), (0, -0.236, 0.135)], [0.009, 0.0085, 0.0085], n=16))
+    hp = [(0, -0.236 - i * 0.011, 0.135 - i * 0.0018) for i in range(10)]
+    P.append(_tube('pf_handle', M_['wood'], hp, [0.0095, 0.011, 0.012, 0.0128, 0.013, 0.0128, 0.0124, 0.0118, 0.0095, 0.004], n=20))
+    # pressure gauges
+    for k, gx in (('l', -0.088), ('r', 0.088)):
+        P.append(lathe(f'bezel_{k}', [(-0.124, 0.0268), (-0.124, 0.034), (-0.131, 0.0345), (-0.136, 0.032), (-0.137, 0.0285), (-0.133, 0.0268)],
+                       M_['chrome'], n=48, axis_pos=(gx, 0, 0.255), closed=True))
+        P.append(cyl(f'dial_{k}', M_['dial_' + k], 0.0275, 0.002, (gx, -0.131, 0.255), n=48))
+        a = R(-35 if k == 'l' else 40)
+        P.append(box(f'needle_{k}', M_['black'], (0.0016, 0.0008, 0.024), (gx + math.sin(a) * 0.008, -0.1325, 0.255 + math.cos(a) * 0.008), rot=(0, a, 0)))
+        P.append(cyl(f'needle_cap_{k}', M_['black'], 0.0025, 0.002, (gx, -0.133, 0.255), n=16))
+    # valve knobs and wands
+    for sx in (-1, 1):
+        x = 0.118 * sx
+        P.append(cyl(f'stem{sx}', M_['chrome'], 0.0055, 0.024, (x, -0.135, 0.2), n=16))
+        P.append(lathe(f'knob{sx}', [(-0.146, 0.0), (-0.146, 0.0145), (-0.15, 0.0175), (-0.163, 0.0165), (-0.17, 0.012), (-0.172, 0.0)],
+                       M_['wood'], n=36, axis_pos=(x, 0, 0.2)))
+        P.append(lathe(f'knob_cap{sx}', [(-0.1715, 0.0), (-0.1715, 0.006), (-0.1725, 0.006), (-0.1725, 0.0)], M_['chrome'], n=24, axis_pos=(x, 0, 0.2)))
+        P.append(sphere(f'wand_joint{sx}', M_['chrome'], 0.009, (x, -0.13, 0.172), seg=20, rings=10))
+        end_z = 0.085 if sx > 0 else 0.115
+        P.append(_tube(f'wand{sx}', M_['chrome'], _bez((x, -0.13, 0.172), (x + 0.012 * sx, -0.15, 0.17), (x + 0.02 * sx, -0.158, 0.14), (x + 0.022 * sx, -0.16, end_z), 14), 0.0042, n=12))
+        P.append(cyl(f'wand_tip{sx}', M_['chrome'], 0.0035, 0.012, (x + 0.022 * sx, -0.16, end_z - 0.005), rot=(0, 0, 0), n=14, r2=0.0052))
+    # drip tray with grille and brass name plate
+    P.append(_rbox('drip', M_['chrome'], (0.24, 0.11, 0.022), (0, -0.166, 0.048), 0.004))
+    P.append(_rbox('grille', M_['grille'], (0.214, 0.09, 0.003), (0, -0.167, 0.0598), 0.001, seg=1))
+    P.append(_rbox('plate', M_['brass'], (0.092, 0.002, 0.015), (0, -0.2215, 0.048), 0.001, seg=2))
+    P.append(_text('plate_text', bpy_mat(M_['black']), 'CASSINI', (0, -0.2226, 0.0478), 0.0105))
+    P += _cup('cup_brew', M_, 0.0, -0.172, 0.0613, upside=False, saucer=True)
+    # indicator lights between the gauges (unbaked glow meshes)
+    for gx, gm in ((-0.024, glow_r), (0.024, glow_a)):
+        P.append(lathe(f'lamp_ring{gx}', [(-0.124, 0.0035), (-0.124, 0.0058), (-0.128, 0.0058), (-0.128, 0.0035)], M_['chrome'], n=20, axis_pos=(gx, 0, 0.3), closed=True))
+        P.append(sphere(f'lamp{gx}', gm, 0.0038, (gx, -0.1265, 0.3), seg=16, rings=8))
+    for o in P:
+        swship.apply_all(o)
+    return P, [empty('cup', (0, -0.172, 0.11))], dict(dist=1.45, center=(0, -0.03, 0.19), dir=(0.75, -1.25, 0.55))
+
+
+def bpy_mat(m):
+    import bpy
+    return bpy.data.materials[m] if isinstance(m, str) else m
+
+
+SHIPS.update({'prop_espresso': prop_espresso})
+
 if __name__ != 'ships':  # executed via the bridge (not imported)
     ship_id = BL_ARGS[0]
     flags = BL_ARGS[1:]
@@ -575,7 +831,7 @@ if __name__ != 'ships':  # executed via the bridge (not imported)
     P, E, cam = SHIPS[ship_id]()
     prev = swlib.out('ships', ship_id, 'preview.jpg')
     if '--no-preview' not in flags:
-        swship.studio_preview(prev, cam['center'], cam['dist'], samples=int(os.environ.get('SW_SAMPLES', 96)))
+        swship.studio_preview(prev, cam['center'], cam['dist'], samples=int(os.environ.get('SW_SAMPLES', 96)), cam_dir=cam.get('dir', (1.0, 1.15, 0.55)))
     res = {'preview': prev}
     if '--preview-only' not in flags:
         path, hull = swship.finalize_ship(ship_id, P, E)

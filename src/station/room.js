@@ -341,7 +341,7 @@ export class RoomMode {
 
   brewEspresso() {
     const e = this.espressoObj; if (!e) return;
-    const cup = e.position.clone().add(new THREE.Vector3(0, 0.12, 0).applyEuler(e.rotation)).add(new THREE.Vector3(0, 0, 0.15).applyEuler(e.rotation));
+    const cup = e.position.clone().add(new THREE.Vector3(0, 0.12, 0).applyEuler(e.rotation)).add(new THREE.Vector3(0, 0, 0.172).applyEuler(e.rotation));
     const mat = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
     for (let i = 0; i < 14; i++) {
       const sp = new THREE.Sprite(mat.clone()); sp.position.copy(cup); sp.scale.setScalar(0.03);

@@ -32,7 +32,7 @@ function labelTex(text, color = '#e8d8b0', bg = null, w = 256, h = 64, font = '6
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-/** Espresso machine (about 30 x 38 x 34 cm), faces +Z. */
+/** Simple stand-in espresso machine (about 30 x 38 x 34 cm), faces +Z. */
 function espresso() {
   const g = new THREE.Group(), st = M.steel(), bl = M.black();
   g.add(mesh(new THREE.BoxGeometry(0.3, 0.34, 0.3), st, 0, 0.17 + 0.02, -0.02));
@@ -58,9 +58,22 @@ function espresso() {
   return g;
 }
 
+/** The real machine: Blender model with baked PBR textures (blender/ships.py prop_espresso); procedural one as fallback. */
+async function espressoModel() {
+  try {
+    const m = await ShipModel.load('prop_espresso');
+    m.update(0, 0);
+    m.root.traverse(o => { if (o.isMesh && o.name.startsWith('hull')) o.material.envMapIntensity = 2.2; });
+    const g = new THREE.Group(); g.add(m.root);
+    // warm under-cabinet light so the chrome has something to catch in the dim galley
+    const l = new THREE.PointLight(0xffd6a0, 0.55, 1.4, 2); l.position.set(0, 0.75, 0.4); g.add(l);
+    return g;
+  } catch { return espresso(); }
+}
+
 /** Keepsakes. when(g): condition; text: memory shown when you look at it. */
 export const GADGETS = {
-  espresso: { name: 'Espressomaschine', text: 'Eine „Cassini Classico“, älter als die Station. Der beste Espresso auf Deck 4, für 1 Kredit.', when: () => true, build: espresso },
+  espresso: { name: 'Espressomaschine', text: 'Eine „Cassini Classico“, älter als die Station. Der beste Espresso auf Deck 4, für 1 Kredit.', when: () => true, build: espressoModel },
   eisvogel_modell: { name: 'Modell des Eisvogels', text: 'Geschenk von Mags nach der ersten Tour. „Damit du nicht vergisst, wer dich zum Fliegen gebracht hat.“', when: (g) => g.flags['done:eisfracht'],
     build: async () => { const g = new THREE.Group(); plinth(g, 0.24); try { const m = await ShipModel.load('eisvogel'); const s = 0.26 / m.length; m.root.scale.setScalar(s); m.root.position.y = 0.09; m.root.rotation.y = 0.6; for (const p of m.plumes) p.visible = false; g.add(m.root); } catch { } g.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.06, 6), M.black(), 0, 0.055, 0)); return g; } },
   fluegel: { name: 'Pilotenschwingen', text: 'Mags hat sie dir nach der Flugstunde an die Jacke gesteckt. Ringgilde, Klasse III. Inoffiziell.', when: (g) => g.flags['done:flugschule'],
