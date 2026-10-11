@@ -34,38 +34,38 @@ export const ZONES = {
   },
   inktomi: {
     name: 'Rhea-System · Bergbauposten Inktomi', body: 'rhea', offset: [0.55, -0.35, 0.55, 1080],
-    station: { id: 'inktomi', model: 'station_small', pos: [0, 0, 0], tint: [1.08, 0.96, 0.84] }, debris: 'rock',
+    station: { id: 'inktomi', model: 'station_inktomi', pos: [0, 0, 0] }, debris: 'rock',
   },
   lagrange: {
     name: 'Rhea-System · Frachtdepot L4', body: 'rhea', offset: [-0.35, 0.25, -0.3, 12500],
-    station: { id: 'lagrange', model: 'station_cassini', pos: [0, 0, 0], tint: [0.86, 0.94, 1.08] },
+    station: { id: 'lagrange', model: 'station_lagrange', pos: [0, 0, 0] },
   },
   sim: {
     name: 'GEFECHTSSIMULATOR · Übungsraum', body: 'rhea', offset: [0.3, 0.85, 0.45, 6000],
   },
   enceladus: {
     name: 'Enceladus · Geysirfeld „Quelle“', body: 'enceladus', offset: [0.7, 0.5, -0.6, 560],
-    station: { id: 'quelle', model: 'station_small', pos: [0, 0, 0], tint: [0.82, 0.95, 1.12] }, geysers: true, debris: 'ice',
+    station: { id: 'quelle', model: 'station_quelle', pos: [0, 0, 0] }, geysers: true, debris: 'ice',
   },
   titan: {
     name: 'Titan-Orbit · Kraken-Hafen', body: 'titan', offset: [0.8, 0.5, 0.2, 5200],
-    station: { id: 'kraken', model: 'station_cassini', pos: [0, 0, 0], tint: [1.0, 0.85, 0.55] },
+    station: { id: 'kraken', model: 'station_kraken', pos: [0, 0, 0] },
   },
   rings: {
     name: 'Mimas-System · Ringrand der Ringgilde', anchor: [-104000 * Math.cos(1.2), 0.05, 104000 * Math.sin(1.2)],
-    station: { id: 'ringgilde', model: 'station_small', pos: [0, 0, 0] }, debris: 'ring',
+    station: { id: 'ringgilde', model: 'station_ringgilde', pos: [0, 0, 0] }, debris: 'ring',
   },
   mimas: {
     name: 'Mimas · Herschel-Depot im Todesstern-Krater', body: 'mimas', offset: [0.8, 0.6, 0.3, 420],
-    station: { id: 'herschel', model: 'station_small', pos: [0, 0, 0], tint: [1.1, 0.78, 0.66] }, debris: 'rock',
+    station: { id: 'herschel', model: 'station_herschel', pos: [0, 0, 0] }, debris: 'rock',
   },
   iapetus: {
     name: 'Iapetus · Das Gewölbe', body: 'iapetus', offset: [0.9, 0.3, 0.2, 1500],
-    station: { id: 'gewoelbe', model: 'station_small', pos: [0, 0, 0], tint: [0.88, 0.82, 1.1] },
+    station: { id: 'gewoelbe', model: 'station_gewoelbe', pos: [0, 0, 0] },
   },
   phoebe: {
     name: 'Iapetus-System · Phoebe, Schakalnest', body: 'phoebe', offset: [0.9, 0.2, 0.1, 230],
-    station: { id: 'schakalnest', model: 'station_small', pos: [0, 0, 0] }, debris: 'rock', hostile: true,
+    station: { id: 'schakalnest', model: 'station_schakalnest', pos: [0, 0, 0] }, debris: 'rock', hostile: true,
   },
 };
 

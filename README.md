@@ -42,7 +42,7 @@ Ein Söldner-Weltraumspiel im Saturnsystem des Jahres 2260. Du startest pleite a
 |---|---|
 | Assets | Alle Modelle, Texturen und Renderings entstehen per Python-Skript in **Blender 5** (`blender/`), gesteuert über die lokale MCP-Bridge (`tools/bl.py`). |
 | Himmel & Planeten | Prozedurale Shader, als Equirect-Texturen gerendert (Milchstraße 8K, Saturn 4K, Monde mit Höhenkarten). |
-| Schiffe & Stationen | Prozedurale Hard-Surface-Modelle mit gebackenen PBR-Texturen (Basisfarbe, AO/Rauheit/Metall, Normalen, Lackmaske). |
+| Schiffe & Stationen | Prozedurale Hard-Surface-Modelle mit gebackenen PBR-Texturen (Basisfarbe, AO/Rauheit/Metall, Normalen, Lackmaske). Jede Station hat ein eigenes Modell (`blender/outposts.py`): Frachtdepot mit Containerregalen und Hydrokulturfarm, Bohrturm über Inktomi, Wassertanks des Kollektivs, goldene Türme über Titan, Gildenhabitate zwischen Eisbrocken, Schwarzmarkt-Bunker, Archiv-Monolith, Piratennest aus Wracks. Vor jeder Andockbucht liegt eine beleuchtete Anflugschneise. |
 | Räume | Cycles-Lightmaps (direktes und indirektes Licht), BVH-Kapselkollision im Browser. |
 | Engine | three.js mit zwei Render-Ebenen (Kilometer für den Weltraum, Meter für Schiffe), logarithmischem Tiefenpuffer, Bloom und ACES-Tonemapping. |
 
