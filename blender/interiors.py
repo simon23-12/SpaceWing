@@ -835,65 +835,86 @@ def hangar():
     led = light_mat('led_hg', '#e8f0ff', 22)
     amber = light_mat('led_hg_amber', '#ffb050', 18)
     S, Gl, Gs, X = [], [], [], []
-    W, D, H = 44.0, 34.0, 16.0   # x [-22, 22]: bay opening at +X
-    INFO['interior'] = ('box', -22, 22, -17, 17, 0.0, H)
-    S.append(box('floor', floor, (W, D, 0.3), (0, 0, -0.15)))
-    S.append(box('ceil', wallm, (W, D, 0.3), (0, 0, H + 0.15)))
-    S += wall('wN', wallm, (-22, 17), (22, 17), H)
-    S += wall('wS', wallm, (22, -17), (-22, -17), H)
-    S += wall('wW', wallm, (-22, -17), (-22, 17), H, openings=[(26.0, 2.6, 0, 3.2)])
-    S += wall('wE', wallm, (22, 17), (22, -17), H, openings=[(17.0, 30.0, 0.5, 13.5)])
+    # big bay: x [-22, 58], y [-40, 17]. The west wall (door to the bridge at y = 9) and the north wall stay where
+    # they always were (the observation dome sits above the north side); the hall grows east and south.
+    X0, X1, Y0, Y1, H = -22.0, 58.0, -40.0, 17.0, 16.0
+    W, D = X1 - X0, Y1 - Y0
+    CX, CY = (X0 + X1) / 2, (Y0 + Y1) / 2
+    INFO['interior'] = ('box', X0, X1, Y0, Y1, 0.0, H)
+    S.append(box('floor', floor, (W, D, 0.3), (CX, CY, -0.15)))
+    S.append(box('ceil', wallm, (W, D, 0.3), (CX, CY, H + 0.15)))
+    S += wall('wN', wallm, (X0, Y1), (X1, Y1), H)
+    S += wall('wS', wallm, (X1, Y0), (X0, Y0), H)
+    S += wall('wW', wallm, (X0, Y0), (X0, Y1), H, openings=[(9.0 - Y0, 2.6, 0, 3.2)])
+    BAY_Y, BAY_W = -11.5, 46.0   # bay opening in the east wall
+    S += wall('wE', wallm, (X1, Y1), (X1, Y0), H, openings=[(Y1 - BAY_Y, BAY_W, 0.5, 13.5)])
+    INFO['bay'] = {'x': X1, 'y': BAY_Y, 'w': BAY_W}
     # bay frame with hazard
-    S.append(box('bayframe_top', hazard, (1.2, 31, 1.0), (22, 0, 14.0)))
-    S.append(box('bayframe_bot', hazard, (1.2, 31, 0.6), (22, 0, 0.2)))
-    field = box('field_bay', dark, (0.1, 30, 13.0), (22.2, 0, 7.0))
+    S.append(box('bayframe_top', hazard, (1.2, BAY_W + 1, 1.0), (X1, BAY_Y, 14.0)))
+    S.append(box('bayframe_bot', hazard, (1.2, BAY_W + 1, 0.6), (X1, BAY_Y, 0.2)))
+    field = box('field_bay', dark, (0.1, BAY_W, 13.0), (X1 + 0.2, BAY_Y, 7.0))
     field.data.materials.clear(); field.data.materials.append(mat_emit('glow_field', '#4aa0ff', 1)); field.name = 'field_bay'
     X.append(field)
-    # landing pad
-    S.append(cyl('pad', trim, 9.0, 0.2, (2, 0, 0.1), rot=(0, 0, 0), n=64))
-    S.append(lathe('pad_ring', [(-0.03, 8.6), (0.03, 8.6), (0.03, 8.9), (-0.03, 8.9)], amber, n=64))
-    S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (2, 0, 0.23)
+    # guide lights on the floor from the pads to the bay
+    for k in range(10):
+        for sy in (-1, 1):
+            S.append(box(f'lane{k}{sy}', amber, (0.6, 0.6, 0.04), (16 + k * 4.2, BAY_Y + sy * 12, 0.02)))
+    # landing pads: ours by the door, three more for other ships
+    PADS = [(2, 0, 9.0), (24, -26, 8.0), (40, 4, 8.0), (40, -27, 8.0)]
+    for i, (px, py, pr) in enumerate(PADS):
+        S.append(cyl(f'pad{i}', trim, pr, 0.2, (px, py, 0.1), rot=(0, 0, 0), n=64))
+        S.append(lathe(f'pad_ring{i}', [(-0.03, pr - 0.4), (0.03, pr - 0.4), (0.03, pr - 0.1), (-0.03, pr - 0.1)], amber, n=64))
+        S[-1].rotation_euler = (R(90), 0, 0); S[-1].location = (px, py, 0.23)
+        Gl.append(text_mesh(f'pad_no{i}', f'7-{"CDEF"[i]}', mat_emit('glow_padno', '#ffd36a', 3), 1.4, (px - pr + 1.6, py, 0.24), rot=(0, 0, R(90))))
     INFO['pad'] = b2t((2, 0, 0.2))
-    # catwalk along north wall + stairs
-    S.append(box('catwalk', mat_floor('grate_hg', '#2a2c2f', 3.0, grate=True), (40, 2.4, 0.12), (0, 15.6, 6.0)))
-    S.append(box('rail', trim, (40, 0.06, 0.06), (0, 14.45, 7.05)))
-    for x in range(-19, 21, 3):
+    INFO['pads'] = [b2t((px, py, 0.2)) for px, py, _ in PADS]
+    # catwalk along north wall
+    S.append(box('catwalk', mat_floor('grate_hg', '#2a2c2f', 3.0, grate=True), (W - 2, 2.4, 0.12), (CX, 15.6, 6.0)))
+    S.append(box('rail', trim, (W - 2, 0.06, 0.06), (CX, 14.45, 7.05)))
+    for x in range(-19, 57, 3):
         S.append(box(f'post{x}', trim, (0.06, 0.06, 1.05), (x, 14.45, 6.55)))
         S.append(box(f'strut{x}', trim, (0.2, 0.2, 6.0), (x, 16.6, 3.0)))
-    # control booth
+    # control booth (flight control, looking over the bay)
     S.append(box('booth', wallm, (6, 4, 3.2), (-17, 14.8, 7.7), bevel=0.1))
     Gs.append(box('glass_booth', mat_glass('glass_hg'), (5.6, 0.05, 1.6), (-17, 12.78, 8.0)))
-    # crates and fuel tanks
+    S.append(box('booth2', wallm, (8, 4, 3.2), (44, 14.8, 7.7), bevel=0.1))
+    Gs.append(box('glass_booth2', mat_glass('glass_hg'), (7.6, 0.05, 1.6), (44, 12.78, 8.0)))
+    Gl.append(box('booth2_glow', mat_emit('glow_booth', '#7fdcff', 2), (7.4, 0.04, 0.6), (44, 12.85, 7.0)))
+    # crates and fuel tanks along the south wall and in the south-west corner
     import random
     rnd = random.Random(5)
-    for i in range(16):
-        x = rnd.uniform(-19, -8) if i % 2 else rnd.uniform(10, 19)
-        sgn_ = -1 if x < 0 else rnd.choice([-1, 1])
-        y = -rnd.uniform(10, 15) if sgn_ else 0   # all crates on the south side: the north-east corner is Yara's workshop
+    for i in range(30):
+        x = rnd.uniform(-15, -6) if i % 3 == 0 else rnd.uniform(4, 52)
+        y = -37.3 if i % 3 else rnd.uniform(-33, -12)   # south row stays inside the wall
         sz = rnd.choice([(2.4, 2.4, 2.4), (2.4, 4.8, 2.4), (1.2, 1.2, 1.2)])
         stack = rnd.random() < 0.3
-        S.append(box(f'crate{i}', crate1 if i % 3 else crate2, sz, (x, y, sz[2] / 2), rot=(0, 0, R(rnd.choice([0, 90, 3, -4]))), bevel=0.04))
+        S.append(box(f'crate{i}', crate1 if i % 3 else crate2, sz, (x, y, sz[2] / 2), rot=(0, 0, R(rnd.choice([0, 3, -4] if i % 3 else [0, 90, 3, -4]))), bevel=0.04))
         if stack:
             S.append(box(f'crateb{i}', crate2, (1.2, 1.2, 1.2), (x, y, sz[2] + 0.6), rot=(0, 0, R(rnd.uniform(-10, 10))), bevel=0.03))
-    for i, y in enumerate((-12, -8)):
+    for i, y in enumerate((-12, -8, -30, -26)):
         S.append(cyl(f'tank{i}', mat_paint(f'tankm{i}', '#b8b4a8', wear=0.4, dirt=0.6, scale=1.5), 1.6, 7, (-19.5, y, 3.5), rot=(0, 0, 0), n=32))
-    # overhead gantry crane
-    S.append(box('gantry', hazard, (1.2, 32, 1.2), (6, 0, 13.5)))
-    S.append(box('gantry_hook', trim, (1.5, 1.5, 0.8), (6, 4, 12.5)))
-    S.append(cyl('cable', dark, 0.05, 4, (6, 4, 10.5), rot=(0, 0, 0), n=6))
-    # ceiling light panels
-    for x in (-15, -5, 5, 15):
-        for y in (-9, 0, 9):
+    # fuel lines from the tanks along the floor
+    S.append(box('fuelpipe', trim, (0.3, 26, 0.3), (-20.6, -20, 0.3)))
+    # overhead gantry cranes
+    for gx in (14, 34):
+        S.append(box(f'gantry{gx}', hazard, (1.2, D - 2, 1.2), (gx, CY, 13.5)))
+        S.append(box(f'gantry_hook{gx}', trim, (1.5, 1.5, 0.8), (gx, -8 if gx == 14 else -20, 12.5)))
+        S.append(cyl(f'cable{gx}', dark, 0.05, 4, (gx, -8 if gx == 14 else -20, 10.5), rot=(0, 0, 0), n=6))
+    # ceiling light panels and lamps
+    for x in range(-15, 56, 10):
+        for y in (-34, -23, -12, -1, 9):
             S.append(box(f'cl{x}{y}', led, (5, 1.0, 0.05), (x, y, H - 0.05)))
-    for x in (-15, 0, 15):
-        point_light(f'hl{x}', (x, 0, H - 2), 2400, '#e8f0ff', 1.0)
-    area_light('bay_spill', (20, 0, 7), (0, R(-90), 0), 12, 600, '#a8c8ff')
-    for y in (-13.5, 13.5):
-        for x in (-12, 0, 12):
-            S.append(box(f'wl{x}{y}', amber, (2.0, 0.05, 0.15), (x, y * 1.255, 3.0)))
+    for x in (-12, 8, 28, 48):
+        for y in (-26, 2):
+            point_light(f'hl{x}{y}', (x, y, H - 2), 2000, '#e8f0ff', 1.0)
+    area_light('bay_spill', (X1 - 2, BAY_Y, 7), (0, R(-90), 0), 16, 700, '#a8c8ff')
+    for y in (Y0 + 0.2, Y1 - 0.2):
+        for x in range(-12, 56, 12):
+            S.append(box(f'wl{x}{y}', amber, (2.0, 0.05, 0.15), (x, y, 3.0)))
     # door to the bridge
     Gl.append(box('door_led', mat_emit('glow_door', '#7fdcff', 6), (0.05, 2.8, 0.06), (-21.8, 9.0, 3.45)))
-    Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, 0, 10), rot=(R(90), 0, R(90))))
+    Gl.append(text_mesh('sign_hg', 'HANGAR 7 · BUCHT C', mat_emit('glow_sign_hg', '#ffd36a', 8), 1.2, (-21.8, -6, 10), rot=(R(90), 0, R(90))))
+    Gl.append(text_mesh('sign_bay', 'STARTBAHN 7 · FREIGABE NUR DURCH FLUGLEITUNG', mat_emit('glow_sign_bay', '#7fdcff', 6), 0.7, (57.8, BAY_Y, 14.9), rot=(R(90), 0, R(-90))))
     marker('ship', 'ship', (2, 0, 0.2), R(0), label='Einsteigen und starten')
     # ---- Yara Benedek's workshop: north-west corner, right beside the door from the bridge (door at y = 9 on the west wall)
     red = mat_paint('toolchest', '#a8241c', color2='#5a1410', wear=0.5, dirt=0.4, scale=3, panel=0.4)

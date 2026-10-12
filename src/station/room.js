@@ -13,6 +13,7 @@ import { DeckDoor, Lift } from './deck.js';
 import { BARKS, PEOPLE } from '../game/story.js';
 import { GADGETS } from './gadgets.js';
 import { Particles, TEX } from '../space/effects.js';
+import { HangarLife } from './hangarLife.js';
 
 /*
  * Hochstation Cassini, Deck 4: one continuous, walkable level. Every room (Blender-baked GLB + lightmap)
@@ -331,6 +332,8 @@ export class RoomMode {
       // Teo's old Spacewing waits in a corner until Mags gives it away
       const g = this.game.state;
       if (!g.flags.m1done && ship?.cls !== 'spacewing') jobs.push(this.parkShip('spacewing', null, this.parts.hangar.toWorld([-13, 0, 4]), hRot + 0.15));
+      // the rest of the hangar at work: visiting ships, pilots, technicians, droids (only in the big bay)
+      if (this.parts.hangar.meta.pads?.length > 1 && !this.cine) { this.life = new HangarLife(this); jobs.push(this.life.init().catch(e => console.warn('hangar life', e))); }
     }
     await Promise.all(jobs);
     const sees = SEES[this.roomId] || PARTS;
@@ -474,7 +477,7 @@ export class RoomMode {
       const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
       const worldStart = root.getWorldPosition(new THREE.Vector3());
       // camera: a quick cut to the side of the bay, ahead of the pad; the ship lifts off and passes it on the way out
-      const camPos = H.toWorld([13, 3.4, -10.5]);
+      const camPos = H.toWorld([40, 3.4, -9]);
       let cut = false;
       this.game.fadeOut(0.2).then(() => { cut = true; this.camera.position.copy(camPos); this.game.fadeIn(0.35); });
       for (const pl of ship.plumes) pl.visible = true;
@@ -503,7 +506,7 @@ export class RoomMode {
         cam.position.copy(camPos).addScaledVector(side, Math.sin(t * 0.4) * 0.15);   // a hand-held drift
         cam.lookAt(look.x, look.y + 0.5, look.z);
         if (cam.fov !== 60) { cam.fov = 60; cam.updateProjectionMatrix(); }
-        if (!faded && along > 48) { faded = true; this.game.fadeOut(0.7).then(() => { done = true; removeEventListener('keydown', skip); resolve(); }); }
+        if (!faded && along > 64) { faded = true; this.game.fadeOut(0.7).then(() => { done = true; removeEventListener('keydown', skip); resolve(); }); }
         if (t > 9) finish();
       };
       this.isRoom = false;
@@ -735,6 +738,7 @@ export class RoomMode {
     if (this.animated.some(a => a.done)) this.animated = this.animated.filter(a => !a.done);
     for (const w of this.walkers) this.walk(w, dt);
     for (const n of this.npcs) if (n.work && n.obj.visible) this.updateYara(n, dt);
+    this.life?.update(dt);
     if (this.sparks) {
       const s = this.sparks;
       for (let i = 0; i < s.n; i++) { s.vel[i * 3 + 1] -= 9.8 * dt; if (s.pos[i * 3 + 1] < this.sparkFloor && s.vel[i * 3 + 1] < 0) { s.vel[i * 3 + 1] *= -0.3; s.vel[i * 3] *= 0.5; s.vel[i * 3 + 2] *= 0.5; } }

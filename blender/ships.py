@@ -1007,6 +1007,61 @@ def bpy_mat(m):
 
 SHIPS.update({'prop_espresso': prop_espresso})
 
+
+# ------------------------------------------------------------------------------------------- hangar droids
+
+def prop_droid():
+    """Maintenance droid for Hangar 7, about 1.05 m: barrel body with panels and a tool arm, domed head with one
+    big lens, two side legs on treads. Front faces +Y (three.js -Z), like the ships."""
+    white = mat_paint('hull_droid', '#d8dade', color2='#8e949a', wear=0.45, rust=0.05, dirt=0.55, metal=0.3, rough=0.4, scale=8, panel=0.8)
+    blue = mat_paint('hull_droid_b', '#2f5f9a', color2='#23466e', wear=0.4, dirt=0.4, metal=0.3, scale=8, panel=0.5)
+    metal = mat_metal('metal_droid', '#7a7e84', 0.35, metal=0.85, grime=0.4)
+    dark = mat_rubber('dark_droid', '#18191b')
+    lens = mat_emit('glow_droid_eye', '#5ab8ff', 9)
+    red = mat_emit('glow_droid_red', '#ff3a2a', 10)
+    P = []
+    P.append(cyl('body', white, 0.27, 0.58, (0, 0, 0.52), rot=(0, 0, 0), n=32))
+    for k, z in enumerate((0.36, 0.66)):
+        P.append(lathe(f'band{k}', [(z - 0.03, 0.276), (z + 0.03, 0.276)], blue, n=32))
+        P[-1].rotation_euler = (R(90), 0, 0)
+    P.append(box('panel_front', blue, (0.2, 0.03, 0.18), (0, 0.27, 0.52), bevel=0.01))
+    P.append(box('vent', dark, (0.16, 0.03, 0.05), (0, 0.272, 0.42)))
+    P.append(sphere('head', white, 0.275, (0, 0, 0.81), scale=(1, 1, 0.85), seg=32, rings=16))
+    P.append(cyl('head_ring', metal, 0.28, 0.03, (0, 0, 0.815), rot=(0, 0, 0), n=32))
+    P.append(cyl('lens_mount', dark, 0.07, 0.06, (0, 0.24, 0.92), rot=(R(90), 0, 0), n=20))
+    P.append(sphere('lens', lens, 0.045, (0, 0.27, 0.92), seg=16, rings=8))
+    P.append(sphere('tally', red, 0.018, (0.1, 0.22, 0.97), seg=10, rings=6))
+    P.append(cyl('antenna', metal, 0.008, 0.18, (-0.12, -0.05, 1.08), rot=(R(-10), 0, 0), n=6))
+    for sx in (-1, 1):
+        P.append(box(f'shoulder{sx}', metal, (0.06, 0.14, 0.14), (0.3 * sx, 0, 0.66), bevel=0.02))
+        P.append(box(f'leg{sx}', white, (0.07, 0.16, 0.62), (0.34 * sx, 0.0, 0.36), rot=(R(-8), 0, 0), bevel=0.02))
+        P.append(box(f'tread{sx}', dark, (0.1, 0.32, 0.1), (0.34 * sx, 0.04, 0.05), bevel=0.03))
+    P.append(box('caster', dark, (0.12, 0.12, 0.08), (0, -0.05, 0.12), bevel=0.02))
+    # tool arm folded against the front
+    P.append(cyl('arm', metal, 0.018, 0.22, (0.12, 0.29, 0.5), rot=(R(20), 0, 0), n=8))
+    P.append(box('claw', metal, (0.05, 0.05, 0.03), (0.12, 0.33, 0.4)))
+    return P, [empty('eye', (0, 0.3, 0.92))], dict(dist=3.2, center=(0, 0, 0.55))
+
+
+def prop_mousedroid():
+    """Small floor droid that scurries between the ships: a low bevelled box on four wheels with a red sensor strip."""
+    shell = mat_paint('hull_mouse', '#3c4046', color2='#24272b', wear=0.6, dirt=0.6, metal=0.4, rough=0.45, scale=10, panel=0.7)
+    metal = mat_metal('metal_mouse', '#6e7278', 0.35, metal=0.85)
+    dark = mat_rubber('dark_mouse', '#151617')
+    red = mat_emit('glow_mouse', '#ff3a2a', 10)
+    P = []
+    P.append(box('shell', shell, (0.36, 0.52, 0.18), (0, 0, 0.15), bevel=0.04))
+    P.append(box('top_plate', metal, (0.24, 0.3, 0.02), (0, -0.04, 0.245), bevel=0.01))
+    P.append(box('sensor', red, (0.2, 0.02, 0.025), (0, 0.262, 0.17)))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            P.append(cyl(f'wheel{sx}{sy}', dark, 0.06, 0.04, (0.19 * sx, 0.17 * sy, 0.06), rot=(0, R(90), 0), n=14))
+    P.append(cyl('mast', metal, 0.006, 0.08, (0.08, -0.15, 0.29), rot=(0, 0, 0), n=6))
+    return P, [], dict(dist=1.6, center=(0, 0, 0.15))
+
+
+SHIPS.update({'prop_droid': prop_droid, 'prop_mousedroid': prop_mousedroid})
+
 # ------------------------------------------------------------------------------------------- moving parts
 # Fighters change shape for attack mode: classify(name, centre) picks the objects of each moving part,
 # hinges: part -> (hinge location, axis (Blender frame), cruise angle, attack angle) in degrees, relative to the modelled pose.
