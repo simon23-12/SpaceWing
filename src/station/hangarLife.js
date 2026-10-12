@@ -134,7 +134,8 @@ export class HangarLife {
   updatePad(pad, dt) {
     pad.wait -= dt;
     const m = pad.ship;
-    if (!m) {   // empty pad: a new ship comes in after a while
+    if (!m) {   // empty pad: a new ship comes in after a while (not while our own ship is landing)
+      if (this.room.cine) return;
       if (pad.wait <= 0 && !pad.loading) {
         pad.loading = true;
         this.loadShip().then(s => {

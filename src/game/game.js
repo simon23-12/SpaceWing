@@ -218,6 +218,7 @@ export class Game {
       ld.done();
     }
     this.mode = room;
+    if (opts.landing) room.landingCine?.();
     await this.fadeIn(0.6);
     if (opts.intro) await this.intro(opts.watched);
     this.checkStationEvents();
@@ -441,6 +442,13 @@ export class Game {
     for (const m of msgs) this.ui.notify(m);
     if (msgs.length) this.audio.coins();
     this.save();
+    // home: the ship flies into Hangar 7 and lands while the flight report is already up
+    if (sortie && STATIONS[stationId].walkable && !dlg) {
+      this.checkUnlocks();
+      await this.enterRoom('hangar', 'default', { landing: true });
+      this.ui.debrief(this.sortieReport(sortie, stationId), { side: true });
+      return;
+    }
     await this.enterStation(stationId);
     if (sortie) this.ui.debrief(this.sortieReport(sortie, stationId));
   }

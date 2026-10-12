@@ -513,6 +513,53 @@ export class RoomMode {
     });
   }
 
+  /**
+   * Coming home (about 11 s): the camera stands at the west end of the hall, the ship comes in through the bay,
+   * brakes over its pad, turns on the spot to face the bay again and settles down. Then you stand beside it.
+   */
+  landingCine() {
+    const ship = this.shipModel, H = this.parts.hangar;
+    if (!ship || !H) return;
+    const root = ship.root, end = root.position.clone(), q1 = root.quaternion.clone();
+    const yaw1 = new THREE.Euler().setFromQuaternion(q1, 'YXZ').y;
+    const from = new THREE.Vector3(92, end.y + 6, 11.5), above = end.clone().add(new THREE.Vector3(0, 4, 0));
+    const camPos = H.toWorld([-4, 2.6, 13]);
+    for (const pl of ship.plumes) pl.visible = true;
+    for (const gl of ship.glows) if (gl.engine) gl.mesh.material.color.copy(gl.base);
+    this.game.audio?.setEngine(true);
+    this.uiEl?.classList.add('hidden');
+    this.isRoom = false;
+    let t = 0;
+    const finish = () => {
+      this.cine = null; this.isRoom = true;
+      root.position.copy(end); root.quaternion.copy(q1);
+      for (const pl of ship.plumes) pl.visible = false;
+      for (const gl of ship.glows) if (gl.engine) gl.mesh.material.color.copy(gl.base).multiplyScalar(0.06);
+      this.game.audio?.setEngine(false);
+      this.uiEl?.classList.remove('hidden');
+      // on foot beside the ship, looking at it
+      const me = H.toWorld([-5, 0, 7]), at = root.getWorldPosition(new THREE.Vector3());
+      this.pos.copy(me); this.vel.set(0, 0, 0);
+      this.yaw = Math.atan2(-(at.x - me.x), -(at.z - me.z)); this.pitch = -0.08;
+      this.updateRoom(true);
+    };
+    this.cine = (room, dt) => {
+      t += dt;
+      const k1 = THREE.MathUtils.smoothstep(t, 0, 7);
+      const turn = THREE.MathUtils.smoothstep(t, 6.5, 9.2), down = THREE.MathUtils.smoothstep(t, 9.0, 11.2);
+      if (t < 7) root.position.lerpVectors(from, above, 1 - Math.pow(1 - k1, 2.2));
+      else root.position.copy(above).lerp(end, down);
+      root.rotation.set(0, yaw1 + Math.PI * (1 - turn), Math.sin(Math.min(1, t / 7) * Math.PI) * 0.06);
+      ship.update(dt, t < 6 ? 0.7 : 0.25, false);
+      this.game.audio?.engine?.(t < 6 ? 0.7 : 0.25, false);
+      const cam = this.camera, look = root.getWorldPosition(new THREE.Vector3());
+      cam.position.copy(camPos);
+      cam.lookAt(look.x, look.y + 0.4, look.z);
+      if (cam.fov !== 55) { cam.fov = 55; cam.updateProjectionMatrix(); }
+      if (t > 11.6) finish();
+    };
+  }
+
   /** Push a standing capsule out of the parked ships' boxes (in the ship's own frame, horizontally). */
   pushOutShips(np, r) {
     for (const s of this.shipBoxes || []) {

@@ -386,3 +386,7 @@ td.nowrap { white-space: nowrap; }
 .hud-attack.on { border-left-color: #ff6a3a; color: #ff9a6a; box-shadow: 0 0 14px rgba(255,106,58,.25); }
 .hud-attack.on .bar i { background: linear-gradient(90deg, #ff5a3a, #ffb050); }
 .hud.cockpit .hud-attack { display: none; }
+/* panel beside a running scene (landing in the hangar): no veil, docked to the right */
+.modal.side { background: none; backdrop-filter: none; justify-content: flex-end; align-items: flex-start; padding: 70px 28px 0; pointer-events: none; }
+.modal.side .panel { pointer-events: auto; width: min(560px, 92vw); max-height: calc(100vh - 100px); }
+.modal.side .debrief { grid-template-columns: repeat(2, 1fr); }

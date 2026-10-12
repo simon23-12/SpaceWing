@@ -210,8 +210,8 @@ export class UI {
   }
 
   // ------------------------------------------------------------------ modal panel scaffold
-  panel(title, sub, build, { onClose, wide, narrow } = {}) {
-    const wrap = $(`<div class="modal"><div class="panel${narrow ? ' narrow' : ''}"><header><h3>${title}</h3><div class="sub">${sub || ''}</div><div class="x">✕</div></header><div class="body"></div></div></div>`);
+  panel(title, sub, build, { onClose, wide, narrow, side } = {}) {
+    const wrap = $(`<div class="modal${side ? ' side' : ''}"><div class="panel${narrow ? ' narrow' : ''}"><header><h3>${title}</h3><div class="sub">${sub || ''}</div><div class="x">✕</div></header><div class="body"></div></div></div>`);
     const body = wrap.querySelector('.body');
     const close = () => { wrap.remove(); this.modalStack = this.modalStack.filter(m => m !== wrap); onClose && onClose(); this.game.onModalClosed?.(); };
     wrap.querySelector('.x').onclick = () => { this.sfx(); close(); };
@@ -463,7 +463,7 @@ export class UI {
   disposePreview() { this.pv?.dispose(); this.pv = null; this.pvWrap = null; }
 
   // ------------------------------------------------------------------ flight report after docking
-  debrief(r) {
+  debrief(r, { side = false } = {}) {
     const g = this.g, mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
     const tile = (label, value, sub = '', cls = '') => `<div class="dtile ${cls}"><label>${label}</label><b>${value}</b><span>${sub}</span></div>`;
     const salvPrice = price(g, r.station, 'schrott', 'sell');
@@ -484,7 +484,7 @@ export class UI {
         addCredits(g, n * salvPrice, `${n} t Bergungsschrott verkauft`); this.sfx('coins'); this.game.save(); rebuild();
       });
       body.querySelector('[data-ok]').onclick = () => { this.sfx(); close(); };
-    });
+    }, { side });
     this.sfx('blip');
   }
 
