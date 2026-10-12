@@ -148,20 +148,32 @@ const plumeFrag = `
     gl_FragColor = vec4(vec3(0.75, 0.85, 1.0) * d * fwd * 0.09 * gain, 1.0);
   }`;
 
+/** White-hot disc, a warm corona falling off softly and six faint diffraction spikes (additive sprite). */
 function makeSunTexture() {
-  const s = 256, c = document.createElement('canvas'); c.width = c.height = s;
+  const s = 1024, h = s / 2, c = document.createElement('canvas'); c.width = c.height = s;
   const g = c.getContext('2d');
-  const grd = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.globalCompositeOperation = 'lighter';
+  const grd = g.createRadialGradient(h, h, 0, h, h, h);
   grd.addColorStop(0, 'rgba(255,255,255,1)');
-  grd.addColorStop(0.04, 'rgba(255,250,235,1)');
-  grd.addColorStop(0.12, 'rgba(255,225,170,0.35)');
-  grd.addColorStop(0.35, 'rgba(255,190,120,0.08)');
+  grd.addColorStop(0.022, 'rgba(255,253,246,1)');
+  grd.addColorStop(0.036, 'rgba(255,238,205,0.7)');
+  grd.addColorStop(0.06, 'rgba(255,216,165,0.3)');
+  grd.addColorStop(0.12, 'rgba(255,192,128,0.1)');
+  grd.addColorStop(0.25, 'rgba(255,168,104,0.035)');
+  grd.addColorStop(0.5, 'rgba(255,150,90,0.009)');
   grd.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = grd; g.fillRect(0, 0, s, s);
-  // faint anamorphic streak
-  const st = g.createLinearGradient(0, 0, s, 0);
-  st.addColorStop(0, 'rgba(160,190,255,0)'); st.addColorStop(0.5, 'rgba(200,220,255,0.55)'); st.addColorStop(1, 'rgba(160,190,255,0)');
-  g.fillStyle = st; g.fillRect(0, s / 2 - 1.5, s, 3);
+  // diffraction spikes: thin, tapering, slightly uneven
+  g.translate(h, h);
+  for (let i = 0; i < 6; i++) {
+    g.save(); g.rotate(i * Math.PI / 3 + 0.26);
+    const len = h * (i % 2 ? 0.55 : 0.8), w = s * 0.0022;
+    const sp = g.createLinearGradient(0, 0, len, 0);
+    sp.addColorStop(0, 'rgba(255,245,225,0.5)'); sp.addColorStop(0.25, 'rgba(255,225,185,0.14)'); sp.addColorStop(1, 'rgba(255,200,150,0)');
+    g.fillStyle = sp;
+    g.beginPath(); g.moveTo(0, -w); g.lineTo(len, 0); g.lineTo(0, w); g.closePath(); g.fill();
+    g.restore();
+  }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -240,8 +252,8 @@ export class SkyLayer {
     }
 
     // Sun glare sprite (very far away along sunDir)
-    this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeSunTexture(), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, color: new THREE.Color(6, 5.6, 5) }));
-    this.sunSprite.scale.setScalar(3.2e6);
+    this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeSunTexture(), blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, color: new THREE.Color(9, 8.5, 7.8) }));
+    this.sunSprite.scale.setScalar(1.8e7);
     this.scene.add(this.sunSprite);
     // Enceladus geysers (south pole plumes)
     const enc = this.moons.enceladus;

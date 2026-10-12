@@ -54,6 +54,61 @@ const plumeFrag = `
     gl_FragColor = vec4(c * a * (layer > 0.5 ? 0.75 : 1.8), 1.0);
   }`;
 
+// Nozzle disc seen from behind: white-hot core, engine colour, a darker lip, slow turbulent swirl.
+const nozzleVert = `
+  attribute vec3 nzOff; varying vec3 vOff;
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
+  void main(){
+    vOff = nzOff;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    #include <logdepthbuf_vertex>
+  }`;
+const nozzleFrag = `
+  uniform vec3 color; uniform float power, time;
+  varying vec3 vOff;
+  #include <logdepthbuf_pars_fragment>
+  void main(){
+    #include <logdepthbuf_fragment>
+    float r = clamp(length(vOff), 0.0, 1.0);
+    float lvl = max(color.r, max(color.g, color.b));     // the hangar dims engines through the colour
+    vec3 tint = color / max(lvl, 1e-4);
+    float ang = atan(vOff.y, vOff.x);
+    float swirl = 0.88 + 0.12 * sin(ang * 9.0 + r * 7.0 - time * 6.0) * sin(ang * 4.0 - time * 2.3);
+    float rings = 0.92 + 0.08 * sin(r * 28.0 - time * (8.0 + 14.0 * power));
+    vec3 core = mix(vec3(1.0), pow(tint, vec3(1.7)), smoothstep(0.0, 0.5 - 0.2 * (1.0 - power), r));
+    float bright = mix(1.0, 0.32, smoothstep(0.25, 1.0, r)) * (0.4 + 1.6 * power);
+    vec3 c = core * bright * swirl * rings;
+    c *= mix(1.0, 0.35, smoothstep(0.86, 1.0, r));   // the nozzle lip stays darker
+    gl_FragColor = vec4(c * lvl * 1.6, 1.0);
+  }`;
+
+/** Per vertex: offset from the centre of its disc, in disc radii (glow meshes hold several joined discs). */
+function nozzleOffsets(geo) {
+  const pos = geo.attributes.position, n = pos.count, parent = new Int32Array(n).map((_, i) => i);
+  const find = i => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
+  const idx = geo.index ? geo.index.array : Array.from({ length: n }, (_, i) => i);
+  for (let i = 0; i < idx.length; i += 3) { const a = find(idx[i]); parent[find(idx[i + 1])] = a; parent[find(idx[i + 2])] = a; }
+  // glTF splits vertices at hard edges: also merge pieces that share a position (cap + side of one disc)
+  const key = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = `${pos.getX(i).toFixed(4)},${pos.getY(i).toFixed(4)},${pos.getZ(i).toFixed(4)}`;
+    if (key.has(k)) parent[find(i)] = find(key.get(k)); else key.set(k, i);
+  }
+  const groups = new Map();
+  for (let i = 0; i < n; i++) { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); }
+  const off = new Float32Array(n * 3), c = new THREE.Vector3(), p = new THREE.Vector3();
+  for (const vs of groups.values()) {
+    c.set(0, 0, 0);
+    for (const i of vs) c.add(p.fromBufferAttribute(pos, i));
+    c.divideScalar(vs.length);
+    let R = 1e-6;
+    for (const i of vs) R = Math.max(R, p.fromBufferAttribute(pos, i).distanceTo(c));
+    for (const i of vs) { p.fromBufferAttribute(pos, i).sub(c).divideScalar(R); off.set([p.x, p.y, p.z], i * 3); }
+  }
+  geo.setAttribute('nzOff', new THREE.BufferAttribute(off, 3));
+}
+
 let glowTex = null;
 function nozzleGlowTex() {
   if (glowTex) return glowTex;
@@ -149,10 +204,15 @@ export class ShipModel {
         const hex = (o.userData && o.userData.glow_color) || '#ffffff';
         const isEngine = n.includes('engine');
         const c = isEngine ? engineColor.clone() : new THREE.Color(hex);
-        o.material = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(isEngine ? 2 : 4), toneMapped: false });
+        if (isEngine) {
+          if (!o.geometry.attributes.nzOff) nozzleOffsets(o.geometry);
+          o.material = new THREE.ShaderMaterial({ vertexShader: nozzleVert, fragmentShader: nozzleFrag,
+            uniforms: { color: { value: c.clone() }, power: { value: 0.5 }, time: { value: Math.random() * 10 } } });
+          o.material.color = o.material.uniforms.color.value;
+        } else o.material = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(4), toneMapped: false });
         this.glows.push({ mesh: o, base: c, engine: isEngine, blink: n.includes('white') });
       } else if (o.isMesh && n.startsWith('glass')) {
-        o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1016, metalness: 0.0, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 2.2, transparent: true, opacity: 0.9 });
+        o.material = new THREE.MeshPhysicalMaterial({ color: 0x0a1016, metalness: 0.0, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 2.2, transparent: true, opacity: 0.9 });
       } else if (n.startsWith('exhaust')) this.exhausts.push(o);
       else if (n.startsWith('gun')) this.guns.push(o);
       else if (n === 'cockpit') this.cockpit = o;
@@ -213,7 +273,7 @@ export class ShipModel {
       U.glow.scale.setScalar(U.radius * (1.9 + p * 1.1 + this.boostK * 1.0));
     }
     for (const g of this.glows) {
-      if (g.engine) g.mesh.material.color.copy(g.base).multiplyScalar(0.5 + 1.5 * p);
+      if (g.engine) { const u = g.mesh.material.uniforms; u.power.value = p; u.time.value += dt; }
       else if (g.blink) g.mesh.visible = (this.time % 1.4) < 0.08;
     }
   }

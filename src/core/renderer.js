@@ -5,6 +5,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
+const _sv = new THREE.Vector3(), _sz = new THREE.Vector2();
+
 // Final grade: subtle vignette + film grain + chromatic fringe at the edges.
 const GradeShader = {
   uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, grain: { value: 0.035 }, hit: { value: 0 }, tint: { value: [1, 1, 1] }, tintAmt: { value: 0 }, flash: { value: 0 } },
@@ -29,14 +31,61 @@ const GradeShader = {
     }`,
 };
 
-// Replaces NaN/Inf pixels before bloom so one bad fragment can never smear into a black block.
+// Replaces NaN/Inf pixels before bloom so one bad fragment can never smear into a black block. Very hot pixels
+// (a sun glint on a mirror-smooth canopy) are capped too, or the bloom smears them into a glowing square.
 const SanitizeShader = {
   uniforms: { tDiffuse: { value: null } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
     void main(){ vec4 c = texture2D(tDiffuse, vUv);
       bool ok = (c.r > -1.0 && c.r < 60000.0) && (c.g > -1.0 && c.g < 60000.0) && (c.b > -1.0 && c.b < 60000.0);
-      gl_FragColor = ok ? vec4(c.rgb, 1.0) : vec4(0.0, 0.0, 0.0, 1.0); }`,
+      gl_FragColor = ok ? vec4(min(c.rgb, vec3(14.0)), 1.0) : vec4(0.0, 0.0, 0.0, 1.0); }`,
+};
+
+// Lens flare of the sun: glare, a faint anamorphic streak, a halo ring and a few ghosts mirrored through the
+// screen centre. Visibility is read from the frame itself (the sun's own pixels), so the ship, a moon or a
+// station wall in front of the sun dims the flare without any extra occlusion pass.
+const FlareShader = {
+  uniforms: { tDiffuse: { value: null }, sunPos: { value: [0.5, 0.5] }, aspect: { value: 1 }, strength: { value: 0 }, px: { value: [0.001, 0.001] } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 sunPos, px; uniform float aspect, strength; varying vec2 vUv;
+    float lum(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+    float tap(vec2 o){ return smoothstep(1.2, 3.0, lum(texture2D(tDiffuse, sunPos + o * px).rgb)); }
+    vec3 ghost(vec2 p, vec2 at, float r, vec3 col){
+      float d = length(p - at) / r;
+      return col * (smoothstep(1.0, 0.82, d) * (0.55 + 0.45 * d * d) + 0.25 * smoothstep(1.6, 0.0, d));
+    }
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      if (strength <= 0.0) { gl_FragColor = vec4(c, 1.0); return; }
+      float vis = (tap(vec2(0.0)) * 2.0 + tap(vec2(3.0, 0.0)) + tap(vec2(-3.0, 0.0)) + tap(vec2(0.0, 3.0)) + tap(vec2(0.0, -3.0))
+                 + tap(vec2(2.0, 2.0)) + tap(vec2(-2.0, 2.0)) + tap(vec2(2.0, -2.0)) + tap(vec2(-2.0, -2.0))) / 10.0;
+      vis *= strength;
+      if (vis <= 0.001) { gl_FragColor = vec4(c, 1.0); return; }
+      vec2 asp = vec2(aspect, 1.0);
+      vec2 p = (vUv - 0.5) * asp, s = (sunPos - 0.5) * asp;
+      vec2 d = p - s; float r = length(d);
+      vec3 warm = vec3(1.0, 0.86, 0.66);
+      vec3 f = vec3(0.0);
+      // soft glare around the disc and a thin, cool anamorphic streak
+      f += warm * (exp(-r * 11.0) * 0.16 + exp(-r * 40.0) * 0.5);
+      f += vec3(0.55, 0.7, 1.0) * exp(-abs(d.y) * 500.0) * exp(-abs(d.x) * 5.5) * 0.22;
+      // faint chromatic halo ring
+      float ring = r - 0.29;
+      f += vec3(exp(-pow((ring + 0.006) * 70.0, 2.0)), exp(-pow(ring * 70.0, 2.0)), exp(-pow((ring - 0.006) * 70.0, 2.0)))
+           * vec3(0.9, 0.75, 0.6) * 0.0055 * smoothstep(0.05, 0.25, r);
+      // ghosts along the line through the centre
+      f += ghost(p, s * -0.35, 0.035, vec3(0.30, 0.55, 0.45)) * 0.10;
+      f += ghost(p, s * -0.62, 0.075, vec3(0.45, 0.35, 0.75)) * 0.07;
+      f += ghost(p, s * 0.42, 0.022, vec3(0.9, 0.6, 0.3)) * 0.12;
+      f += ghost(p, s * -1.05, 0.13, vec3(0.35, 0.5, 0.8)) * 0.03;
+      f += ghost(p, s * -1.4, 0.045, vec3(0.8, 0.5, 0.35)) * 0.08;
+      f += ghost(p, s * -0.15, 0.012, vec3(0.6, 0.85, 1.0)) * 0.16;
+      // slight veiling glare over the whole frame when looking into the sun
+      f += warm * 0.012;
+      gl_FragColor = vec4(c + f * vis, 1.0);
+    }`,
 };
 
 export class Renderer {
@@ -60,6 +109,8 @@ export class Renderer {
     this.composer.addPass(this.passFar);
     this.composer.addPass(this.passNear);
     this.composer.addPass(new ShaderPass(SanitizeShader));
+    this.flare = new ShaderPass(FlareShader);
+    this.composer.addPass(this.flare);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.composer.addPass(this.grade);
@@ -71,6 +122,7 @@ export class Renderer {
   /** far: {scene, camera} rendered first (km units), near: {scene, camera} on top (m units). near may be null. */
   setLayers(far, near) {
     this.passFar.scene = far.scene; this.passFar.camera = far.camera;
+    this.far = far;
     this.passNear.enabled = !!near;
     if (near) { this.passNear.scene = near.scene; this.passNear.camera = near.camera; }
     this.cameras = [far.camera, near && near.camera].filter(Boolean);
@@ -113,8 +165,28 @@ export class Renderer {
     for (const o of hidden) o.visible = false;
   }
 
+  /** Where the far layer's sun lands on screen; the flare fades out towards the edges and behind the camera. */
+  updateFlare() {
+    const u = this.flare.uniforms, sun = this.far?.sunSprite, cam = this.far?.camera;
+    u.strength.value = 0;
+    if (!sun || !sun.visible || !cam) return;
+    cam.updateMatrixWorld();
+    _sv.copy(sun.position).applyMatrix4(cam.matrixWorldInverse);
+    if (_sv.z >= 0) return;
+    _sv.applyMatrix4(cam.projectionMatrix);
+    const x = _sv.x * 0.5 + 0.5, y = _sv.y * 0.5 + 0.5;
+    const edge = Math.min(x, 1 - x, y, 1 - y);
+    if (edge < 0.003) return;
+    u.sunPos.value = [x, y];
+    u.strength.value = Math.min(1, edge / 0.06);
+    u.aspect.value = cam.aspect;
+    const size = this.gl.getDrawingBufferSize(_sz);
+    u.px.value = [1 / size.x, 1 / size.y];
+  }
+
   render(dt) {
     this.grade.uniforms.time.value += dt;
+    this.updateFlare();
     this.composer.render(dt);
   }
 }
