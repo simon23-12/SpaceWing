@@ -428,15 +428,21 @@ export class Game {
     else if (st && st.onDock && g.flags['accepted:' + g.story]) dlg = st.onDock(this, stationId);
     const scene = dlg && dlg[0]?.scene;
     if (dlg) {
-      this.mode = { kind: 'cutscene', render3D: false };
-      const bg = document.createElement('div');
-      bg.className = 'overview';
-      const img = { hangar: 'assets/ui/hangar.jpg', bar: 'assets/ui/bar.jpg', kraken: 'assets/ui/kraken.jpg', vault: 'assets/ui/vault.jpg', quelle: 'assets/ui/dock.jpg' }[scene] || 'assets/ui/overview.jpg';
-      bg.innerHTML = `<div class="img" style="inset:0;background-image:url(${assets.url(img)}), url(${assets.url('assets/ui/overview.jpg')})"></div>`;
-      document.getElementById('ui').appendChild(bg);
+      // on Cassini the scene plays in the live deck (today's people, not the old stills); elsewhere a still
+      const live = STATIONS[stationId].walkable && await this.cutsceneRoom(scene === 'hangar' || scene === 'bar' ? scene : 'bruecke');
+      let bg = null;
+      if (!live) {
+        this.mode = { kind: 'cutscene', render3D: false };
+        bg = document.createElement('div');
+        bg.className = 'overview';
+        const img = { hangar: 'assets/ui/hangar.jpg', bar: 'assets/ui/bar.jpg', kraken: 'assets/ui/kraken.jpg', vault: 'assets/ui/vault.jpg', quelle: 'assets/ui/dock.jpg' }[scene] || 'assets/ui/overview.jpg';
+        bg.innerHTML = `<div class="img" style="inset:0;background-image:url(${assets.url(img)}), url(${assets.url('assets/ui/overview.jpg')})"></div>`;
+        document.getElementById('ui').appendChild(bg);
+      }
       await this.fadeIn(0.6);
       await this.ui.dialog(dlg);
-      bg.remove();
+      bg?.remove();
+      if (live) { await this.fadeOut(0.5); await this.leaveMode(); }
       if (g.flags.endingShown && !g.flags.creditsShown) { g.flags.creditsShown = true; await this.credits(); }
     }
     for (const m of msgs) this.ui.notify(m);
@@ -451,6 +457,43 @@ export class Game {
     }
     await this.enterStation(stationId);
     if (sortie) this.ui.debrief(this.sortieReport(sortie, stationId));
+  }
+
+  /**
+   * Background for a story scene on Cassini: the walkable deck in cine mode with a fixed, slowly drifting camera.
+   * bar: on Mags' table; hangar: on the parked ship; bruecke: across the command deck. Returns false if it fails.
+   */
+  async cutsceneRoom(roomId) {
+    const ld = this.ui.loading('HOCHSTATION CASSINI');
+    let t = 0, shot = null;
+    const room = new RoomMode(this, roomId, 'default', { cine: (r, dt) => {
+      t += dt;
+      if (!shot) {
+        const V = (x, y, z) => new THREE.Vector3(x, y, z);
+        if (roomId === 'bar') {
+          const m = r.npcs.find(n => n.id === 'mags') || r.npcs.find(n => n.id === 'juno') || r.npcs.find(n => n.id === 'kix');
+          const at = m ? m.obj.position.clone().add(V(0, 1.1, 0)) : r.findSpawn('bar', 'default').pos.clone().add(V(0, 1.2, 0));
+          const dir = m?.marker?.dir?.clone() || V(0, 0, 1);
+          shot = { at, from: at.clone().addScaledVector(dir, 2.8).add(V(dir.z * 1.4, 0.45, -dir.x * 1.4)) };
+        } else if (roomId === 'hangar' && r.shipModel) {
+          const at = r.shipModel.root.getWorldPosition(new THREE.Vector3());
+          shot = { at, from: r.parts.hangar.toWorld([-8, 2.2, 9]) };
+        } else {
+          const sp = r.findSpawn(roomId, 'default');
+          shot = { at: sp.pos.clone().addScaledVector(sp.dir, 8).add(V(0, 1.4, 0)), from: sp.pos.clone().add(V(0, 1.8, 0)) };
+        }
+      }
+      const cam = r.camera;
+      cam.position.copy(shot.from).add(new THREE.Vector3(Math.sin(t * 0.15) * 0.25, Math.sin(t * 0.21) * 0.05, 0));
+      cam.lookAt(shot.at);
+      if (cam.fov !== 50) { cam.fov = 50; cam.updateProjectionMatrix(); }
+    } });
+    try { await room.init(); } catch (e) { console.error(e); ld.done(); room.dispose?.(); return false; }
+    ld.done();
+    this.renderer.setLayers(room.sky, { scene: room.scene, camera: room.camera });
+    this.mode = room;
+    this.audio.setMusic(roomId === 'bar' ? 'jazz' : 'station');
+    return true;
   }
 
   /** Numbers for the flight report after docking. */

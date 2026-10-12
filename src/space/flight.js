@@ -355,7 +355,7 @@ export class FlightMode {
     m.position.copy(ship.pos).addScaledVector(ship.up(new THREE.Vector3()), -ship.radius * 0.25);
     m.quaternion.copy(ship.quat);
     this.scene.add(m);
-    this.missiles.push({ mesh: m, vel: ship.vel.clone().addScaledVector(ship.forward(new THREE.Vector3()), 60), target, owner: ship, life: 9, dmg: 140 });
+    this.missiles.push({ mesh: m, vel: ship.vel.clone().addScaledVector(ship.forward(new THREE.Vector3()), 60), target, owner: ship, life: 9, dmg: 140, snd: this.game.audio?.missileLoop?.() });
     this.game.audio?.missile();
     return true;
   }
@@ -1015,7 +1015,15 @@ export class FlightMode {
       }
       m.mesh.position.addScaledVector(m.vel, dt);
       this.trails.emit(m.mesh.position, new THREE.Vector3().randomDirection().multiplyScalar(2), new THREE.Color(2.5, 1.6, 0.9), 1.4, 0.5, 3);
-      if (m.life <= 0) { this.scene.remove(m.mesh); this.missiles.splice(i, 1); }
+      // flight sound: louder when close, panned to its side, the whistle rises as it closes in on the camera
+      if (m.snd) {
+        const cam = this.camera, rel = _v.copy(m.mesh.position).sub(cam.position), d = rel.length();
+        const near = Math.max(0, 1 - d / 1800);
+        const right = _w.set(1, 0, 0).applyQuaternion(cam.quaternion);
+        const closing = THREE.MathUtils.clamp(-m.vel.dot(rel) / Math.max(d, 1) / 520, 0, 1);
+        m.snd.set(near * near * (m.owner?.isPlayer ? 0.32 : 0.45), rel.dot(right) / Math.max(d, 1), closing);
+      }
+      if (m.life <= 0) { m.snd?.stop(); this.scene.remove(m.mesh); this.missiles.splice(i, 1); }
     }
   }
 
@@ -1065,6 +1073,7 @@ export class FlightMode {
   }
 
   dispose() {
+    for (const m of this.missiles) m.snd?.stop();
     this.streaks?.dispose();
     this.hud.dispose();
     this.game.ui.cockpit(false);

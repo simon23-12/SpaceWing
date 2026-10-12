@@ -263,6 +263,44 @@ export class Audio {
     const ng = C.createGain(); ng.gain.setValueAtTime(0.0001, t + 1.7); ng.gain.linearRampToValueAtTime(0.18, t + 1.8); ng.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
     n.connect(nf).connect(ng).connect(this.sfx); n.start(t + 1.6); n.stop(t + 2.9);
   }
+  /**
+   * A missile in flight: rocket roar (band-passed noise with a little flutter) and a thin whistle, panned and
+   * pitched by the caller every frame (set(volume, pan -1..1, closing 0..1)); stop() lets it die out.
+   */
+  missileLoop() {
+    if (!this.ctx) return null;
+    const C = this.ctx, t = C.currentTime;
+    this.liveMissiles = (this.liveMissiles || 0) + 1;
+    if (this.liveMissiles > 8) { this.liveMissiles--; return null; }
+    const n = this.noiseSource(true);
+    const bp = C.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+    const lfo = C.createOscillator(); lfo.frequency.value = 17 + Math.random() * 6;
+    const lg = C.createGain(); lg.gain.value = 220; lfo.connect(lg).connect(bp.frequency);
+    const o = C.createOscillator(); o.type = 'sine'; o.frequency.value = 1700 + Math.random() * 200;
+    const og = C.createGain(); og.gain.value = 0.18;
+    const g = C.createGain(); g.gain.value = 0;
+    const pan = C.createStereoPanner ? C.createStereoPanner() : null;
+    n.connect(bp).connect(g); o.connect(og).connect(g);
+    (pan ? g.connect(pan) : g).connect(this.sfx);
+    n.start(t, Math.random()); o.start(t); lfo.start(t);
+    let dead = false;
+    return {
+      set: (vol, p = 0, closing = 0) => {
+        if (dead) return;
+        const now = C.currentTime;
+        g.gain.setTargetAtTime(vol, now, 0.05);
+        if (pan) pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, p)), now, 0.05);
+        o.frequency.setTargetAtTime(1500 + 900 * closing, now, 0.08);
+        bp.frequency.setTargetAtTime(700 + 600 * closing, now, 0.08);
+      },
+      stop: () => {
+        if (dead) return; dead = true; this.liveMissiles--;
+        const now = C.currentTime;
+        g.gain.cancelScheduledValues(now); g.gain.setTargetAtTime(0, now, 0.08);
+        for (const s of [n, o, lfo]) s.stop(now + 0.5);
+      },
+    };
+  }
   lockTone() { this.beep(1320, 0.12, 0.08); setTimeout(() => this.beep(1320, 0.12, 0.08), 140); }
   /**
    * Wings moving into the attack pose (or back): a hydraulic release hiss, a servo motor whining up (down when

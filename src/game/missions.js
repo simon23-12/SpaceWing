@@ -78,14 +78,26 @@ function cargoJob(g, r, station, to, id, tier) {
     text: `${client} sucht einen Piloten für ${amount} ${COMMODITIES[com].unit} ${COMMODITIES[com].name} nach ${STATIONS[to].name}.${risk ? ' Piratenaktivität auf der Route gemeldet.' : ''}${local ? ` Kein Hyperraumsprung nötig: Raumsprung im ${MOONS[moonOfStation(station)].name}-System.` : jumpNote(STATIONS[station].zone, STATIONS[to].zone)}` };
 }
 
-/** Freight inside the current moon system never runs out: the board is topped up whenever it runs low. */
+function bountyJob(g, r, station, zone, id, tier) {
+  const count = 2 + Math.floor(r() * (2 + tier));
+  const pay = Math.round((700 + count * 420 + tier * 300) / 10) * 10;
+  return { id, kind: 'kopfgeld', zone, count, pay, client: 'Söldnerbörse',
+    title: `Kopfgeld: ${count} Schakale bei ${ZONES[zone].name.split(' · ').pop()}`,
+    text: `Eine Schakal-Rotte lauert bei ${ZONES[zone].name}. Zahlung pro Abschuss, Bonus bei Vollzug.${jumpNote(STATIONS[station].zone, zone)}` };
+}
+
+/** Freight and bounties inside the current moon system never run out: the board is topped up whenever it runs low. */
 function topUpLocal(g, station, board) {
   const local = openStations(g).filter(s => s !== station && moonOfStation(s) === moonOfStation(station));
-  if (!local.length) return;
   const tier = Math.min(4, Math.floor((g.earned || 0) / 15000));
   const r = rnd(g.day * 104729 + (g.jobSeq = (g.jobSeq || 0) + 1) * 7477);
-  while (board.jobs.filter(j => j.kind === 'fracht' && local.includes(j.to)).length < 3) {
+  while (local.length && board.jobs.filter(j => j.kind === 'fracht' && local.includes(j.to)).length < 3) {
     board.jobs.unshift(cargoJob(g, r, station, local[Math.floor(r() * local.length)], `L${g.day}-${station}-${g.jobSeq}-${board.jobs.length}`, tier));
+  }
+  // bounties in this moon system (never on the Iapetus archive zone)
+  const zones = MOONS[moonOfStation(station)].zones.filter(z => !ZONES[z].hostile && z !== 'iapetus');
+  while (zones.length && board.jobs.filter(j => j.kind === 'kopfgeld' && zones.includes(j.zone)).length < 2) {
+    board.jobs.push(bountyJob(g, r, station, zones[Math.floor(r() * zones.length)], `B${g.day}-${station}-${g.jobSeq}-${board.jobs.length}`, tier));
   }
 }
 
@@ -105,12 +117,7 @@ export function generateJobs(g, station) {
       jobs.push(cargoJob(g, r, station, others[Math.floor(r() * others.length)], id, tier));
     } else if (kind === 'kopfgeld') {
       const zones = openZones(g).filter(z => z !== 'iapetus');
-      const zone = zones[Math.floor(r() * zones.length)];
-      const count = 2 + Math.floor(r() * (2 + tier));
-      const pay = Math.round((700 + count * 420 + tier * 300) / 10) * 10;
-      jobs.push({ id, kind, zone, count, pay, client: 'Söldnerbörse',
-        title: `Kopfgeld: ${count} Schakale bei ${ZONES[zone].name.split(' ·')[0]}`,
-        text: `Eine Schakal-Rotte lauert bei ${ZONES[zone].name}. Zahlung pro Abschuss, Bonus bei Vollzug.${jumpNote(STATIONS[station].zone, zone)}` });
+      jobs.push(bountyJob(g, r, station, zones[Math.floor(r() * zones.length)], id, tier));
     } else {
       const zone = STATIONS[station].zone;
       const pay = Math.round((1200 + tier * 500 + r() * 600) / 10) * 10;
