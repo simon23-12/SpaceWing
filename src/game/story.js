@@ -335,13 +335,13 @@ export const STORY = {
         jump('rhea');
       } else if (f.zoneId === 'rhea' && stage >= 1) {
         const d = f.station.dock;
-        p.ai = { mode: 'goto', point: d.pos.clone().addScaledVector(d.dir, 900), throttle: 0.6, arrive: 200 };
+        p.ai = { mode: 'goto', point: d.pos.clone().addScaledVector(d.dir, 600), throttle: 0.6, arrive: 150 };
         await c.wait(2);
         c.say('Mags', 'Da ist sie, unsere Cassini. Ich bring uns rein.', 'ringgilde');
         c.objective('Mags dockt an der Hochstation Cassini an');
-        await c.until(() => p.ai.mode !== 'goto' || c.near(d.pos, 1200));
+        await c.until(() => p.ai.mode !== 'goto' || c.near(d.pos, 800));
         g.flags.m1stage = 2;
-        f.requestDock();
+        f.requestDock(true);
       } else {
         await c.wait(2);
         jump('enceladus');

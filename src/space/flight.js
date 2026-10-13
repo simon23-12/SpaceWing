@@ -576,14 +576,15 @@ export class FlightMode {
     return this.player.pos.distanceTo(this.station.dock.pos) < DOCK_RANGE;
   }
 
-  requestDock() {
+  /** scripted: a mission pilot docks (gunner seat), so range and nearby hostiles do not block it. */
+  requestDock(scripted = false) {
     if (this.state !== 'flying') return;
     if (this.opts.sim) { this.game.endSim(this, null); return; }
     if (this.missionBlocksDock) { this.hud.showToast(this.missionBlocksDock, 2.5); return; }
     if (!this.station) { this.hud.showToast('Keine Station in Reichweite', 2); return; }
     if (this.zone.hostile) { this.hud.showToast('Andocken verweigert', 2); return; }
-    if (!this.canDock()) { this.hud.showToast('Zu weit entfernt – in die beleuchtete Anflugschneise, näher als 1 km an die Andockbucht', 2.5); return; }
-    if (!this.allowHotDock && this.ships.some(s => s.alive && this.isHostile(s, this.player) && s.pos.distanceTo(this.player.pos) < 3000)) {
+    if (!scripted && !this.canDock()) { this.hud.showToast('Zu weit entfernt – in die beleuchtete Anflugschneise, näher als 1 km an die Andockbucht', 2.5); return; }
+    if (!scripted && !this.allowHotDock && this.ships.some(s => s.alive && this.isHostile(s, this.player) && s.pos.distanceTo(this.player.pos) < 3000)) {
       this.hud.showToast('Andocken unmöglich – Feinde in der Nähe', 2.5); return;
     }
     const d = this.station.dock;
